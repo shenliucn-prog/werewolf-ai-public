@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>狼人杀 · 暗夜茶馆</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand" id="brand">🐺 暗夜茶馆 · 狼人杀</div>
+    <div class="controls">
+      <select id="board" title="选择板子"></select>
+      <label><span data-i18n="你的角色">你的角色</span> <select id="playerRole" aria-label="你的角色"><option value="random" data-i18n="随机身份">随机身份</option></select></label>
+      <select id="locale" title="Language"><option value="zh-CN">中文</option><option value="en">English</option></select>
+      <label><input id="conjectureMode" type="checkbox"><span data-i18n="猜想模式（测试版）">猜想模式（测试版）</span></label>
+      <details class="llm-settings">
+        <summary data-i18n="名字与人格">名字与人格</summary>
+        <div class="llm-settings-body" style="max-height:70vh;overflow:auto">
+          <p data-i18n="每位NPC可选每局随机或固定人格；开局后锁定。">每位NPC可选每局随机或固定人格；开局后锁定。</p>
+          <button id="randomNames" type="button" data-i18n="随机名字">随机名字</button>
+          <div id="castNames"></div>
+          <p id="castError" role="alert"></p>
+        </div>
+      </details>
+      <details class="llm-settings">
+        <summary data-i18n="模型设置">模型设置</summary>
+        <div class="llm-settings-body">
+          <label><span data-i18n="模式">模式</span> <select id="llmMode"><option value="" data-i18n="使用服务器默认">使用服务器默认</option><option value="local" data-i18n="只用本地 AI">只用本地 AI</option><option value="custom" data-i18n="本局自带 Key">本局自带 Key</option></select></label>
+          <label><span data-i18n="接口地址">接口地址</span> <input id="llmBaseUrl" placeholder="https://.../v1" autocomplete="off"></label>
+          <label><span data-i18n="模型名">模型名</span> <input id="llmModel" placeholder="例如 gpt-4o-mini" autocomplete="off"></label>
+          <label>API Key <input id="llmApiKey" type="password" placeholder="仅用于本局，不保存" autocomplete="off"></label>
+          <label><span data-i18n="推理强度">推理强度</span> <input id="llmReasoningEffort" placeholder="可选，如 medium" autocomplete="off"></label>
+          <label><span data-i18n="推理字段">推理字段</span> <input id="llmReasoningParam" placeholder="可选，如 reasoning_effort" autocomplete="off"></label>
+        </div>
+      </details>
+      <button id="newGame">开始新游戏</button>
+      <span id="status" class="status" role="status"></span>
+    </div>
+  </header>
+  <p class="mode-note" style="margin:12px 24px" data-i18n="当前仅文字驱动。语音与视觉玩法尚无方案、尚未实现；头像仅作装饰。猜想模式要求双表并保留公开历史，不等于完美推理。">当前仅文字驱动。语音与视觉玩法尚无方案、尚未实现；头像仅作装饰。猜想模式要求双表并保留公开历史，不等于完美推理。</p>
+
+  <p id="boardDescription" style="margin:12px 24px" aria-live="polite"></p>
+  <details class="quick-help">
+    <summary data-i18n="第一次玩？两分钟规则">第一次玩？两分钟规则</summary>
+    <p data-i18n="先选经典板、只用本地AI、关闭猜想模式。夜晚按私密提示行动；白天发言、比较声明、投票放逐。">先选经典板、只用本地AI、关闭猜想模式。夜晚按私密提示行动；白天发言、比较声明、投票放逐。</p>
+    <p data-i18n="全部狼人出局则好人胜；全部神职或全部平民出局则狼人胜。死者公开翻牌，警长放逐票重1.5票，平票无人出局。">全部狼人出局则好人胜；全部神职或全部平民出局则狼人胜。死者公开翻牌，警长放逐票重1.5票，平票无人出局。</p>
+    <p data-i18n="不懂就问主持人，不消耗行动。原有女巫每局两瓶药，每夜择一；神女巫看本局规则。断线不能续局。">不懂就问主持人，不消耗行动。原有女巫每局两瓶药，每夜择一；神女巫看本局规则。断线不能续局。</p>
+  </details>
+  <main class="layout">
+    <!-- 左侧：牌桌 -->
+    <section class="table-wrap">
+      <div id="phase-banner" class="phase-banner"></div>
+      <div class="table" id="table">
+        <div class="moon" id="moon">🌕</div>
+        <div class="center-logo">狼<br>人<br>杀</div>
+      </div>
+    </section>
+
+    <!-- 右侧：信息流 -->
+    <aside class="sidebar">
+      <div class="player-card" id="playerCard">
+        <div class="pc-title" id="identityTitle">你的身份</div>
+        <div class="pc-body" id="playerBody">尚未入局</div>
+      </div>
+      <div class="host-chat">
+        <div class="pc-title" id="hostChatTitle">🎙️ 问主持人（规则单聊）</div>
+        <div class="host-chat-log" id="hostChatLog">我只解释规则和公开流程，不会泄露身份或替你决策。</div>
+        <div class="host-chat-entry">
+          <input id="hostQuestion" aria-labelledby="hostChatTitle" placeholder="例如：女巫怎么用药？" maxlength="320">
+          <button id="askHost" data-i18n="提问">提问</button>
+        </div>
+      </div>
+      <div class="log" id="log" role="log" aria-live="polite" aria-relevant="additions"></div>
+      <div class="action-panel" id="actionPanel" role="region" aria-label="当前行动 / Current action" style="display:none"></div>
+    </aside>
+  </main>
+
+  <!-- 复盘弹窗 -->
+  <div class="modal-mask" id="reviewMask" style="display:none">
+    <div class="modal">
+      <h2 data-i18n="📊 本局复盘">📊 本局复盘</h2>
+      <pre id="reviewText" class="review-text"></pre>
+      <button id="closeReview" data-i18n="关闭">关闭</button>
+    </div>
+  </div>
+
+  <script src="/js/i18n.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

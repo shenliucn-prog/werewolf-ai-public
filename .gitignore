@@ -1,0 +1,46 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ---- 密钥与本地配置 ----
+.env
+.env.*
+*.key
+*.pem
+# 只提交模板
+!.env.example
+
+# ---- 运行时产物（对局跑出来的状态，不是代码）----
+# 注意：路径必须写全，否则匹配不到 .gitignore 所在目录之外的同名目录。
+# 之前漏写 werewolf_web/ 前缀，导致 data/npc_memory/ 里以角色名命名的
+# 记忆文件被误提交进索引。
+werewolf_web/data/reviews/
+werewolf_web/data/host_style.json
+werewolf_web/data/host_style.*.json
+werewolf_web/data/npc_memory/
+
+# ---- 开发过程产物：不进仓库，仓库只放能跑起来的程序 ----
+# 对局记录、分析文档、人设档案副本、一次性工具脚本、开发期自测脚本
+playtest/
+players/
+tools/
+werewolf_projects_analysis.md
+werewolf_web/test_fast.py
+werewolf_web/test_headless.py
+werewolf_web/test_http.py
+werewolf_web/playtest.py
+
+# ---- 工具与临时 ----
+.workbuddy/
+*.log
+.DS_Store
+node_modules/
+Thumbs.db
+.pytest_cache/
+.coverage
+htmlcov/
+output/playwright/
+.playwright-cli/

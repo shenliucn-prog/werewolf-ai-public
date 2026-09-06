@@ -1,0 +1,12 @@
+{
+  "name": "werewolf-ai-ui-tests",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Development-only DOM regression tests; the game has no frontend build step.",
+  "engines": { "node": "^22.22.2 || ^24.15.0 || >=26.0.0" },
+  "scripts": {
+    "test": "node tests/test_setup_ui.cjs",
+    "check": "node --check werewolf_web/static/js/app.js && node --check werewolf_web/static/js/i18n.js"
+  },
+  "devDependencies": { "jsdom": "30.0.1" }
+}
