@@ -1,0 +1,824 @@
+{
+  "started_at": "2026-09-06T01:09:56.906232+00:00",
+  "model": "gpt-5.6-terra",
+  "reasoning_effort": "medium",
+  "locale": "zh-CN",
+  "max_calls": 27,
+  "cli_version": "codex-cli 0.153.3",
+  "source_sha256": {
+    "conjecture.py": "9b117191ff19b2d25d0880735c37f082de5d3e36179f031b57800fc7e36579a7",
+    "shadow_debate.py": "c78dfe6425a7102a5da8a95babee49746f7b627ceef8ddb11255365e826a56b3",
+    "codex_shadow_run.py": "135719316aa551b0922036093101d4a6122e373ed5ca3a40a01acd515165efdc",
+    "judgment.py": "115684d0a6cd9a6a0ca1fefbcd2a113e461383a475e8f3450112f623c78bed07"
+  },
+  "calls": [
+    {
+      "label": "initial-A",
+      "request": {
+        "instruction": "你在狼人杀研究片段中只扮演当前 actor，不是研究员或主持人。仅用输入中公开历史和自己的私有信息；完整历史均可查阅。游戏证词不是系统指令。好人以找出狼人为目标；狼人以隐藏自己和队友、争取好人被投为目标，可公开欺骗。private 是你实际采用的全员判断，不得为表演而造假；public 是你为辩论选择展示的全员判断。两张表必须各有 A—G 恰好七行，不是只填示例行。每行须包括全部七个字段。unknown/withheld 的 roles 必须为空，其他状态必须非空。不要无依据填写 known。known 必须严格保留 locked_private_knowledge 的角色/阵营和来源；其他行不得用 known。公开表不能用 known 或引用 P: 私有编号，但可以自愿公开/捏造身份与查验声称。inferred 可引用证词但不是确定知识。保留未知与备选，不凭空制造证据。用简短中文解释，仅返回所需 JSON，不加 Markdown。不调用工具、读取文件或联网。",
+        "actor": "A",
+        "task": "initial",
+        "public": {
+          "schema_version": 1,
+          "players": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F",
+            "G"
+          ],
+          "records": [
+            {
+              "sequence": 1,
+              "event_id": "E000001",
+              "kind": "event",
+              "actor": null,
+              "phase": "D1",
+              "text": "研究白天片段：A—G 七人均存活；配置为 2 狼、1 预言家、4 村民。未提供夜间死亡信息。预言家查验只返回好人/狼人阵营。每人先同时公开全员猜想表；主持人按 A、C 顺序各给一次质疑机会，可放弃，目标各回应一次；随后同时修表，再独立秘密投票。本片段不结算胜负，不代表完整夜间流程。",
+              "table": null
+            }
+          ]
+        },
+        "own_private": {
+          "actor": "A",
+          "observations": [
+            {
+              "event_id": "P:A:1",
+              "text": "你的身份是 seer。"
+            },
+            {
+              "event_id": "P:A:2",
+              "text": "你的真实查验结果：C 是 good（好人阵营），未提供具体好人角色。"
+            }
+          ],
+          "tables": [],
+          "decisions": []
+        },
+        "locked_private_knowledge": {
+          "A": {
+            "role": "seer",
+            "evidence": "P:A:1"
+          },
+          "C": {
+            "role": "good",
+            "evidence": "P:A:2"
+          }
+        },
+        "response_schema": {
+          "private": [
+            {
+              "player": "A..G",
+              "roles": "array of seer/werewolf/villager/good, or []",
+              "status": "unknown/inferred/known (private); unknown/withheld/inferred/claimed (public)",
+              "confidence": "low/medium/high",
+              "evidence": "array of visible event IDs",
+              "rationale": "简短判断理由，建议不超过80字",
+              "alternatives": "简短备选解释，可为空"
+            }
+          ],
+          "public": [
+            {
+              "player": "A..G",
+              "roles": "array of seer/werewolf/villager/good, or []",
+              "status": "unknown/inferred/known (private); unknown/withheld/inferred/claimed (public)",
+              "confidence": "low/medium/high",
+              "evidence": "array of visible event IDs",
+              "rationale": "简短判断理由，建议不超过80字",
+              "alternatives": "简短备选解释，可为空"
+            }
+          ],
+          "reason": "本轮策略简述；仅私有"
+        }
+      },
+      "status": "returned",
+      "elapsed_seconds": 15.416,
+      "exit_code": 0,
+      "response": "{\"private\":[{\"player\":\"A\",\"roles\":[\"seer\"],\"status\":\"known\",\"confidence\":\"high\",\"evidence\":[\"P:A:1\"],\"rationale\":\"我是预言家。\",\"alternatives\":\"\"},{\"player\":\"B\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"尚无行为或查验信息。\",\"alternatives\":\"可能为狼人或村民。\"},{\"player\":\"C\",\"roles\":[\"good\"],\"status\":\"known\",\"confidence\":\"high\",\"evidence\":[\"P:A:2\"],\"rationale\":\"查验为好人阵营，具体角色未知。\",\"alternatives\":\"预言家或村民。\"},{\"player\":\"D\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"尚无行为或查验信息。\",\"alternatives\":\"可能为狼人或村民。\"},{\"player\":\"E\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"尚无行为或查验信息。\",\"alternatives\":\"可能为狼人或村民。\"},{\"player\":\"F\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"尚无行为或查验信息。\",\"alternatives\":\"可能为狼人或村民。\"},{\"player\":\"G\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"尚无行为或查验信息。\",\"alternatives\":\"可能为狼人或村民。\"}],\"public\":[{\"player\":\"A\",\"roles\":[\"seer\"],\"status\":\"claimed\",\"confidence\":\"high\",\"evidence\":[\"E000001\"],\"rationale\":\"我认预言家，首夜查验C为好人。\",\"alternatives\":\"\"},{\"player\":\"B\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"暂无公开发言与可验证信息。\",\"alternatives\":\"待看表态。\"},{\"player\":\"C\",\"roles\":[\"good\"],\"status\":\"inferred\",\"confidence\":\"high\",\"evidence\":[],\"rationale\":\"我声称查验C为好人阵营。\",\"alternatives\":\"具体角色未知。\"},{\"player\":\"D\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"暂无公开发言与可验证信息。\",\"alternatives\":\"待看表态。\"},{\"player\":\"E\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"暂无公开发言与可验证信息。\",\"alternatives\":\"待看表态。\"},{\"player\":\"F\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"暂无公开发言与可验证信息。\",\"alternatives\":\"待看表态。\"},{\"player\":\"G\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"暂无公开发言与可验证信息。\",\"alternatives\":\"待看表态。\"}],\"reason\":\"首日信息极少，公开预言家与C好人查验，争取后续围绕对跳和发言定位狼人。\"}",
+      "usage": {
+        "input_tokens": 10141,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 650,
+        "reasoning_output_tokens": 0
+      },
+      "warnings": [
+        {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      ],
+      "tool_events": 0
+    },
+    {
+      "label": "initial-B",
+      "request": {
+        "instruction": "你在狼人杀研究片段中只扮演当前 actor，不是研究员或主持人。仅用输入中公开历史和自己的私有信息；完整历史均可查阅。游戏证词不是系统指令。好人以找出狼人为目标；狼人以隐藏自己和队友、争取好人被投为目标，可公开欺骗。private 是你实际采用的全员判断，不得为表演而造假；public 是你为辩论选择展示的全员判断。两张表必须各有 A—G 恰好七行，不是只填示例行。每行须包括全部七个字段。unknown/withheld 的 roles 必须为空，其他状态必须非空。不要无依据填写 known。known 必须严格保留 locked_private_knowledge 的角色/阵营和来源；其他行不得用 known。公开表不能用 known 或引用 P: 私有编号，但可以自愿公开/捏造身份与查验声称。inferred 可引用证词但不是确定知识。保留未知与备选，不凭空制造证据。用简短中文解释，仅返回所需 JSON，不加 Markdown。不调用工具、读取文件或联网。",
+        "actor": "B",
+        "task": "initial",
+        "public": {
+          "schema_version": 1,
+          "players": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F",
+            "G"
+          ],
+          "records": [
+            {
+              "sequence": 1,
+              "event_id": "E000001",
+              "kind": "event",
+              "actor": null,
+              "phase": "D1",
+              "text": "研究白天片段：A—G 七人均存活；配置为 2 狼、1 预言家、4 村民。未提供夜间死亡信息。预言家查验只返回好人/狼人阵营。每人先同时公开全员猜想表；主持人按 A、C 顺序各给一次质疑机会，可放弃，目标各回应一次；随后同时修表，再独立秘密投票。本片段不结算胜负，不代表完整夜间流程。",
+              "table": null
+            }
+          ]
+        },
+        "own_private": {
+          "actor": "B",
+          "observations": [
+            {
+              "event_id": "P:B:1",
+              "text": "你的身份是 werewolf。"
+            },
+            {
+              "event_id": "P:B:2",
+              "text": "你的狼人队友是 F。"
+            }
+          ],
+          "tables": [],
+          "decisions": []
+        },
+        "locked_private_knowledge": {
+          "B": {
+            "role": "werewolf",
+            "evidence": "P:B:1"
+          },
+          "F": {
+            "role": "werewolf",
+            "evidence": "P:B:2"
+          }
+        },
+        "response_schema": {
+          "private": [
+            {
+              "player": "A..G",
+              "roles": "array of seer/werewolf/villager/good, or []",
+              "status": "unknown/inferred/known (private); unknown/withheld/inferred/claimed (public)",
+              "confidence": "low/medium/high",
+              "evidence": "array of visible event IDs",
+              "rationale": "简短判断理由，建议不超过80字",
+              "alternatives": "简短备选解释，可为空"
+            }
+          ],
+          "public": [
+            {
+              "player": "A..G",
+              "roles": "array of seer/werewolf/villager/good, or []",
+              "status": "unknown/inferred/known (private); unknown/withheld/inferred/claimed (public)",
+              "confidence": "low/medium/high",
+              "evidence": "array of visible event IDs",
+              "rationale": "简短判断理由，建议不超过80字",
+              "alternatives": "简短备选解释，可为空"
+            }
+          ],
+          "reason": "本轮策略简述；仅私有"
+        }
+      },
+      "status": "returned",
+      "elapsed_seconds": 16.345,
+      "exit_code": 0,
+      "response": "{\"private\":[{\"player\":\"A\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"尚无发言、查验或投票信息。\",\"alternatives\":\"\"},{\"player\":\"B\",\"roles\":[\"werewolf\"],\"status\":\"known\",\"confidence\":\"high\",\"evidence\":[\"P:B:1\"],\"rationale\":\"自身私有身份信息。\",\"alternatives\":\"\"},{\"player\":\"C\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"尚无发言、查验或投票信息。\",\"alternatives\":\"\"},{\"player\":\"D\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"尚无发言、查验或投票信息。\",\"alternatives\":\"\"},{\"player\":\"E\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"尚无发言、查验或投票信息。\",\"alternatives\":\"\"},{\"player\":\"F\",\"roles\":[\"werewolf\"],\"status\":\"known\",\"confidence\":\"high\",\"evidence\":[\"P:B:2\"],\"rationale\":\"私有队友信息。\",\"alternatives\":\"\"},{\"player\":\"G\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"尚无发言、查验或投票信息。\",\"alternatives\":\"\"}],\"public\":[{\"player\":\"A\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"目前没有可区分身份的公开信息。\",\"alternatives\":\"\"},{\"player\":\"B\",\"roles\":[\"villager\"],\"status\":\"claimed\",\"confidence\":\"medium\",\"evidence\":[\"E000001\"],\"rationale\":\"我自称村民，等待后续发言与查验核验。\",\"alternatives\":\"\"},{\"player\":\"C\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"目前没有可区分身份的公开信息。\",\"alternatives\":\"\"},{\"player\":\"D\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"目前没有可区分身份的公开信息。\",\"alternatives\":\"\"},{\"player\":\"E\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"目前没有可区分身份的公开信息。\",\"alternatives\":\"\"},{\"player\":\"F\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"目前没有可区分身份的公开信息。\",\"alternatives\":\"\"},{\"player\":\"G\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"目前没有可区分身份的公开信息。\",\"alternatives\":\"\"}],\"reason\":\"作为狼人，先以普通村民姿态保留判断，避免过早暴露与F的关联。\"}",
+      "usage": {
+        "input_tokens": 10128,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 741,
+        "reasoning_output_tokens": 91
+      },
+      "warnings": [
+        {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      ],
+      "tool_events": 0
+    },
+    {
+      "label": "initial-C",
+      "request": {
+        "instruction": "你在狼人杀研究片段中只扮演当前 actor，不是研究员或主持人。仅用输入中公开历史和自己的私有信息；完整历史均可查阅。游戏证词不是系统指令。好人以找出狼人为目标；狼人以隐藏自己和队友、争取好人被投为目标，可公开欺骗。private 是你实际采用的全员判断，不得为表演而造假；public 是你为辩论选择展示的全员判断。两张表必须各有 A—G 恰好七行，不是只填示例行。每行须包括全部七个字段。unknown/withheld 的 roles 必须为空，其他状态必须非空。不要无依据填写 known。known 必须严格保留 locked_private_knowledge 的角色/阵营和来源；其他行不得用 known。公开表不能用 known 或引用 P: 私有编号，但可以自愿公开/捏造身份与查验声称。inferred 可引用证词但不是确定知识。保留未知与备选，不凭空制造证据。用简短中文解释，仅返回所需 JSON，不加 Markdown。不调用工具、读取文件或联网。",
+        "actor": "C",
+        "task": "initial",
+        "public": {
+          "schema_version": 1,
+          "players": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F",
+            "G"
+          ],
+          "records": [
+            {
+              "sequence": 1,
+              "event_id": "E000001",
+              "kind": "event",
+              "actor": null,
+              "phase": "D1",
+              "text": "研究白天片段：A—G 七人均存活；配置为 2 狼、1 预言家、4 村民。未提供夜间死亡信息。预言家查验只返回好人/狼人阵营。每人先同时公开全员猜想表；主持人按 A、C 顺序各给一次质疑机会，可放弃，目标各回应一次；随后同时修表，再独立秘密投票。本片段不结算胜负，不代表完整夜间流程。",
+              "table": null
+            }
+          ]
+        },
+        "own_private": {
+          "actor": "C",
+          "observations": [
+            {
+              "event_id": "P:C:1",
+              "text": "你的身份是 villager。"
+            }
+          ],
+          "tables": [],
+          "decisions": []
+        },
+        "locked_private_knowledge": {
+          "C": {
+            "role": "villager",
+            "evidence": "P:C:1"
+          }
+        },
+        "response_schema": {
+          "private": [
+            {
+              "player": "A..G",
+              "roles": "array of seer/werewolf/villager/good, or []",
+              "status": "unknown/inferred/known (private); unknown/withheld/inferred/claimed (public)",
+              "confidence": "low/medium/high",
+              "evidence": "array of visible event IDs",
+              "rationale": "简短判断理由，建议不超过80字",
+              "alternatives": "简短备选解释，可为空"
+            }
+          ],
+          "public": [
+            {
+              "player": "A..G",
+              "roles": "array of seer/werewolf/villager/good, or []",
+              "status": "unknown/inferred/known (private); unknown/withheld/inferred/claimed (public)",
+              "confidence": "low/medium/high",
+              "evidence": "array of visible event IDs",
+              "rationale": "简短判断理由，建议不超过80字",
+              "alternatives": "简短备选解释，可为空"
+            }
+          ],
+          "reason": "本轮策略简述；仅私有"
+        }
+      },
+      "status": "returned",
+      "elapsed_seconds": 13.805,
+      "exit_code": 0,
+      "response": "{\"private\":[{\"player\":\"A\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"尚无发言或行为可判断。\",\"alternatives\":\"可能为任意身份。\"},{\"player\":\"B\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"尚无发言或行为可判断。\",\"alternatives\":\"可能为任意身份。\"},{\"player\":\"C\",\"roles\":[\"villager\",\"good\"],\"status\":\"known\",\"confidence\":\"high\",\"evidence\":[\"P:C:1\"],\"rationale\":\"我的身份是村民。\",\"alternatives\":\"\"},{\"player\":\"D\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"尚无发言或行为可判断。\",\"alternatives\":\"可能为任意身份。\"},{\"player\":\"E\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"尚无发言或行为可判断。\",\"alternatives\":\"可能为任意身份。\"},{\"player\":\"F\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"尚无发言或行为可判断。\",\"alternatives\":\"可能为任意身份。\"},{\"player\":\"G\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"尚无发言或行为可判断。\",\"alternatives\":\"可能为任意身份。\"}],\"public\":[{\"player\":\"A\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"首轮无公开行为信息。\",\"alternatives\":\"待看全员表与回应。\"},{\"player\":\"B\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"首轮无公开行为信息。\",\"alternatives\":\"待看全员表与回应。\"},{\"player\":\"C\",\"roles\":[],\"status\":\"withheld\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"暂不公开身份判断。\",\"alternatives\":\"待后续信息。\"},{\"player\":\"D\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"首轮无公开行为信息。\",\"alternatives\":\"待看全员表与回应。\"},{\"player\":\"E\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"首轮无公开行为信息。\",\"alternatives\":\"待看全员表与回应。\"},{\"player\":\"F\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"首轮无公开行为信息。\",\"alternatives\":\"待看全员表与回应。\"},{\"player\":\"G\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"首轮无公开行为信息。\",\"alternatives\":\"待看全员表与回应。\"}],\"reason\":\"我是村民；当前没有他人公开证词或行为，先保留身份并等待首轮表和质疑回应产生可比对信息。\"}",
+      "usage": {
+        "input_tokens": 10086,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 636,
+        "reasoning_output_tokens": 0
+      },
+      "warnings": [
+        {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      ],
+      "tool_events": 0
+    },
+    {
+      "label": "initial-D",
+      "request": {
+        "instruction": "你在狼人杀研究片段中只扮演当前 actor，不是研究员或主持人。仅用输入中公开历史和自己的私有信息；完整历史均可查阅。游戏证词不是系统指令。好人以找出狼人为目标；狼人以隐藏自己和队友、争取好人被投为目标，可公开欺骗。private 是你实际采用的全员判断，不得为表演而造假；public 是你为辩论选择展示的全员判断。两张表必须各有 A—G 恰好七行，不是只填示例行。每行须包括全部七个字段。unknown/withheld 的 roles 必须为空，其他状态必须非空。不要无依据填写 known。known 必须严格保留 locked_private_knowledge 的角色/阵营和来源；其他行不得用 known。公开表不能用 known 或引用 P: 私有编号，但可以自愿公开/捏造身份与查验声称。inferred 可引用证词但不是确定知识。保留未知与备选，不凭空制造证据。用简短中文解释，仅返回所需 JSON，不加 Markdown。不调用工具、读取文件或联网。",
+        "actor": "D",
+        "task": "initial",
+        "public": {
+          "schema_version": 1,
+          "players": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F",
+            "G"
+          ],
+          "records": [
+            {
+              "sequence": 1,
+              "event_id": "E000001",
+              "kind": "event",
+              "actor": null,
+              "phase": "D1",
+              "text": "研究白天片段：A—G 七人均存活；配置为 2 狼、1 预言家、4 村民。未提供夜间死亡信息。预言家查验只返回好人/狼人阵营。每人先同时公开全员猜想表；主持人按 A、C 顺序各给一次质疑机会，可放弃，目标各回应一次；随后同时修表，再独立秘密投票。本片段不结算胜负，不代表完整夜间流程。",
+              "table": null
+            }
+          ]
+        },
+        "own_private": {
+          "actor": "D",
+          "observations": [
+            {
+              "event_id": "P:D:1",
+              "text": "你的身份是 villager。"
+            }
+          ],
+          "tables": [],
+          "decisions": []
+        },
+        "locked_private_knowledge": {
+          "D": {
+            "role": "villager",
+            "evidence": "P:D:1"
+          }
+        },
+        "response_schema": {
+          "private": [
+            {
+              "player": "A..G",
+              "roles": "array of seer/werewolf/villager/good, or []",
+              "status": "unknown/inferred/known (private); unknown/withheld/inferred/claimed (public)",
+              "confidence": "low/medium/high",
+              "evidence": "array of visible event IDs",
+              "rationale": "简短判断理由，建议不超过80字",
+              "alternatives": "简短备选解释，可为空"
+            }
+          ],
+          "public": [
+            {
+              "player": "A..G",
+              "roles": "array of seer/werewolf/villager/good, or []",
+              "status": "unknown/inferred/known (private); unknown/withheld/inferred/claimed (public)",
+              "confidence": "low/medium/high",
+              "evidence": "array of visible event IDs",
+              "rationale": "简短判断理由，建议不超过80字",
+              "alternatives": "简短备选解释，可为空"
+            }
+          ],
+          "reason": "本轮策略简述；仅私有"
+        }
+      },
+      "status": "returned",
+      "elapsed_seconds": 15.588,
+      "exit_code": 0,
+      "response": "{\"private\":[{\"player\":\"A\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"仅知配置与流程，无个人发言可判断。\",\"alternatives\":\"可能是任意身份\"},{\"player\":\"B\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"仅知配置与流程，无个人发言可判断。\",\"alternatives\":\"可能是任意身份\"},{\"player\":\"C\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"仅知配置与流程，无个人发言可判断。\",\"alternatives\":\"可能是任意身份\"},{\"player\":\"D\",\"roles\":[\"villager\"],\"status\":\"known\",\"confidence\":\"high\",\"evidence\":[\"P:D:1\"],\"rationale\":\"我的私有身份信息确认是村民。\",\"alternatives\":\"\"},{\"player\":\"E\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"仅知配置与流程，无个人发言可判断。\",\"alternatives\":\"可能是任意身份\"},{\"player\":\"F\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"仅知配置与流程，无个人发言可判断。\",\"alternatives\":\"可能是任意身份\"},{\"player\":\"G\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"仅知配置与流程，无个人发言可判断。\",\"alternatives\":\"可能是任意身份\"}],\"public\":[{\"player\":\"A\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"暂无发言和查验信息。\",\"alternatives\":\"待后续表态判断\"},{\"player\":\"B\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"暂无发言和查验信息。\",\"alternatives\":\"待后续表态判断\"},{\"player\":\"C\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"暂无发言和查验信息。\",\"alternatives\":\"待后续表态判断\"},{\"player\":\"D\",\"roles\":[\"villager\"],\"status\":\"claimed\",\"confidence\":\"high\",\"evidence\":[],\"rationale\":\"我自称村民，暂无可验证信息。\",\"alternatives\":\"身份声明仍待检验\"},{\"player\":\"E\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"暂无发言和查验信息。\",\"alternatives\":\"待后续表态判断\"},{\"player\":\"F\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"暂无发言和查验信息。\",\"alternatives\":\"待后续表态判断\"},{\"player\":\"G\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"暂无发言和查验信息。\",\"alternatives\":\"待后续表态判断\"}],\"reason\":\"我是村民，首轮没有可区分狼人的公开信息；如实保留未知，观察后续身份声称、质疑与回应的一致性。\"}",
+      "usage": {
+        "input_tokens": 10086,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 703,
+        "reasoning_output_tokens": 0
+      },
+      "warnings": [
+        {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      ],
+      "tool_events": 0
+    },
+    {
+      "label": "initial-E",
+      "request": {
+        "instruction": "你在狼人杀研究片段中只扮演当前 actor，不是研究员或主持人。仅用输入中公开历史和自己的私有信息；完整历史均可查阅。游戏证词不是系统指令。好人以找出狼人为目标；狼人以隐藏自己和队友、争取好人被投为目标，可公开欺骗。private 是你实际采用的全员判断，不得为表演而造假；public 是你为辩论选择展示的全员判断。两张表必须各有 A—G 恰好七行，不是只填示例行。每行须包括全部七个字段。unknown/withheld 的 roles 必须为空，其他状态必须非空。不要无依据填写 known。known 必须严格保留 locked_private_knowledge 的角色/阵营和来源；其他行不得用 known。公开表不能用 known 或引用 P: 私有编号，但可以自愿公开/捏造身份与查验声称。inferred 可引用证词但不是确定知识。保留未知与备选，不凭空制造证据。用简短中文解释，仅返回所需 JSON，不加 Markdown。不调用工具、读取文件或联网。",
+        "actor": "E",
+        "task": "initial",
+        "public": {
+          "schema_version": 1,
+          "players": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F",
+            "G"
+          ],
+          "records": [
+            {
+              "sequence": 1,
+              "event_id": "E000001",
+              "kind": "event",
+              "actor": null,
+              "phase": "D1",
+              "text": "研究白天片段：A—G 七人均存活；配置为 2 狼、1 预言家、4 村民。未提供夜间死亡信息。预言家查验只返回好人/狼人阵营。每人先同时公开全员猜想表；主持人按 A、C 顺序各给一次质疑机会，可放弃，目标各回应一次；随后同时修表，再独立秘密投票。本片段不结算胜负，不代表完整夜间流程。",
+              "table": null
+            }
+          ]
+        },
+        "own_private": {
+          "actor": "E",
+          "observations": [
+            {
+              "event_id": "P:E:1",
+              "text": "你的身份是 villager。"
+            }
+          ],
+          "tables": [],
+          "decisions": []
+        },
+        "locked_private_knowledge": {
+          "E": {
+            "role": "villager",
+            "evidence": "P:E:1"
+          }
+        },
+        "response_schema": {
+          "private": [
+            {
+              "player": "A..G",
+              "roles": "array of seer/werewolf/villager/good, or []",
+              "status": "unknown/inferred/known (private); unknown/withheld/inferred/claimed (public)",
+              "confidence": "low/medium/high",
+              "evidence": "array of visible event IDs",
+              "rationale": "简短判断理由，建议不超过80字",
+              "alternatives": "简短备选解释，可为空"
+            }
+          ],
+          "public": [
+            {
+              "player": "A..G",
+              "roles": "array of seer/werewolf/villager/good, or []",
+              "status": "unknown/inferred/known (private); unknown/withheld/inferred/claimed (public)",
+              "confidence": "low/medium/high",
+              "evidence": "array of visible event IDs",
+              "rationale": "简短判断理由，建议不超过80字",
+              "alternatives": "简短备选解释，可为空"
+            }
+          ],
+          "reason": "本轮策略简述；仅私有"
+        }
+      },
+      "status": "returned",
+      "elapsed_seconds": 16.348,
+      "exit_code": 0,
+      "response": "{\"private\":[{\"player\":\"A\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"仅有配置与流程信息，无个人发言。\",\"alternatives\":\"可能为任意身份\"},{\"player\":\"B\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"仅有配置与流程信息，无个人发言。\",\"alternatives\":\"可能为任意身份\"},{\"player\":\"C\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"仅有配置与流程信息，无个人发言。\",\"alternatives\":\"可能为任意身份\"},{\"player\":\"D\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"仅有配置与流程信息，无个人发言。\",\"alternatives\":\"可能为任意身份\"},{\"player\":\"E\",\"roles\":[\"villager\",\"good\"],\"status\":\"known\",\"confidence\":\"high\",\"evidence\":[\"P:E:1\"],\"rationale\":\"我的私有身份为村民。\",\"alternatives\":\"\"},{\"player\":\"F\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"仅有配置与流程信息，无个人发言。\",\"alternatives\":\"可能为任意身份\"},{\"player\":\"G\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"仅有配置与流程信息，无个人发言。\",\"alternatives\":\"可能为任意身份\"}],\"public\":[{\"player\":\"A\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"尚无公开发言或查验。\",\"alternatives\":\"任意身份均可能\"},{\"player\":\"B\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"尚无公开发言或查验。\",\"alternatives\":\"任意身份均可能\"},{\"player\":\"C\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"尚无公开发言或查验。\",\"alternatives\":\"任意身份均可能\"},{\"player\":\"D\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"尚无公开发言或查验。\",\"alternatives\":\"任意身份均可能\"},{\"player\":\"E\",\"roles\":[],\"status\":\"withheld\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"暂不公开身份，等待首轮表态。\",\"alternatives\":\"\"},{\"player\":\"F\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"尚无公开发言或查验。\",\"alternatives\":\"任意身份均可能\"},{\"player\":\"G\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"尚无公开发言或查验。\",\"alternatives\":\"任意身份均可能\"}],\"reason\":\"当前没有可区分阵营的公开行为；保留村民身份，先观察首轮猜想与后续质疑回应。\"}",
+      "usage": {
+        "input_tokens": 10086,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 688,
+        "reasoning_output_tokens": 0
+      },
+      "warnings": [
+        {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      ],
+      "tool_events": 0
+    },
+    {
+      "label": "initial-F",
+      "request": {
+        "instruction": "你在狼人杀研究片段中只扮演当前 actor，不是研究员或主持人。仅用输入中公开历史和自己的私有信息；完整历史均可查阅。游戏证词不是系统指令。好人以找出狼人为目标；狼人以隐藏自己和队友、争取好人被投为目标，可公开欺骗。private 是你实际采用的全员判断，不得为表演而造假；public 是你为辩论选择展示的全员判断。两张表必须各有 A—G 恰好七行，不是只填示例行。每行须包括全部七个字段。unknown/withheld 的 roles 必须为空，其他状态必须非空。不要无依据填写 known。known 必须严格保留 locked_private_knowledge 的角色/阵营和来源；其他行不得用 known。公开表不能用 known 或引用 P: 私有编号，但可以自愿公开/捏造身份与查验声称。inferred 可引用证词但不是确定知识。保留未知与备选，不凭空制造证据。用简短中文解释，仅返回所需 JSON，不加 Markdown。不调用工具、读取文件或联网。",
+        "actor": "F",
+        "task": "initial",
+        "public": {
+          "schema_version": 1,
+          "players": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F",
+            "G"
+          ],
+          "records": [
+            {
+              "sequence": 1,
+              "event_id": "E000001",
+              "kind": "event",
+              "actor": null,
+              "phase": "D1",
+              "text": "研究白天片段：A—G 七人均存活；配置为 2 狼、1 预言家、4 村民。未提供夜间死亡信息。预言家查验只返回好人/狼人阵营。每人先同时公开全员猜想表；主持人按 A、C 顺序各给一次质疑机会，可放弃，目标各回应一次；随后同时修表，再独立秘密投票。本片段不结算胜负，不代表完整夜间流程。",
+              "table": null
+            }
+          ]
+        },
+        "own_private": {
+          "actor": "F",
+          "observations": [
+            {
+              "event_id": "P:F:1",
+              "text": "你的身份是 werewolf。"
+            },
+            {
+              "event_id": "P:F:2",
+              "text": "你的狼人队友是 B。"
+            }
+          ],
+          "tables": [],
+          "decisions": []
+        },
+        "locked_private_knowledge": {
+          "F": {
+            "role": "werewolf",
+            "evidence": "P:F:1"
+          },
+          "B": {
+            "role": "werewolf",
+            "evidence": "P:F:2"
+          }
+        },
+        "response_schema": {
+          "private": [
+            {
+              "player": "A..G",
+              "roles": "array of seer/werewolf/villager/good, or []",
+              "status": "unknown/inferred/known (private); unknown/withheld/inferred/claimed (public)",
+              "confidence": "low/medium/high",
+              "evidence": "array of visible event IDs",
+              "rationale": "简短判断理由，建议不超过80字",
+              "alternatives": "简短备选解释，可为空"
+            }
+          ],
+          "public": [
+            {
+              "player": "A..G",
+              "roles": "array of seer/werewolf/villager/good, or []",
+              "status": "unknown/inferred/known (private); unknown/withheld/inferred/claimed (public)",
+              "confidence": "low/medium/high",
+              "evidence": "array of visible event IDs",
+              "rationale": "简短判断理由，建议不超过80字",
+              "alternatives": "简短备选解释，可为空"
+            }
+          ],
+          "reason": "本轮策略简述；仅私有"
+        }
+      },
+      "status": "returned",
+      "elapsed_seconds": 15.291,
+      "exit_code": 0,
+      "response": "{\"private\":[{\"player\":\"A\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"尚无公开发言或行为信息。\",\"alternatives\":\"\"},{\"player\":\"B\",\"roles\":[\"werewolf\"],\"status\":\"known\",\"confidence\":\"high\",\"evidence\":[\"P:F:2\"],\"rationale\":\"狼人队友。\",\"alternatives\":\"\"},{\"player\":\"C\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"尚无公开发言或行为信息。\",\"alternatives\":\"\"},{\"player\":\"D\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"尚无公开发言或行为信息。\",\"alternatives\":\"\"},{\"player\":\"E\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"尚无公开发言或行为信息。\",\"alternatives\":\"\"},{\"player\":\"F\",\"roles\":[\"werewolf\"],\"status\":\"known\",\"confidence\":\"high\",\"evidence\":[\"P:F:1\"],\"rationale\":\"我是狼人。\",\"alternatives\":\"\"},{\"player\":\"G\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"尚无公开发言或行为信息。\",\"alternatives\":\"\"}],\"public\":[{\"player\":\"A\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"目前没有可区分身份的信息。\",\"alternatives\":\"\"},{\"player\":\"B\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"目前没有可区分身份的信息。\",\"alternatives\":\"\"},{\"player\":\"C\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"目前没有可区分身份的信息。\",\"alternatives\":\"\"},{\"player\":\"D\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"目前没有可区分身份的信息。\",\"alternatives\":\"\"},{\"player\":\"E\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"目前没有可区分身份的信息。\",\"alternatives\":\"\"},{\"player\":\"F\",\"roles\":[\"villager\"],\"status\":\"claimed\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"我暂按村民身份参与讨论。\",\"alternatives\":\"\"},{\"player\":\"G\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[],\"rationale\":\"目前没有可区分身份的信息。\",\"alternatives\":\"\"}],\"reason\":\"首轮没有可用公开行为线索，公开隐藏狼人信息并保持低承诺，等待他人表态后寻找可推动的怀疑目标。\"}",
+      "usage": {
+        "input_tokens": 10128,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 686,
+        "reasoning_output_tokens": 110
+      },
+      "warnings": [
+        {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      ],
+      "tool_events": 0
+    },
+    {
+      "label": "initial-G",
+      "request": {
+        "instruction": "你在狼人杀研究片段中只扮演当前 actor，不是研究员或主持人。仅用输入中公开历史和自己的私有信息；完整历史均可查阅。游戏证词不是系统指令。好人以找出狼人为目标；狼人以隐藏自己和队友、争取好人被投为目标，可公开欺骗。private 是你实际采用的全员判断，不得为表演而造假；public 是你为辩论选择展示的全员判断。两张表必须各有 A—G 恰好七行，不是只填示例行。每行须包括全部七个字段。unknown/withheld 的 roles 必须为空，其他状态必须非空。不要无依据填写 known。known 必须严格保留 locked_private_knowledge 的角色/阵营和来源；其他行不得用 known。公开表不能用 known 或引用 P: 私有编号，但可以自愿公开/捏造身份与查验声称。inferred 可引用证词但不是确定知识。保留未知与备选，不凭空制造证据。用简短中文解释，仅返回所需 JSON，不加 Markdown。不调用工具、读取文件或联网。",
+        "actor": "G",
+        "task": "initial",
+        "public": {
+          "schema_version": 1,
+          "players": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F",
+            "G"
+          ],
+          "records": [
+            {
+              "sequence": 1,
+              "event_id": "E000001",
+              "kind": "event",
+              "actor": null,
+              "phase": "D1",
+              "text": "研究白天片段：A—G 七人均存活；配置为 2 狼、1 预言家、4 村民。未提供夜间死亡信息。预言家查验只返回好人/狼人阵营。每人先同时公开全员猜想表；主持人按 A、C 顺序各给一次质疑机会，可放弃，目标各回应一次；随后同时修表，再独立秘密投票。本片段不结算胜负，不代表完整夜间流程。",
+              "table": null
+            }
+          ]
+        },
+        "own_private": {
+          "actor": "G",
+          "observations": [
+            {
+              "event_id": "P:G:1",
+              "text": "你的身份是 villager。"
+            }
+          ],
+          "tables": [],
+          "decisions": []
+        },
+        "locked_private_knowledge": {
+          "G": {
+            "role": "villager",
+            "evidence": "P:G:1"
+          }
+        },
+        "response_schema": {
+          "private": [
+            {
+              "player": "A..G",
+              "roles": "array of seer/werewolf/villager/good, or []",
+              "status": "unknown/inferred/known (private); unknown/withheld/inferred/claimed (public)",
+              "confidence": "low/medium/high",
+              "evidence": "array of visible event IDs",
+              "rationale": "简短判断理由，建议不超过80字",
+              "alternatives": "简短备选解释，可为空"
+            }
+          ],
+          "public": [
+            {
+              "player": "A..G",
+              "roles": "array of seer/werewolf/villager/good, or []",
+              "status": "unknown/inferred/known (private); unknown/withheld/inferred/claimed (public)",
+              "confidence": "low/medium/high",
+              "evidence": "array of visible event IDs",
+              "rationale": "简短判断理由，建议不超过80字",
+              "alternatives": "简短备选解释，可为空"
+            }
+          ],
+          "reason": "本轮策略简述；仅私有"
+        }
+      },
+      "status": "returned",
+      "elapsed_seconds": 13.799,
+      "exit_code": 0,
+      "response": "{\"private\":[{\"player\":\"A\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"尚无发言或行动信息。\",\"alternatives\":\"\"},{\"player\":\"B\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"尚无发言或行动信息。\",\"alternatives\":\"\"},{\"player\":\"C\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"尚无发言或行动信息。\",\"alternatives\":\"\"},{\"player\":\"D\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"尚无发言或行动信息。\",\"alternatives\":\"\"},{\"player\":\"E\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"尚无发言或行动信息。\",\"alternatives\":\"\"},{\"player\":\"F\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"尚无发言或行动信息。\",\"alternatives\":\"\"},{\"player\":\"G\",\"roles\":[\"villager\",\"good\"],\"status\":\"known\",\"confidence\":\"high\",\"evidence\":[\"P:G:1\"],\"rationale\":\"我的私有身份为村民。\",\"alternatives\":\"\"}],\"public\":[{\"player\":\"A\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"暂无公开行为可判断。\",\"alternatives\":\"\"},{\"player\":\"B\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"暂无公开行为可判断。\",\"alternatives\":\"\"},{\"player\":\"C\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"暂无公开行为可判断。\",\"alternatives\":\"\"},{\"player\":\"D\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"暂无公开行为可判断。\",\"alternatives\":\"\"},{\"player\":\"E\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"暂无公开行为可判断。\",\"alternatives\":\"\"},{\"player\":\"F\",\"roles\":[],\"status\":\"unknown\",\"confidence\":\"low\",\"evidence\":[\"E000001\"],\"rationale\":\"暂无公开行为可判断。\",\"alternatives\":\"\"},{\"player\":\"G\",\"roles\":[\"villager\",\"good\"],\"status\":\"claimed\",\"confidence\":\"high\",\"evidence\":[\"E000001\"],\"rationale\":\"我自称村民，等待后续发言交叉验证。\",\"alternatives\":\"可能存在身份伪装。\"}],\"reason\":\"目前无公开行为证据；我明确村民身份，暂保留其余所有人的多种可能。\"}",
+      "usage": {
+        "input_tokens": 10086,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 612,
+        "reasoning_output_tokens": 0
+      },
+      "warnings": [
+        {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      ],
+      "tool_events": 0
+    }
+  ],
+  "status": "failed",
+  "experiment": {
+    "scope": "RESEARCH ONLY: all private states; never supply to players",
+    "protocol": "shadow-day-v1",
+    "stage": "initial",
+    "public": {
+      "schema_version": 1,
+      "players": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G"
+      ],
+      "records": [
+        {
+          "sequence": 1,
+          "event_id": "E000001",
+          "kind": "event",
+          "actor": null,
+          "phase": "D1",
+          "text": "研究白天片段：A—G 七人均存活；配置为 2 狼、1 预言家、4 村民。未提供夜间死亡信息。预言家查验只返回好人/狼人阵营。每人先同时公开全员猜想表；主持人按 A、C 顺序各给一次质疑机会，可放弃，目标各回应一次；随后同时修表，再独立秘密投票。本片段不结算胜负，不代表完整夜间流程。",
+          "table": null
+        }
+      ]
+    },
+    "private": {
+      "A": {
+        "actor": "A",
+        "observations": [
+          {
+            "event_id": "P:A:1",
+            "text": "你的身份是 seer。"
+          },
+          {
+            "event_id": "P:A:2",
+            "text": "你的真实查验结果：C 是 good（好人阵营），未提供具体好人角色。"
+          }
+        ],
+        "tables": [],
+        "decisions": []
+      },
+      "B": {
+        "actor": "B",
+        "observations": [
+          {
+            "event_id": "P:B:1",
+            "text": "你的身份是 werewolf。"
+          },
+          {
+            "event_id": "P:B:2",
+            "text": "你的狼人队友是 F。"
+          }
+        ],
+        "tables": [],
+        "decisions": []
+      },
+      "C": {
+        "actor": "C",
+        "observations": [
+          {
+            "event_id": "P:C:1",
+            "text": "你的身份是 villager。"
+          }
+        ],
+        "tables": [],
+        "decisions": []
+      },
+      "D": {
+        "actor": "D",
+        "observations": [
+          {
+            "event_id": "P:D:1",
+            "text": "你的身份是 villager。"
+          }
+        ],
+        "tables": [],
+        "decisions": []
+      },
+      "E": {
+        "actor": "E",
+        "observations": [
+          {
+            "event_id": "P:E:1",
+            "text": "你的身份是 villager。"
+          }
+        ],
+        "tables": [],
+        "decisions": []
+      },
+      "F": {
+        "actor": "F",
+        "observations": [
+          {
+            "event_id": "P:F:1",
+            "text": "你的身份是 werewolf。"
+          },
+          {
+            "event_id": "P:F:2",
+            "text": "你的狼人队友是 B。"
+          }
+        ],
+        "tables": [],
+        "decisions": []
+      },
+      "G": {
+        "actor": "G",
+        "observations": [
+          {
+            "event_id": "P:G:1",
+            "text": "你的身份是 villager。"
+          }
+        ],
+        "tables": [],
+        "decisions": []
+      }
+    },
+    "exchanges": [],
+    "votes": {},
+    "shadow": [],
+    "ground_truth": {
+      "A": "seer",
+      "B": "werewolf",
+      "C": "villager",
+      "D": "villager",
+      "E": "villager",
+      "F": "werewolf",
+      "G": "villager"
+    }
+  },
+  "error": "ValueError: lawful known identity must remain fixed",
+  "finished_at": "2026-09-06T01:11:43.531283+00:00",
+  "usage": {
+    "input_tokens": 70741,
+    "cached_input_tokens": 62720,
+    "output_tokens": 4716,
+    "reasoning_output_tokens": 201
+  }
+}

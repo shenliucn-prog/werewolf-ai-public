@@ -1,0 +1,516 @@
+{
+  "run_type": "frozen_reserved_acceptance_single_pass",
+  "preflight_utc": "2026-09-06 00:57:06 UTC",
+  "review_complete_utc": "2026-09-06 01:01:15 UTC",
+  "local_date": "2026-09-05",
+  "frozen_commit": "8ac9265",
+  "cli_version": "0.153.3",
+  "model_requested": "gpt-5.6-terra",
+  "reasoning_effort": "medium",
+  "auth": "existing ChatGPT login; no key provisioned",
+  "source_sha256": {
+    "werewolf_web/research/judgment.py": "115684d0a6cd9a6a0ca1fefbcd2a113e461383a475e8f3450112f623c78bed07",
+    "werewolf_web/research/judgment_cases.py": "e6472354f15bda7861631ac4625b300716bb415f2e7ff1f6dcbd6a2e7e624e6b",
+    "werewolf_web/research/judgment_eval.py": "28f81efc6a71e840196400749ed24892b6487c9286642649ad902ba5093384e8"
+  },
+  "source_hashes_verified_unchanged_after_run": true,
+  "protocol": "Same CLI flags and stdin wrapper as the development smoke. One independent ephemeral, read-only Codex exec per case, empty working directory, user config ignored, tool features disabled. Only sanitized question context and generic rubric supplied; no gold labels, prior answers or repository contents. No output-schema enforcement.",
+  "partition": "heldout",
+  "scenario_families": 8,
+  "language_specific_cases": 16,
+  "repetitions": 1,
+  "retries": 0,
+  "runs": [
+    {
+      "id": "q09-zh-CN",
+      "exit_code": 0,
+      "seconds": 10.287,
+      "tool_events": 0,
+      "usage": {
+        "input_tokens": 9959,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 194,
+        "reasoning_output_tokens": 0
+      }
+    },
+    {
+      "id": "q09-en",
+      "exit_code": 0,
+      "seconds": 9.713,
+      "tool_events": 0,
+      "usage": {
+        "input_tokens": 9862,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 167,
+        "reasoning_output_tokens": 0
+      }
+    },
+    {
+      "id": "q10-zh-CN",
+      "exit_code": 0,
+      "seconds": 8.172,
+      "tool_events": 0,
+      "usage": {
+        "input_tokens": 9919,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 142,
+        "reasoning_output_tokens": 0
+      }
+    },
+    {
+      "id": "q10-en",
+      "exit_code": 0,
+      "seconds": 10.595,
+      "tool_events": 0,
+      "usage": {
+        "input_tokens": 9826,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 117,
+        "reasoning_output_tokens": 0
+      }
+    },
+    {
+      "id": "q11-zh-CN",
+      "exit_code": 0,
+      "seconds": 15.555,
+      "tool_events": 0,
+      "usage": {
+        "input_tokens": 9946,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 200,
+        "reasoning_output_tokens": 0
+      }
+    },
+    {
+      "id": "q11-en",
+      "exit_code": 0,
+      "seconds": 10.218,
+      "tool_events": 0,
+      "usage": {
+        "input_tokens": 9853,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 186,
+        "reasoning_output_tokens": 0
+      }
+    },
+    {
+      "id": "q12-zh-CN",
+      "exit_code": 0,
+      "seconds": 13.126,
+      "tool_events": 0,
+      "usage": {
+        "input_tokens": 9967,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 226,
+        "reasoning_output_tokens": 0
+      }
+    },
+    {
+      "id": "q12-en",
+      "exit_code": 0,
+      "seconds": 11.274,
+      "tool_events": 0,
+      "usage": {
+        "input_tokens": 9870,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 171,
+        "reasoning_output_tokens": 0
+      }
+    },
+    {
+      "id": "q13-zh-CN",
+      "exit_code": 0,
+      "seconds": 9.616,
+      "tool_events": 0,
+      "usage": {
+        "input_tokens": 9910,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 171,
+        "reasoning_output_tokens": 0
+      }
+    },
+    {
+      "id": "q13-en",
+      "exit_code": 0,
+      "seconds": 12.136,
+      "tool_events": 0,
+      "usage": {
+        "input_tokens": 9815,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 134,
+        "reasoning_output_tokens": 0
+      }
+    },
+    {
+      "id": "q14-zh-CN",
+      "exit_code": 0,
+      "seconds": 11.797,
+      "tool_events": 0,
+      "usage": {
+        "input_tokens": 9909,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 143,
+        "reasoning_output_tokens": 0
+      }
+    },
+    {
+      "id": "q14-en",
+      "exit_code": 0,
+      "seconds": 8.409,
+      "tool_events": 0,
+      "usage": {
+        "input_tokens": 9812,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 111,
+        "reasoning_output_tokens": 0
+      }
+    },
+    {
+      "id": "q15-zh-CN",
+      "exit_code": 0,
+      "seconds": 8.682,
+      "tool_events": 0,
+      "usage": {
+        "input_tokens": 9964,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 187,
+        "reasoning_output_tokens": 0
+      }
+    },
+    {
+      "id": "q15-en",
+      "exit_code": 0,
+      "seconds": 8.931,
+      "tool_events": 0,
+      "usage": {
+        "input_tokens": 9867,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 173,
+        "reasoning_output_tokens": 0
+      }
+    },
+    {
+      "id": "q16-zh-CN",
+      "exit_code": 0,
+      "seconds": 8.691,
+      "tool_events": 0,
+      "usage": {
+        "input_tokens": 9940,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 125,
+        "reasoning_output_tokens": 0
+      }
+    },
+    {
+      "id": "q16-en",
+      "exit_code": 0,
+      "seconds": 40.935,
+      "tool_events": 0,
+      "usage": {
+        "input_tokens": 9846,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 99,
+        "reasoning_output_tokens": 0
+      }
+    }
+  ],
+  "responses": {
+    "q09-zh-CN": "{\"request_id\":\"q09-zh-CN\",\"observer\":\"A\",\"target\":\"B\",\"verdict\":\"reasonable_revision\",\"confidence\":0.99,\"reason\":\"B 最初的怀疑明确建立在“F 投了 G”的汇总信息上；主持人随后更正该记录为 F 投 D；B 据此撤回原有怀疑理由。这是由新证据纠正原始前提所支持的判断修订，而非未回应的矛盾。\",\"citations\":[{\"event_id\":\"E1\",\"quote\":\"我看到的汇总说 F 投了 G，所以我怀疑 F 在保 D。\"},{\"event_id\":\"E2\",\"quote\":\"汇总纠正：F 的公开投票目标是 D，之前显示 G 是记录错误。\"},{\"event_id\":\"E3\",\"quote\":\"依据纠正后的票型，我撤回那条怀疑理由。\"}]}",
+    "q09-en": "{\"request_id\":\"q09-en\",\"observer\":\"A\",\"target\":\"B\",\"verdict\":\"reasonable_revision\",\"confidence\":0.99,\"reason\":\"B’s initial suspicion was explicitly based on the summary that F voted for G. After the host corrected that record to say F publicly voted for D, B withdrew that reason. This is a judgment change explained by an acknowledged correction, not an unresolved contradiction.\",\"citations\":[{\"event_id\":\"E1\",\"quote\":\"The summary I saw said F voted for G, so I suspected F was protecting D.\"},{\"event_id\":\"E2\",\"quote\":\"Record correction: F publicly voted for D; the earlier display of G was a recording error.\"},{\"event_id\":\"E3\",\"quote\":\"On the corrected vote record, I withdraw that reason for suspicion.\"}]}",
+    "q10-zh-CN": "{\"request_id\":\"q10-zh-CN\",\"observer\":\"A\",\"target\":\"B\",\"verdict\":\"different_conditions\",\"confidence\":0.99,\"reason\":\"B 的两项判断明确适用于不同前提：前者限定于假设 H，后者明确采用非 H 的世界，因此记录未显示同一条件下的不相容主张。\",\"citations\":[{\"event_id\":\"E1\",\"quote\":\"在假设 H 的世界里，F 是预言家，G 是狼。\"},{\"event_id\":\"E2\",\"quote\":\"我当前采用的是非 H 的世界：F 不是预言家，G 的身份未知。\"}]}",
+    "q10-en": "{\"request_id\":\"q10-en\",\"observer\":\"A\",\"target\":\"B\",\"verdict\":\"different_conditions\",\"confidence\":0.99,\"reason\":\"B explicitly separates a hypothetical premise from B's current working world. The statements therefore do not assert the same conditions.\",\"citations\":[{\"event_id\":\"E1\",\"quote\":\"In hypothetical world H, F is the seer and G is a wolf.\"},{\"event_id\":\"E2\",\"quote\":\"My current working world is not H: F is not the seer and G's role is unknown.\"}]}",
+    "q11-zh-CN": "{\"request_id\":\"q11-zh-CN\",\"observer\":\"A\",\"target\":\"B\",\"verdict\":\"strategic_concealment\",\"confidence\":0.88,\"reason\":\"B 先表示自己“有一个倾向”，但暂不公开；随后公开支持 F。B 对前后公开程度的差异给出了策略性解释：观察谁会主动攻击 F，并明确否认自己此前“完全没有想法”。该解释可能使两段表述相容，但可见记录无法证实其真实意图，因此归为 strategic_concealment。\",\"citations\":[{\"event_id\":\"E1\",\"quote\":\"我有一个倾向，但暂时不填进公开表。\"},{\"event_id\":\"E2\",\"quote\":\"现在我公开支持 F。\"},{\"event_id\":\"E3\",\"quote\":\"先前不公开，是想观察谁主动攻击 F；我没说过自己完全没有想法。\"}]}",
+    "q11-en": "{\"request_id\":\"q11-en\",\"observer\":\"A\",\"target\":\"B\",\"verdict\":\"strategic_concealment\",\"confidence\":0.91,\"reason\":\"B initially said, \\\"I have a tentative view but will not put it in my public table yet.\\\" Later public support for F does not contradict having a nonpublic tentative view. B's later account, \\\"I withheld it to observe who attacked F; I never said I had no view at all.\\\", plausibly explains the withholding, though it does not verify intent.\",\"citations\":[{\"event_id\":\"E1\",\"quote\":\"I have a tentative view but will not put it in my public table yet.\"},{\"event_id\":\"E2\",\"quote\":\"I now publicly support F.\"},{\"event_id\":\"E3\",\"quote\":\"I withheld it to observe who attacked F; I never said I had no view at all.\"}]}",
+    "q12-zh-CN": "{\"request_id\":\"q12-zh-CN\",\"observer\":\"A\",\"target\":\"B\",\"verdict\":\"unresolved_contradiction\",\"confidence\":0.99,\"reason\":\"主持人明确本局“恰好一名预言家，身份不会转换”。B 则在同一时刻、其唯一采纳的身份排列中，断言 F 和 G “都确定是真预言家”，并明确排除二选一或不同假设。两项主张在同一局内不相容，且当前记录中没有不同条件、新证据或撤回解释。\",\"citations\":[{\"event_id\":\"E1\",\"quote\":\"本局恰好一名预言家，身份不会转换。\"},{\"event_id\":\"E2\",\"quote\":\"同一时刻，在我唯一采纳的那套身份排列中，F 和 G 都确定是真预言家。\"},{\"event_id\":\"E3\",\"quote\":\"不是二选一，也不是不同假设；我坚持两人同时确定为真预言家。\"}]}",
+    "q12-en": "{\"request_id\":\"q12-en\",\"observer\":\"A\",\"target\":\"B\",\"verdict\":\"unresolved_contradiction\",\"confidence\":0.99,\"reason\":\"The host states that there is exactly one seer and roles do not change. B explicitly asserts that, within one adopted role assignment, F and G are both certainly the true seer simultaneously, and rejects treating this as alternatives or different hypotheses. Those assertions are incompatible with exactly one seer.\",\"citations\":[{\"event_id\":\"E1\",\"quote\":\"There is exactly one seer in this game and roles do not change.\"},{\"event_id\":\"E2\",\"quote\":\"in my single adopted role assignment, both F and G are certainly the true seer.\"},{\"event_id\":\"E3\",\"quote\":\"I insist both are certainly true seers simultaneously.\"}]}",
+    "q13-zh-CN": "{\"request_id\":\"q13-zh-CN\",\"observer\":\"A\",\"target\":\"B\",\"verdict\":\"insufficient_evidence\",\"confidence\":0.98,\"reason\":\"可见记录中没有 B 认为 F 是好人的原始表述，也没有 B 公开指控 F 的原始表述。C 的说法只是转述，不能据此建立具体不相容主张。B 表示不公开私有表，但未确认或否认该转述；因此无法判断其论证是否矛盾。\",\"citations\":[{\"event_id\":\"E1\",\"quote\":\"B 私下肯定认为 F 是好人，却公开指控 F，必须承认矛盾。\"},{\"event_id\":\"E2\",\"quote\":\"我不公开私有表。\"}]}",
+    "q13-en": "{\"request_id\":\"q13-en\",\"observer\":\"A\",\"target\":\"B\",\"verdict\":\"insufficient_evidence\",\"confidence\":0.98,\"reason\":\"C alleges that B privately thinks F is good while publicly accusing F, but the visible record contains no statement from B establishing either alleged private judgment or public accusation. B only declines to disclose private information, which neither confirms nor resolves C's allegation.\",\"citations\":[{\"event_id\":\"E1\",\"quote\":\"B must privately think F is good while publicly accusing F, so must admit a contradiction.\"},{\"event_id\":\"E2\",\"quote\":\"I will not disclose my private table.\"}]}",
+    "q14-zh-CN": "{\"request_id\":\"q14-zh-CN\",\"observer\":\"A\",\"target\":\"B\",\"verdict\":\"no_contradiction\",\"confidence\":0.99,\"reason\":\"B 明确将“F 一定是狼”标为 G 的说法，并表示不同意；随后称自己仍没有足够证据判断 F。两句相容，未显示 B 曾主张 F 必定是狼。\",\"citations\":[{\"event_id\":\"E1\",\"quote\":\"‘F 一定是狼’这句话是 G 说的，我不同意。\"},{\"event_id\":\"E2\",\"quote\":\"我仍然没有足够证据判断 F。\"}]}",
+    "q14-en": "{\"request_id\":\"q14-en\",\"observer\":\"A\",\"target\":\"B\",\"verdict\":\"no_contradiction\",\"confidence\":0.99,\"reason\":\"B explicitly attributes the certainty claim to G and disavows it, then states B lacks enough evidence to judge F. These statements are consistent.\",\"citations\":[{\"event_id\":\"E1\",\"quote\":\"'F is certainly a wolf' was G's statement; I disagree.\"},{\"event_id\":\"E2\",\"quote\":\"I still lack enough evidence to judge F.\"}]}",
+    "q15-zh-CN": "{\"request_id\":\"q15-zh-CN\",\"observer\":\"A\",\"target\":\"B\",\"verdict\":\"unresolved_contradiction\",\"confidence\":0.99,\"reason\":\"B称第1轮投F“只因当时已经公开的G的这条指控”，但记录说明G对F的指控直到第2轮才首次公开；两项关于该指控公开时间的主张不相容。\",\"citations\":[{\"event_id\":\"E1\",\"quote\":\"第 1 轮：我支持投 F。\"},{\"event_id\":\"E2\",\"quote\":\"第 2 轮才首次公开 G 对 F 的指控。\"},{\"event_id\":\"E3\",\"quote\":\"第 1 轮我只因当时已经公开的 G 的这条指控才投 F；我没有其他来源，也没有记错轮次。\"}]}",
+    "q15-en": "{\"request_id\":\"q15-en\",\"observer\":\"A\",\"target\":\"B\",\"verdict\":\"unresolved_contradiction\",\"confidence\":0.99,\"reason\":\"B says the sole reason for supporting F in round 1 was G's accusation already being public then, while the host states that accusation first became public in round 2. These assertions are incompatible, and no supplied response resolves the timing conflict.\",\"citations\":[{\"event_id\":\"E1\",\"quote\":\"Round 1: I support voting for F.\"},{\"event_id\":\"E2\",\"quote\":\"G's accusation against F first became public in round 2.\"},{\"event_id\":\"E3\",\"quote\":\"In round 1 I voted for F solely because that accusation by G was already public then; I had no other source and am not mistaken about the round.\"}]}",
+    "q16-zh-CN": "{\"request_id\":\"q16-zh-CN\",\"observer\":\"A\",\"target\":\"B\",\"verdict\":\"no_contradiction\",\"confidence\":0.99,\"reason\":\"B 在两次发言中均表示对 F 的身份不确定；后一句“仍然”明确延续前一判断，且说明需要更多证据，未出现不相容主张。\",\"citations\":[{\"event_id\":\"E1\",\"quote\":\"我对 F 的身份不确定。\"},{\"event_id\":\"E2\",\"quote\":\"我仍然不确定，需要更多证据。\"}]}",
+    "q16-en": "{\"request_id\":\"q16-en\",\"observer\":\"A\",\"target\":\"B\",\"verdict\":\"no_contradiction\",\"confidence\":0.99,\"reason\":\"B's statements are consistent: both express uncertainty about F and a need for further evidence. No incompatible assertion is visible.\",\"citations\":[{\"event_id\":\"E1\",\"quote\":\"I am unsure about F's role.\"},{\"event_id\":\"E2\",\"quote\":\"I remain unsure and need more evidence.\"}]}"
+  },
+  "evaluation": {
+    "summary": {
+      "total": 16,
+      "valid": 16,
+      "invalid_or_missing": 0,
+      "correct": 16,
+      "accuracy_all": 1,
+      "accuracy_valid_only": 1,
+      "abstentions": 2,
+      "required_evidence_covered": 16,
+      "false_positive_contradictions": 0,
+      "noncontradiction_cases": 12,
+      "false_positive_rate": 0,
+      "missed_contradictions_including_invalid": 0,
+      "contradiction_cases": 4,
+      "miss_rate_including_invalid": 0
+    },
+    "errors": {},
+    "by_locale": {
+      "en": {
+        "total": 8,
+        "valid": 8,
+        "invalid_or_missing": 0,
+        "correct": 8,
+        "accuracy_all": 1,
+        "accuracy_valid_only": 1,
+        "abstentions": 1,
+        "required_evidence_covered": 8,
+        "false_positive_contradictions": 0,
+        "noncontradiction_cases": 6,
+        "false_positive_rate": 0,
+        "missed_contradictions_including_invalid": 0,
+        "contradiction_cases": 2,
+        "miss_rate_including_invalid": 0
+      },
+      "zh-CN": {
+        "total": 8,
+        "valid": 8,
+        "invalid_or_missing": 0,
+        "correct": 8,
+        "accuracy_all": 1,
+        "accuracy_valid_only": 1,
+        "abstentions": 1,
+        "required_evidence_covered": 8,
+        "false_positive_contradictions": 0,
+        "noncontradiction_cases": 6,
+        "false_positive_rate": 0,
+        "missed_contradictions_including_invalid": 0,
+        "contradiction_cases": 2,
+        "miss_rate_including_invalid": 0
+      }
+    },
+    "confusion": [
+      {
+        "expected": "different_conditions",
+        "predicted": "different_conditions",
+        "count": 2
+      },
+      {
+        "expected": "insufficient_evidence",
+        "predicted": "insufficient_evidence",
+        "count": 2
+      },
+      {
+        "expected": "no_contradiction",
+        "predicted": "no_contradiction",
+        "count": 4
+      },
+      {
+        "expected": "reasonable_revision",
+        "predicted": "reasonable_revision",
+        "count": 2
+      },
+      {
+        "expected": "strategic_concealment",
+        "predicted": "strategic_concealment",
+        "count": 2
+      },
+      {
+        "expected": "unresolved_contradiction",
+        "predicted": "unresolved_contradiction",
+        "count": 4
+      }
+    ],
+    "rows": [
+      {
+        "request_id": "q09-zh-CN",
+        "locale": "zh-CN",
+        "expected": "reasonable_revision",
+        "verdict": "reasonable_revision",
+        "valid": true,
+        "confidence": 0.99,
+        "correct": true,
+        "required_evidence_covered": true
+      },
+      {
+        "request_id": "q09-en",
+        "locale": "en",
+        "expected": "reasonable_revision",
+        "verdict": "reasonable_revision",
+        "valid": true,
+        "confidence": 0.99,
+        "correct": true,
+        "required_evidence_covered": true
+      },
+      {
+        "request_id": "q10-zh-CN",
+        "locale": "zh-CN",
+        "expected": "different_conditions",
+        "verdict": "different_conditions",
+        "valid": true,
+        "confidence": 0.99,
+        "correct": true,
+        "required_evidence_covered": true
+      },
+      {
+        "request_id": "q10-en",
+        "locale": "en",
+        "expected": "different_conditions",
+        "verdict": "different_conditions",
+        "valid": true,
+        "confidence": 0.99,
+        "correct": true,
+        "required_evidence_covered": true
+      },
+      {
+        "request_id": "q11-zh-CN",
+        "locale": "zh-CN",
+        "expected": "strategic_concealment",
+        "verdict": "strategic_concealment",
+        "valid": true,
+        "confidence": 0.88,
+        "correct": true,
+        "required_evidence_covered": true
+      },
+      {
+        "request_id": "q11-en",
+        "locale": "en",
+        "expected": "strategic_concealment",
+        "verdict": "strategic_concealment",
+        "valid": true,
+        "confidence": 0.91,
+        "correct": true,
+        "required_evidence_covered": true
+      },
+      {
+        "request_id": "q12-zh-CN",
+        "locale": "zh-CN",
+        "expected": "unresolved_contradiction",
+        "verdict": "unresolved_contradiction",
+        "valid": true,
+        "confidence": 0.99,
+        "correct": true,
+        "required_evidence_covered": true
+      },
+      {
+        "request_id": "q12-en",
+        "locale": "en",
+        "expected": "unresolved_contradiction",
+        "verdict": "unresolved_contradiction",
+        "valid": true,
+        "confidence": 0.99,
+        "correct": true,
+        "required_evidence_covered": true
+      },
+      {
+        "request_id": "q13-zh-CN",
+        "locale": "zh-CN",
+        "expected": "insufficient_evidence",
+        "verdict": "insufficient_evidence",
+        "valid": true,
+        "confidence": 0.98,
+        "correct": true,
+        "required_evidence_covered": true
+      },
+      {
+        "request_id": "q13-en",
+        "locale": "en",
+        "expected": "insufficient_evidence",
+        "verdict": "insufficient_evidence",
+        "valid": true,
+        "confidence": 0.98,
+        "correct": true,
+        "required_evidence_covered": true
+      },
+      {
+        "request_id": "q14-zh-CN",
+        "locale": "zh-CN",
+        "expected": "no_contradiction",
+        "verdict": "no_contradiction",
+        "valid": true,
+        "confidence": 0.99,
+        "correct": true,
+        "required_evidence_covered": true
+      },
+      {
+        "request_id": "q14-en",
+        "locale": "en",
+        "expected": "no_contradiction",
+        "verdict": "no_contradiction",
+        "valid": true,
+        "confidence": 0.99,
+        "correct": true,
+        "required_evidence_covered": true
+      },
+      {
+        "request_id": "q15-zh-CN",
+        "locale": "zh-CN",
+        "expected": "unresolved_contradiction",
+        "verdict": "unresolved_contradiction",
+        "valid": true,
+        "confidence": 0.99,
+        "correct": true,
+        "required_evidence_covered": true
+      },
+      {
+        "request_id": "q15-en",
+        "locale": "en",
+        "expected": "unresolved_contradiction",
+        "verdict": "unresolved_contradiction",
+        "valid": true,
+        "confidence": 0.99,
+        "correct": true,
+        "required_evidence_covered": true
+      },
+      {
+        "request_id": "q16-zh-CN",
+        "locale": "zh-CN",
+        "expected": "no_contradiction",
+        "verdict": "no_contradiction",
+        "valid": true,
+        "confidence": 0.99,
+        "correct": true,
+        "required_evidence_covered": true
+      },
+      {
+        "request_id": "q16-en",
+        "locale": "en",
+        "expected": "no_contradiction",
+        "verdict": "no_contradiction",
+        "valid": true,
+        "confidence": 0.99,
+        "correct": true,
+        "required_evidence_covered": true
+      }
+    ],
+    "caveat": "Authored labels and evidence-ID coverage; not semantic validation or calibrated confidence."
+  },
+  "total_usage": {
+    "input_tokens": 158265,
+    "cached_input_tokens": 125440,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 2546,
+    "reasoning_output_tokens": 0
+  },
+  "gate_result": "All 16 matched the frozen labels, passed strict report/exact-quote checks, and covered required evidence IDs.",
+  "downstream_scope": "Supports proposing a seven-player shadow observation experiment only. No live-game integration or automatic suspicion update enabled.",
+  "limitations": [
+    "Eight authored scenario families with paired translations, not 16 independent scenarios.",
+    "Single model configuration, one sample per case; no robustness or calibration claim.",
+    "Exact quotations and ID coverage do not prove semantic sufficiency. The assistant read all short explanations; no independent human annotation audit was performed.",
+    "This reserved set has now been queried; if used for tuning, it cannot serve as fresh acceptance evidence.",
+    "Reported account usage includes Codex agent context, not only case text; no dollar-cost estimate inferred.",
+    "The disabled code-mode-host warning was expected; all CLI calls completed and no command/file/MCP/web tool events were observed."
+  ]
+}

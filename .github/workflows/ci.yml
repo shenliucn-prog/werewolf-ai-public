@@ -1,0 +1,47 @@
+name: Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: python -m pip install -r werewolf_web/requirements.txt
+      - run: python -m unittest discover -s tests -q
+        env:
+          LLM_ENABLED: 'false'
+          LLM_API_KEY: ''
+      - run: node --check werewolf_web/static/js/app.js
+      - run: node --check werewolf_web/static/js/i18n.js
+      - run: npm ci
+      - run: npm test
+      - run: python scripts/check_release.py
+      - run: git diff --check
+
+  dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pip-audit
+      - run: python -m pip_audit -r werewolf_web/requirements.txt --progress-spinner off

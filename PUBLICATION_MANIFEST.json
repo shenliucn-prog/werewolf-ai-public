@@ -1,0 +1,976 @@
+{
+  "format": 1,
+  "git_history_included": false,
+  "source_commit": null,
+  "source_state": "First public root snapshot; prior private Git history is not imported. Per-file hashes identify this initial packaging record.",
+  "portrait_policy": "Only independent EXIF description ServiceUser/Time/ContentId fields redacted; all non-EXIF chunks and separate signed UserComment preserved byte-for-byte. Signature validity not asserted. Provider trace IDs in that envelope remain.",
+  "publication_status": "Authorized for publication at https://github.com/shenliucn-prog/werewolf-ai-public; consult GitHub for live visibility and CI.",
+  "files": [
+    {
+      "path": ".gitattributes",
+      "source_sha256": "f7883ae1a4f3195feb50451a299de75f6e199ef88ea0531599f234c9c98eb37a",
+      "sha256": "f7883ae1a4f3195feb50451a299de75f6e199ef88ea0531599f234c9c98eb37a",
+      "redacted_fields": []
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/bug_report.md",
+      "source_sha256": "5c58bbc248648bc716f9e4e7ddad56af37087c948571fd5e032053cfd865536c",
+      "sha256": "5c58bbc248648bc716f9e4e7ddad56af37087c948571fd5e032053cfd865536c",
+      "redacted_fields": []
+    },
+    {
+      "path": ".github/PULL_REQUEST_TEMPLATE.md",
+      "source_sha256": "3d1a8b7f4cbfc0aee6ee646cb0106feb328e2e454288648d04042e901cea27c4",
+      "sha256": "3d1a8b7f4cbfc0aee6ee646cb0106feb328e2e454288648d04042e901cea27c4",
+      "redacted_fields": []
+    },
+    {
+      "path": ".github/dependabot.yml",
+      "source_sha256": "8fff57f5b020b19c85663c0d2651a75b2c36bf00ec50fefc7bba160716d0b788",
+      "sha256": "8fff57f5b020b19c85663c0d2651a75b2c36bf00ec50fefc7bba160716d0b788",
+      "redacted_fields": []
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "source_sha256": "ba5644be400eba9cf456178541a2be219f9d009ffdbada94f6ded4355ddbdcea",
+      "sha256": "ba5644be400eba9cf456178541a2be219f9d009ffdbada94f6ded4355ddbdcea",
+      "redacted_fields": []
+    },
+    {
+      "path": ".gitignore",
+      "source_sha256": "6ce55df646ece9509de9c3a18697f0b3b9cf3d116eac529c3a91053c24b54371",
+      "sha256": "6ce55df646ece9509de9c3a18697f0b3b9cf3d116eac529c3a91053c24b54371",
+      "redacted_fields": []
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "source_sha256": "8c0e88c7b9cd93961fd574f6b765cc279f1ca2a4c59c07b83bb8c1dc50275e05",
+      "sha256": "e3a3d2d3168f66f57b78b9b7156cf66c08a2ab90d60929967045b1ec220afb2f",
+      "redacted_fields": []
+    },
+    {
+      "path": "LICENSE",
+      "source_sha256": "7a2c33fd8fd627c901fd6a0164659e956620c10001a0b9126b2effd672bc0dd3",
+      "sha256": "7a2c33fd8fd627c901fd6a0164659e956620c10001a0b9126b2effd672bc0dd3",
+      "redacted_fields": []
+    },
+    {
+      "path": "README.md",
+      "source_sha256": "574a2c3b81dd9361d28845543fc98e5c72646e80307287a2ef5296cc1c050459",
+      "sha256": "01ec416e3280448ef17159970d7b3f9697ffa8dc15968be20fb9b945cf7064e7",
+      "redacted_fields": []
+    },
+    {
+      "path": "README.zh-CN.md",
+      "source_sha256": "2a1a9b64fa1e4f5d9b5674d2950f2544f8401b22bdb88ade428eabe9d625ffb8",
+      "sha256": "52586d5fea15626ba34660cca7fe5bc22c352f262317bcd25a4c0abbfb3eaf80",
+      "redacted_fields": []
+    },
+    {
+      "path": "SECURITY.md",
+      "source_sha256": "9b2340e2e90ce68db6375326ae6fac95f4dfeddab03f410f76dbe292f8a190fa",
+      "sha256": "9b2340e2e90ce68db6375326ae6fac95f4dfeddab03f410f76dbe292f8a190fa",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "source_sha256": "6c76963a8f6557389ab63a5699033fc70797865a5322dd6299c394a86d0154f3",
+      "sha256": "6c76963a8f6557389ab63a5699033fc70797865a5322dd6299c394a86d0154f3",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/ASSETS.md",
+      "source_sha256": "d6ac9dea1111481b6d4d7c337941da40030d5bf10aaa221e107468e90bc46e33",
+      "sha256": "d6ac9dea1111481b6d4d7c337941da40030d5bf10aaa221e107468e90bc46e33",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/CAST_CUSTOMIZATION.md",
+      "source_sha256": "579f667c7f7b4efaf448ca6850df76b119b44ffaa9cf006edf48f48670939ec9",
+      "sha256": "579f667c7f7b4efaf448ca6850df76b119b44ffaa9cf006edf48f48670939ec9",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/CONJECTURE_JUDGMENT_EVAL.md",
+      "source_sha256": "a963e3ca1890b075f91d0a1e716a0daec5a3e984f7d6e51fde7bfb68c00fcd21",
+      "sha256": "a963e3ca1890b075f91d0a1e716a0daec5a3e984f7d6e51fde7bfb68c00fcd21",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/CONJECTURE_RESEARCH.md",
+      "source_sha256": "c85570bd4060592d5a7c2047ee4e4e7fd8d3de0b8ac7c8aef6a0eabda25e48fe",
+      "sha256": "c85570bd4060592d5a7c2047ee4e4e7fd8d3de0b8ac7c8aef6a0eabda25e48fe",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/CONJECTURE_SHADOW_DAY.md",
+      "source_sha256": "6224042aba430f9cfaa9baee69cbec2406cc775d39efbf7489d5817fe1199bdc",
+      "sha256": "6224042aba430f9cfaa9baee69cbec2406cc775d39efbf7489d5817fe1199bdc",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/DIVINE_WITCH.md",
+      "source_sha256": "9d6de9d2fccc1e5032a5ffc0d075bfc3f52525291c670e27d866755708433add",
+      "sha256": "9d6de9d2fccc1e5032a5ffc0d075bfc3f52525291c670e27d866755708433add",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/EXTREME_EXPERIMENT.md",
+      "source_sha256": "a9538443659ab630036583f72f40f6cc344c15213739f688951917918f545431",
+      "sha256": "a9538443659ab630036583f72f40f6cc344c15213739f688951917918f545431",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/GAME_MODES.md",
+      "source_sha256": "803ae6b4ae6a9e103017b953f52b724534e764cc669e844c435609fc416326b4",
+      "sha256": "803ae6b4ae6a9e103017b953f52b724534e764cc669e844c435609fc416326b4",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/KNOWN_LIMITATIONS.md",
+      "source_sha256": "5fff03b8818f13361dd81aa9d20fda1c42e7ede9ba1609e5ce1f560c18270738",
+      "sha256": "5fff03b8818f13361dd81aa9d20fda1c42e7ede9ba1609e5ce1f560c18270738",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/MECHANICS_LAB.md",
+      "source_sha256": "e7bb2b4a4a0f242f9fda6121e60ef99c012379e158aac4dd46e2134f72c7ebeb",
+      "sha256": "e7bb2b4a4a0f242f9fda6121e60ef99c012379e158aac4dd46e2134f72c7ebeb",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/PERSONALITIES.md",
+      "source_sha256": "cda510a21030e19a8911f044f08efc30ad9bc4a3525328e345f6fd3a1afdefa6",
+      "sha256": "cda510a21030e19a8911f044f08efc30ad9bc4a3525328e345f6fd3a1afdefa6",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/PLAYER_GUIDE.md",
+      "source_sha256": "d946d7b2be2c9f11899ff064973fc65643994165ea111e14a5e4f211408250f7",
+      "sha256": "d946d7b2be2c9f11899ff064973fc65643994165ea111e14a5e4f211408250f7",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/PUBLICATION_PLAN.md",
+      "source_sha256": "59fad286739daa88aafaff0ec22ddca1e90c9f3b90441a1ae22d23d250196fb2",
+      "sha256": "0bdfe0b79996162b8080ceb4ccb64b3df287ec15caa9e5a24c1e0fce9b475f75",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/PUBLIC_LAUNCH.md",
+      "source_sha256": "01f0c81a8384a437554cde6b3386172b598570c9eb920cd34f9457f75b28f4b0",
+      "sha256": "01f0c81a8384a437554cde6b3386172b598570c9eb920cd34f9457f75b28f4b0",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/PUBLIC_RELEASE.md",
+      "source_sha256": "976463b41d6e0200845f1b728ef335e4b31707909792a08180f019782219d698",
+      "sha256": "23e3667c7495114a720686dca67d1cc36e59b8c7cc0378773e20f48025d60c51",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/RELEASE_AUDIT.md",
+      "source_sha256": "c57192fe9c4031580e8d928879e6ca57561e915204428aa763d8006a58a585b3",
+      "sha256": "c57192fe9c4031580e8d928879e6ca57561e915204428aa763d8006a58a585b3",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/RULE_VARIANT.md",
+      "source_sha256": "d7540abf949c29142bae70cf9718039e7f6609e748ec09a09aa1f9a7de29a1ec",
+      "sha256": "d7540abf949c29142bae70cf9718039e7f6609e748ec09a09aa1f9a7de29a1ec",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/audit-assets/before-settings-en.png",
+      "source_sha256": "9bf05946f3c7d7a74ab9684e136bc039c9d59edc2f922363555635a4d9f42849",
+      "sha256": "9bf05946f3c7d7a74ab9684e136bc039c9d59edc2f922363555635a4d9f42849",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/audit-assets/conjecture-editor.png",
+      "source_sha256": "b3e1bacc99b6485406c000e4068230da1bb5f59cf6b2f500a4a6e431a54d5f8e",
+      "sha256": "b3e1bacc99b6485406c000e4068230da1bb5f59cf6b2f500a4a6e431a54d5f8e",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/audit-assets/divine-rules-choice.png",
+      "source_sha256": "7e3d458cf6321026582e3e7ab2d2a97c5316d49f092a819277622c5b4f935fb7",
+      "sha256": "7e3d458cf6321026582e3e7ab2d2a97c5316d49f092a819277622c5b4f935fb7",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/audit-assets/final-guide-en.png",
+      "source_sha256": "3d5ca803f3127cf48fc4b49dfc8f1daf2ce312702936f3864ebf652fcc2f3055",
+      "sha256": "3d5ca803f3127cf48fc4b49dfc8f1daf2ce312702936f3864ebf652fcc2f3055",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/audit-assets/fixed-settings-en.png",
+      "source_sha256": "3ba74a643bcbd1ec8bdb20d13ecc89c6d28881f5934b0f5b652ab402d62272db",
+      "sha256": "3ba74a643bcbd1ec8bdb20d13ecc89c6d28881f5934b0f5b652ab402d62272db",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/codex-dev-smoke-2026-09-05.json",
+      "source_sha256": "5ba7d83b5f26da4ef791c7b3013941be9ea8c61f0e26fb60710a683c4d7f57db",
+      "sha256": "5ba7d83b5f26da4ef791c7b3013941be9ea8c61f0e26fb60710a683c4d7f57db",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/codex-heldout-2026-09-05.json",
+      "source_sha256": "c18cab15dbfd53d225911652b3b2995e3aa50835593e2947a28526604c85341b",
+      "sha256": "c18cab15dbfd53d225911652b3b2995e3aa50835593e2947a28526604c85341b",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/codex-heldout-2026-09-05.md",
+      "source_sha256": "c5098e1147df3e4faecc189c4722e60fabcf9d27828673f10357e6eca11eff24",
+      "sha256": "c5098e1147df3e4faecc189c4722e60fabcf9d27828673f10357e6eca11eff24",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/codex-shadow-day-2026-09-05.json",
+      "source_sha256": "adae1780bff6ddefd8682b394e5e4dfb04953c23d989fbd62ea992f3f5b6c45e",
+      "sha256": "adae1780bff6ddefd8682b394e5e4dfb04953c23d989fbd62ea992f3f5b6c45e",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/codex-shadow-day-2026-09-05.md",
+      "source_sha256": "ec66e8f7ac01fdf59f97f85ab0e4e043433b3a9e39f7e6c4b468ea211d0d02e6",
+      "sha256": "ec66e8f7ac01fdf59f97f85ab0e4e043433b3a9e39f7e6c4b468ea211d0d02e6",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/codex-shadow-day-v2-2026-09-05.json",
+      "source_sha256": "d15aa74dd0818cb3c97cf2c4b13b48d2ea76af0c353ab4b65f48bb417bee2915",
+      "sha256": "d15aa74dd0818cb3c97cf2c4b13b48d2ea76af0c353ab4b65f48bb417bee2915",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/codex-shadow-day-v2-2026-09-05.md",
+      "source_sha256": "139e77b07437c74d45e72dc72b630345b116b1aa5ae523a211497d600637a432",
+      "sha256": "139e77b07437c74d45e72dc72b630345b116b1aa5ae523a211497d600637a432",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/codex-shadow-day-v3-1-2026-09-05.json",
+      "source_sha256": "91b1c842ffb58a121601e6193efb2c53d37885f03eb6524228cda39a08672752",
+      "sha256": "91b1c842ffb58a121601e6193efb2c53d37885f03eb6524228cda39a08672752",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/codex-shadow-day-v3-1-2026-09-05.md",
+      "source_sha256": "de7357a43de642b57959ef0c99b1bbe41add1ee0d52a35a07d8cd44d68bc441c",
+      "sha256": "de7357a43de642b57959ef0c99b1bbe41add1ee0d52a35a07d8cd44d68bc441c",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/codex-shadow-day-v3-2026-09-05.json",
+      "source_sha256": "f84456aaacc395e44652d0ca794cb496bc847013630cbb0b2f59f6b260799b93",
+      "sha256": "f84456aaacc395e44652d0ca794cb496bc847013630cbb0b2f59f6b260799b93",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/codex-shadow-day-v3-2026-09-05.md",
+      "source_sha256": "412781ebf38335149ac537b61e2f386cdd2f3097b5b9356a909bd7c73277fa4b",
+      "sha256": "412781ebf38335149ac537b61e2f386cdd2f3097b5b9356a909bd7c73277fa4b",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/divine-witch-local-2026-09-06-v1.json.gz",
+      "source_sha256": "3e07b7b74b94581198cb7e93d6baaac93cfd68ec126dac1b01fa9f2396d71788",
+      "sha256": "3e07b7b74b94581198cb7e93d6baaac93cfd68ec126dac1b01fa9f2396d71788",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/divine-witch-local-2026-09-06-v2.json.gz",
+      "source_sha256": "86d43eabcec325ea23ab082a3972d91b65fd6862666dc3c7159cdc4773cdeab0",
+      "sha256": "86d43eabcec325ea23ab082a3972d91b65fd6862666dc3c7159cdc4773cdeab0",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/divine-witch-local-2026-09-06-v2.md",
+      "source_sha256": "b0b9d85e69b34ca66ac4e7b73b7cfad072f3999e1a19f9c2b61441d75804f4a4",
+      "sha256": "b0b9d85e69b34ca66ac4e7b73b7cfad072f3999e1a19f9c2b61441d75804f4a4",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/divine-witch-local-v2-source.tar.gz",
+      "source_sha256": "e59ee5a40085a6a677503585d12c59e39d89984fb06d7c7ede623cc23a999d00",
+      "sha256": "e59ee5a40085a6a677503585d12c59e39d89984fb06d7c7ede623cc23a999d00",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/extreme-2026-09-06-v1/REPORT.md",
+      "source_sha256": "6636cdd9c4b46bbd668878e11668f56028f6d98956e9f8c9f3bbe96636dd211e",
+      "sha256": "6636cdd9c4b46bbd668878e11668f56028f6d98956e9f8c9f3bbe96636dd211e",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/extreme-2026-09-06-v1/condition-0.json",
+      "source_sha256": "7b7b34cac7498940b9edd25d54592995fecdae117b6484c1bcb9a1e3423b64ee",
+      "sha256": "7b7b34cac7498940b9edd25d54592995fecdae117b6484c1bcb9a1e3423b64ee",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/extreme-2026-09-06-v1/condition-1.json",
+      "source_sha256": "cebffaadab4124c622581e96bf2f5908a5a356bbee1369007b7c39b7cfcd5b09",
+      "sha256": "cebffaadab4124c622581e96bf2f5908a5a356bbee1369007b7c39b7cfcd5b09",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/extreme-2026-09-06-v1/condition-2.json",
+      "source_sha256": "24aa7b170793bd4ec1e15fe5d3ffc431bc68ae11f44de9baa273ecae5f49989d",
+      "sha256": "24aa7b170793bd4ec1e15fe5d3ffc431bc68ae11f44de9baa273ecae5f49989d",
+      "redacted_fields": []
+    },
+    {
+      "path": "docs/research-runs/extreme-2026-09-06-v1/condition-3.json",
+      "source_sha256": "7f9813b2276d6fe742702f49104adddb4642241a6c3b6f430ad29ec7af70c2e7",
+      "sha256": "7f9813b2276d6fe742702f49104adddb4642241a6c3b6f430ad29ec7af70c2e7",
+      "redacted_fields": []
+    },
+    {
+      "path": "package-lock.json",
+      "source_sha256": "57184b3e7b04b6e14276ab40ce5462c8a70cbf97085096e958e757508b8ec397",
+      "sha256": "57184b3e7b04b6e14276ab40ce5462c8a70cbf97085096e958e757508b8ec397",
+      "redacted_fields": []
+    },
+    {
+      "path": "package.json",
+      "source_sha256": "6c3ec1690b1b84f0e1bff06493707e94b2d744267c20911b023dee515348bacc",
+      "sha256": "6c3ec1690b1b84f0e1bff06493707e94b2d744267c20911b023dee515348bacc",
+      "redacted_fields": []
+    },
+    {
+      "path": "scripts/audit_publication.py",
+      "source_sha256": "d0dd52aa3c8456be755ca6c1514a200dc2ce67d91750cec948a5326e3921cfb6",
+      "sha256": "d0dd52aa3c8456be755ca6c1514a200dc2ce67d91750cec948a5326e3921cfb6",
+      "redacted_fields": []
+    },
+    {
+      "path": "scripts/check_release.py",
+      "source_sha256": "565d54a19e5ab5a31bb47ab6f4b3bca43232ed266cffd628239d443d55551036",
+      "sha256": "565d54a19e5ab5a31bb47ab6f4b3bca43232ed266cffd628239d443d55551036",
+      "redacted_fields": []
+    },
+    {
+      "path": "scripts/prepare_release.py",
+      "source_sha256": "ad3a8d77b2ff39c45bad0099ba1269200865c7ed8eb181975e448dfd26818bc9",
+      "sha256": "ad3a8d77b2ff39c45bad0099ba1269200865c7ed8eb181975e448dfd26818bc9",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/audit_divine_witch.py",
+      "source_sha256": "335d7fa299f5cd8ef14552590fd5e087c688d3a839f11b88b49c4efaabe32bfd",
+      "sha256": "335d7fa299f5cd8ef14552590fd5e087c688d3a839f11b88b49c4efaabe32bfd",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/audit_extreme.py",
+      "source_sha256": "6f10c4de050b91baf34974b5819e845ed5e89e8d5ccc22b798003ca08c649f7e",
+      "sha256": "6f10c4de050b91baf34974b5819e845ed5e89e8d5ccc22b798003ca08c649f7e",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_affect.py",
+      "source_sha256": "f4b7e1a12273e0649ff1ca484909cd7523e14827f33334e0a376004a7a7e5647",
+      "sha256": "f4b7e1a12273e0649ff1ca484909cd7523e14827f33334e0a376004a7a7e5647",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_api_contract.py",
+      "source_sha256": "9152cc782787d9d2505648b126a394b1a4d7eb81598995bb206eec7bedeb9658",
+      "sha256": "9152cc782787d9d2505648b126a394b1a4d7eb81598995bb206eec7bedeb9658",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_casting.py",
+      "source_sha256": "2aa694f0a0bbc6a738539504ef46c4a62ced9cff883a1d12afba7787eaba7910",
+      "sha256": "2aa694f0a0bbc6a738539504ef46c4a62ced9cff883a1d12afba7787eaba7910",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_chat_game.py",
+      "source_sha256": "c7fb4f0c317cc4bb2c5396017eb455d15c562780987b0e97344c0ce7a19cbe20",
+      "sha256": "c7fb4f0c317cc4bb2c5396017eb455d15c562780987b0e97344c0ce7a19cbe20",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_conjecture.py",
+      "source_sha256": "c65e353b751dcccbea6dce999560a11adf85f34d887c729a9643a5260128ebde",
+      "sha256": "c65e353b751dcccbea6dce999560a11adf85f34d887c729a9643a5260128ebde",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_debate.py",
+      "source_sha256": "c7a28e035308308af368e9dbeb9ea0205043ae83f6069b73d6760487c439953e",
+      "sha256": "c7a28e035308308af368e9dbeb9ea0205043ae83f6069b73d6760487c439953e",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_divine_witch.py",
+      "source_sha256": "a860879fb697f788787fee2bb5f3b59eec37dfe8f84a2ed3681f628380fbe7a5",
+      "sha256": "a860879fb697f788787fee2bb5f3b59eec37dfe8f84a2ed3681f628380fbe7a5",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_engine.py",
+      "source_sha256": "fb207fd8abbb6930be699c66aac1dd97d4f884b2154ce2963b4fad378a5a8fea",
+      "sha256": "fb207fd8abbb6930be699c66aac1dd97d4f884b2154ce2963b4fad378a5a8fea",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_game_options.py",
+      "source_sha256": "86e1cf9ed00dd48d94b3624fb22875c92fd38ae08731edf3fb16d5d24c182d31",
+      "sha256": "86e1cf9ed00dd48d94b3624fb22875c92fd38ae08731edf3fb16d5d24c182d31",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_host.py",
+      "source_sha256": "fe5d599eeeb496533d6aaed66c0b89cb37c224b7f2034490e1b4958ffec2a2a4",
+      "sha256": "fe5d599eeeb496533d6aaed66c0b89cb37c224b7f2034490e1b4958ffec2a2a4",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_i18n.py",
+      "source_sha256": "e4e33e30777c55a7e35c02a7c814a820cb9dde893bccf5be977d1519597847cf",
+      "sha256": "e4e33e30777c55a7e35c02a7c814a820cb9dde893bccf5be977d1519597847cf",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_judgment.py",
+      "source_sha256": "307160f47cd4132421f1f93786a6c3a50ce3cb23084f7f5e1c5ac3d3fa067fc2",
+      "sha256": "307160f47cd4132421f1f93786a6c3a50ce3cb23084f7f5e1c5ac3d3fa067fc2",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_llm_resilience.py",
+      "source_sha256": "e226c9052d0d3c7ef65bc499e64e7955c639497524cb245d0074b9ad1aea82a0",
+      "sha256": "e226c9052d0d3c7ef65bc499e64e7955c639497524cb245d0074b9ad1aea82a0",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_mechanics_lab.py",
+      "source_sha256": "491cd556137743d3ddada37485e576e21bb325613f6acac825ec6bea97a5e54c",
+      "sha256": "491cd556137743d3ddada37485e576e21bb325613f6acac825ec6bea97a5e54c",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_playable_locales.py",
+      "source_sha256": "745d9343ee670523f89691016cbd15a31aed0adddc1c2ff6e068e10b78f349c3",
+      "sha256": "745d9343ee670523f89691016cbd15a31aed0adddc1c2ff6e068e10b78f349c3",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_publication_audit.py",
+      "source_sha256": "0b0898e78ca6c7ab08361042c54000beaec1795fdab1e58e5728270d8e6b8234",
+      "sha256": "0b0898e78ca6c7ab08361042c54000beaec1795fdab1e58e5728270d8e6b8234",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_release_candidate.py",
+      "source_sha256": "bcc1a6e196c086fc9297ae9196895cd86f71b8d40d3b4bce6c7d3ddaf70cf779",
+      "sha256": "bcc1a6e196c086fc9297ae9196895cd86f71b8d40d3b4bce6c7d3ddaf70cf779",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_role_selection.py",
+      "source_sha256": "a201167b134d831cc7350f22c147611262f92c48c3ec4e485fc4e58bee2d8730",
+      "sha256": "a201167b134d831cc7350f22c147611262f92c48c3ec4e485fc4e58bee2d8730",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_setup_ui.cjs",
+      "source_sha256": "a86989c3a5116d77e354d4b3133da7c163ec51f07a24425f2b5264927c62c1e4",
+      "sha256": "a86989c3a5116d77e354d4b3133da7c163ec51f07a24425f2b5264927c62c1e4",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_shadow_debate.py",
+      "source_sha256": "4b7f721183682cd0ba330d1ec32b56cd91cbf3e8b35968105c2e69fbc943bf7e",
+      "sha256": "4b7f721183682cd0ba330d1ec32b56cd91cbf3e8b35968105c2e69fbc943bf7e",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_special_roles.py",
+      "source_sha256": "9c37740b4c2497356264057335b419497b75e996e0b319f560c7141f73429892",
+      "sha256": "9c37740b4c2497356264057335b419497b75e996e0b319f560c7141f73429892",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_strategy.py",
+      "source_sha256": "5e170405fb0ca9f3feec48a2a719b8f02cbe8c96c4759c37d3430768b15f5933",
+      "sha256": "5e170405fb0ca9f3feec48a2a719b8f02cbe8c96c4759c37d3430768b15f5933",
+      "redacted_fields": []
+    },
+    {
+      "path": "tests/test_table_talk.py",
+      "source_sha256": "b690f293ee4b88a8ad0404e9bb7aebe856ba830ded748bf256d03841c05ea89a",
+      "sha256": "b690f293ee4b88a8ad0404e9bb7aebe856ba830ded748bf256d03841c05ea89a",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/.env.example",
+      "source_sha256": "52404b905256fda32d1181ec94082d4321e20ede490b758a155613965331faca",
+      "sha256": "52404b905256fda32d1181ec94082d4321e20ede490b758a155613965331faca",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/__init__.py",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/ai/__init__.py",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/ai/affect.py",
+      "source_sha256": "b355245d8001a369e1f70773d3fcabc43cc3f8c71268d7df254a543256a15f33",
+      "sha256": "b355245d8001a369e1f70773d3fcabc43cc3f8c71268d7df254a543256a15f33",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/ai/brain.py",
+      "source_sha256": "00361d7b5a272b5fca6e460bfa02d0285767fc44f4092310a4fcd5612e409d48",
+      "sha256": "00361d7b5a272b5fca6e460bfa02d0285767fc44f4092310a4fcd5612e409d48",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/ai/growth.py",
+      "source_sha256": "4d28e18b5660b718926987d274661a095a668d6f03706e8452c271ff0ec2444a",
+      "sha256": "4d28e18b5660b718926987d274661a095a668d6f03706e8452c271ff0ec2444a",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/ai/host.py",
+      "source_sha256": "ca99825a193c3bc1357cb2059dc7ab473397b98fb83ec5b05ce070f624fd20fd",
+      "sha256": "ca99825a193c3bc1357cb2059dc7ab473397b98fb83ec5b05ce070f624fd20fd",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/ai/llm.py",
+      "source_sha256": "fa47df017088d1431294a314bce129e6002d9500813c37566de371b01f0124d3",
+      "sha256": "fa47df017088d1431294a314bce129e6002d9500813c37566de371b01f0124d3",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/ai/npc.py",
+      "source_sha256": "70fe5754c5e72dc29f80a57ea61c90e62fe55b4714b4f763ca3abafb43720b33",
+      "sha256": "70fe5754c5e72dc29f80a57ea61c90e62fe55b4714b4f763ca3abafb43720b33",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/ai/prompts.py",
+      "source_sha256": "42715692908eb51750ce48de50fb25d911badc627bb2101f2e71ce41dd401063",
+      "sha256": "42715692908eb51750ce48de50fb25d911badc627bb2101f2e71ce41dd401063",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/ai/strategic_agent.py",
+      "source_sha256": "0229e0ee79ec2054b78996c05dfc66d68f99799c1e27a05b196bcdb1f51a2a81",
+      "sha256": "0229e0ee79ec2054b78996c05dfc66d68f99799c1e27a05b196bcdb1f51a2a81",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/ai/strategy.py",
+      "source_sha256": "cba349248ffba041c018240cb306c5f4683adf904664b143e766fa657eb9efe2",
+      "sha256": "cba349248ffba041c018240cb306c5f4683adf904664b143e766fa657eb9efe2",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/casting.py",
+      "source_sha256": "252614322f9ba6f88e549f36696b983b122a8d3bc196061d186ef31dab0879b5",
+      "sha256": "252614322f9ba6f88e549f36696b983b122a8d3bc196061d186ef31dab0879b5",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/chat_game.py",
+      "source_sha256": "bef1dccdde1b26c0124616b9ddd0b1593bab7ea3db3e18847584747f1f39838f",
+      "sha256": "bef1dccdde1b26c0124616b9ddd0b1593bab7ea3db3e18847584747f1f39838f",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/cli_game.py",
+      "source_sha256": "6ea9c2095c10b33ebe71c8d7f9258ba0519a36c4f286cdccad77b440a8b90c18",
+      "sha256": "6ea9c2095c10b33ebe71c8d7f9258ba0519a36c4f286cdccad77b440a8b90c18",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/config.py",
+      "source_sha256": "5480b89229fd49ed8201daf94db06be5a5c87c01190a59d813acab6030c35bb3",
+      "sha256": "5480b89229fd49ed8201daf94db06be5a5c87c01190a59d813acab6030c35bb3",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/data/boards.json",
+      "source_sha256": "2361b5bf39a7b67c2650575bb47819d543d276aa13f020baeb59c030ca11aace",
+      "sha256": "2361b5bf39a7b67c2650575bb47819d543d276aa13f020baeb59c030ca11aace",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/data/personas/player-acheng.md",
+      "source_sha256": "4b799c8e1de43cc6a34a6f22bbac43cd5b50fa41459fee70f21fac25933c2a6e",
+      "sha256": "4b799c8e1de43cc6a34a6f22bbac43cd5b50fa41459fee70f21fac25933c2a6e",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/data/personas/player-aji.md",
+      "source_sha256": "d99f58d36b99b1aefc9dc21169c8c7fa31ce8f2759ffae1e1f80926ae64e6776",
+      "sha256": "d99f58d36b99b1aefc9dc21169c8c7fa31ce8f2759ffae1e1f80926ae64e6776",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/data/personas/player-alan.md",
+      "source_sha256": "385654dd8dba5b7d4b4a12644eac44e067138176f4e446d4439e56f0ff1865b5",
+      "sha256": "385654dd8dba5b7d4b4a12644eac44e067138176f4e446d4439e56f0ff1865b5",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/data/personas/player-aman.md",
+      "source_sha256": "b876c38090d49b0d350ab0047ae3d19598e1f88b75bb91dcdd5237576e6600be",
+      "sha256": "b876c38090d49b0d350ab0047ae3d19598e1f88b75bb91dcdd5237576e6600be",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/data/personas/player-amo.md",
+      "source_sha256": "0c5d386125f6a453673b00d0245ef532bbb3e2bf2cc181126456eca294946871",
+      "sha256": "0c5d386125f6a453673b00d0245ef532bbb3e2bf2cc181126456eca294946871",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/data/personas/player-dashan.md",
+      "source_sha256": "0ba93989c017e75b614dd6718ebbed23519cfb4f5d162ce4a7b91e1bede599fd",
+      "sha256": "0ba93989c017e75b614dd6718ebbed23519cfb4f5d162ce4a7b91e1bede599fd",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/data/personas/player-laomai.md",
+      "source_sha256": "f24040236779e7247817a5c577bc2c165d878d5509e4a40bbb750c0e87f32068",
+      "sha256": "f24040236779e7247817a5c577bc2c165d878d5509e4a40bbb750c0e87f32068",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/data/personas/player-tiandou.md",
+      "source_sha256": "da4b4dfba8dd1bc1829da9bf5d646c591a49dd620c4a67cec6fc4a9ae48a89bc",
+      "sha256": "da4b4dfba8dd1bc1829da9bf5d646c591a49dd620c4a67cec6fc4a9ae48a89bc",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/data/personas/player-xiaolu.md",
+      "source_sha256": "3bc497dba5c1152ac39438614f3643c3a6391c5b8e7d4de45efb0625725b9888",
+      "sha256": "3bc497dba5c1152ac39438614f3643c3a6391c5b8e7d4de45efb0625725b9888",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/data/personas/player-xiaoman.md",
+      "source_sha256": "79d587013adfec9fb175bfc1262a042fd78cb752765f3db774dccaaa497ba563",
+      "sha256": "79d587013adfec9fb175bfc1262a042fd78cb752765f3db774dccaaa497ba563",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/data/personas/player-xicao.md",
+      "source_sha256": "df89b89eda4adae8198d160cf5441f67d61a430ff74f3ffcf7275197be546d14",
+      "sha256": "df89b89eda4adae8198d160cf5441f67d61a430ff74f3ffcf7275197be546d14",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/data/personas/player-yexiao.md",
+      "source_sha256": "acc7d0269ce55dac2ab558c0cdd822fe66f3ed2b0963aeb5cf52290ab7853fc3",
+      "sha256": "acc7d0269ce55dac2ab558c0cdd822fe66f3ed2b0963aeb5cf52290ab7853fc3",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/game/__init__.py",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/game/conjecture.py",
+      "source_sha256": "58bdb0cfe7744da063b6f965aae89b2a2925857ac8d001cde78ebe6dd9d9009e",
+      "sha256": "58bdb0cfe7744da063b6f965aae89b2a2925857ac8d001cde78ebe6dd9d9009e",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/game/engine.py",
+      "source_sha256": "aab5b28fd49e0ea55bf9ab9ffee5c062b4b6f31919a0209df971fd8e34fbb665",
+      "sha256": "aab5b28fd49e0ea55bf9ab9ffee5c062b4b6f31919a0209df971fd8e34fbb665",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/game/models.py",
+      "source_sha256": "61254a85c003f8efa893c1a0aeba404fd020f354b1ff58bee127fefee0e0ec16",
+      "sha256": "61254a85c003f8efa893c1a0aeba404fd020f354b1ff58bee127fefee0e0ec16",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/i18n.py",
+      "source_sha256": "2ca3fe8166b86bc0e29975ce5c2be5ffef66b8ce7c5c70200e2852ce5ec6c48d",
+      "sha256": "2ca3fe8166b86bc0e29975ce5c2be5ffef66b8ce7c5c70200e2852ce5ec6c48d",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/requirements.txt",
+      "source_sha256": "00ef51a1b1321eb0055a2e83a36029f470142cabede15811c26cef1b240a1796",
+      "sha256": "00ef51a1b1321eb0055a2e83a36029f470142cabede15811c26cef1b240a1796",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/research/__init__.py",
+      "source_sha256": "26240d51f6f09ae286ca1831e55a163ed99da9ffddbb62a55a256124a9a9f142",
+      "sha256": "26240d51f6f09ae286ca1831e55a163ed99da9ffddbb62a55a256124a9a9f142",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/research/codex_shadow_run.py",
+      "source_sha256": "6b5a9a2a5857d961861825d8b5a409fa6b49a1031231fa77d795b03d621ea3a4",
+      "sha256": "6b5a9a2a5857d961861825d8b5a409fa6b49a1031231fa77d795b03d621ea3a4",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/research/conjecture.py",
+      "source_sha256": "551a312f62124e8102268e4487f5245bbd6abaa73d8f9ba84eb80c75b63486c7",
+      "sha256": "551a312f62124e8102268e4487f5245bbd6abaa73d8f9ba84eb80c75b63486c7",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/research/debate.py",
+      "source_sha256": "37b1450ef1f2745dbd3ab07d5aac821a363fcc3a58753ecf04adf45753fd7cd3",
+      "sha256": "37b1450ef1f2745dbd3ab07d5aac821a363fcc3a58753ecf04adf45753fd7cd3",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/research/debate_fixtures.py",
+      "source_sha256": "a3685d89ebef52de018d69656adff273b98c6aa183328fe4d03b98cb7d602590",
+      "sha256": "a3685d89ebef52de018d69656adff273b98c6aa183328fe4d03b98cb7d602590",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/research/divine_witch_screen.py",
+      "source_sha256": "3ab9702296a9ee8fc33afbabe623fc584e3f5c9a382515e2cf1759dc3648a2aa",
+      "sha256": "3ab9702296a9ee8fc33afbabe623fc584e3f5c9a382515e2cf1759dc3648a2aa",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/research/extreme_game.py",
+      "source_sha256": "461060109ce93f30e5c8d51f35aff9e159edcbf094f0a981c4437d3d96990e3e",
+      "sha256": "461060109ce93f30e5c8d51f35aff9e159edcbf094f0a981c4437d3d96990e3e",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/research/extreme_profiles.py",
+      "source_sha256": "c6dec169a3f02b0ede4b58b8e56434370dd2b539ac6ea3e22c285c3442798aa0",
+      "sha256": "c6dec169a3f02b0ede4b58b8e56434370dd2b539ac6ea3e22c285c3442798aa0",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/research/extreme_run.py",
+      "source_sha256": "bc374ea371cb52c4ebe300163dbc904655c7cc6ee5fda0e2ec4de612865b2729",
+      "sha256": "bc374ea371cb52c4ebe300163dbc904655c7cc6ee5fda0e2ec4de612865b2729",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/research/fixtures.py",
+      "source_sha256": "85700ae8cb00a16df9b3a8a8871d0aae2a3859c768077ed0f69bceb411b677b1",
+      "sha256": "85700ae8cb00a16df9b3a8a8871d0aae2a3859c768077ed0f69bceb411b677b1",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/research/identity_constraints.py",
+      "source_sha256": "439fd79fe4a93b8c0b6f128922e87f9c7faf24c88ad0271b6e6f7dd1a1e2547a",
+      "sha256": "439fd79fe4a93b8c0b6f128922e87f9c7faf24c88ad0271b6e6f7dd1a1e2547a",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/research/judgment.py",
+      "source_sha256": "115684d0a6cd9a6a0ca1fefbcd2a113e461383a475e8f3450112f623c78bed07",
+      "sha256": "115684d0a6cd9a6a0ca1fefbcd2a113e461383a475e8f3450112f623c78bed07",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/research/judgment_cases.py",
+      "source_sha256": "e6472354f15bda7861631ac4625b300716bb415f2e7ff1f6dcbd6a2e7e624e6b",
+      "sha256": "e6472354f15bda7861631ac4625b300716bb415f2e7ff1f6dcbd6a2e7e624e6b",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/research/judgment_eval.py",
+      "source_sha256": "28f81efc6a71e840196400749ed24892b6487c9286642649ad902ba5093384e8",
+      "sha256": "28f81efc6a71e840196400749ed24892b6487c9286642649ad902ba5093384e8",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/research/mechanics_lab.py",
+      "source_sha256": "3107a869c7689c8f1963bc0605a13e2af358416a5d8d26b2b7fa4ed76f59e96f",
+      "sha256": "3107a869c7689c8f1963bc0605a13e2af358416a5d8d26b2b7fa4ed76f59e96f",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/research/shadow_debate.py",
+      "source_sha256": "5c04079afcd750b630d0dde3601992c82e14e0bb11587e9f71f0f1fb3fb51976",
+      "sha256": "5c04079afcd750b630d0dde3601992c82e14e0bb11587e9f71f0f1fb3fb51976",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/research/shadow_schema.py",
+      "source_sha256": "cc22aa61f13f2d722d0ee1400da5f6baf139ca3efb4c70d9c6a986022b45cd02",
+      "sha256": "cc22aa61f13f2d722d0ee1400da5f6baf139ca3efb4c70d9c6a986022b45cd02",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/run.py",
+      "source_sha256": "071bcbffc0e806febd1379a1a352a8a766ac4e365273b9aef98536d7ae0c7f32",
+      "sha256": "071bcbffc0e806febd1379a1a352a8a766ac4e365273b9aef98536d7ae0c7f32",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/static/css/style.css",
+      "source_sha256": "981300fa140ee2fb372eefc163873d1702098f8e2752f8c5a434390359d5d717",
+      "sha256": "981300fa140ee2fb372eefc163873d1702098f8e2752f8c5a434390359d5d717",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/static/img/portraits/acheng.png",
+      "source_sha256": "fb4dd24ee25169b52b2e050755fef681750cb850b39a73e0f352e23a6048b68e",
+      "sha256": "fb4dd24ee25169b52b2e050755fef681750cb850b39a73e0f352e23a6048b68e",
+      "redacted_fields": [
+        "ContentId",
+        "ServiceUser",
+        "Time"
+      ]
+    },
+    {
+      "path": "werewolf_web/static/img/portraits/aji.png",
+      "source_sha256": "2da75b20f0b7ca67fce69e785edae258f667bfb370830aa8f1e3a64f9e190fb3",
+      "sha256": "2da75b20f0b7ca67fce69e785edae258f667bfb370830aa8f1e3a64f9e190fb3",
+      "redacted_fields": [
+        "ContentId",
+        "ServiceUser",
+        "Time"
+      ]
+    },
+    {
+      "path": "werewolf_web/static/img/portraits/alan.png",
+      "source_sha256": "fc53466dbbec3d8b67da75876af59311dd8920c42e2dc44cb0a8db99d9fa1f05",
+      "sha256": "fc53466dbbec3d8b67da75876af59311dd8920c42e2dc44cb0a8db99d9fa1f05",
+      "redacted_fields": [
+        "ContentId",
+        "ServiceUser",
+        "Time"
+      ]
+    },
+    {
+      "path": "werewolf_web/static/img/portraits/aman.png",
+      "source_sha256": "cd85bd0e552a845fa529dc356a86fc5e462f4802a7fe3c1407743a857d8471c5",
+      "sha256": "cd85bd0e552a845fa529dc356a86fc5e462f4802a7fe3c1407743a857d8471c5",
+      "redacted_fields": [
+        "ContentId",
+        "ServiceUser",
+        "Time"
+      ]
+    },
+    {
+      "path": "werewolf_web/static/img/portraits/amo.png",
+      "source_sha256": "729bac89520b9453b9fcee9c0de89103d5430a42efc0e41a49b57ca1c4137d86",
+      "sha256": "729bac89520b9453b9fcee9c0de89103d5430a42efc0e41a49b57ca1c4137d86",
+      "redacted_fields": [
+        "ContentId",
+        "ServiceUser",
+        "Time"
+      ]
+    },
+    {
+      "path": "werewolf_web/static/img/portraits/dashan.png",
+      "source_sha256": "b3ad79caf13f56e13feece879a13185236bd5f8afbc2233d2c28f1ebdf12906e",
+      "sha256": "b3ad79caf13f56e13feece879a13185236bd5f8afbc2233d2c28f1ebdf12906e",
+      "redacted_fields": [
+        "ContentId",
+        "ServiceUser",
+        "Time"
+      ]
+    },
+    {
+      "path": "werewolf_web/static/img/portraits/laomai.png",
+      "source_sha256": "592ad0eeb29ad08d0ca0c276eaad2197d4455ade1ac6476b3ef66ac4580e1fef",
+      "sha256": "592ad0eeb29ad08d0ca0c276eaad2197d4455ade1ac6476b3ef66ac4580e1fef",
+      "redacted_fields": [
+        "ContentId",
+        "ServiceUser",
+        "Time"
+      ]
+    },
+    {
+      "path": "werewolf_web/static/img/portraits/tiandou.png",
+      "source_sha256": "072a47d939502ff82cc4d73d4da00504bcf6e25859364d038cc7b3aece551463",
+      "sha256": "072a47d939502ff82cc4d73d4da00504bcf6e25859364d038cc7b3aece551463",
+      "redacted_fields": [
+        "ContentId",
+        "ServiceUser",
+        "Time"
+      ]
+    },
+    {
+      "path": "werewolf_web/static/img/portraits/xiaolu.png",
+      "source_sha256": "394f6587db61458790aecf8152242e9c5d5ad4f5f123e6733c1535a1d9a6d188",
+      "sha256": "394f6587db61458790aecf8152242e9c5d5ad4f5f123e6733c1535a1d9a6d188",
+      "redacted_fields": [
+        "ContentId",
+        "ServiceUser",
+        "Time"
+      ]
+    },
+    {
+      "path": "werewolf_web/static/img/portraits/xiaoman.png",
+      "source_sha256": "c4753efd300da6c50b2bd32587815988244ac6940935a21367bb60db6a3ea7bf",
+      "sha256": "c4753efd300da6c50b2bd32587815988244ac6940935a21367bb60db6a3ea7bf",
+      "redacted_fields": [
+        "ContentId",
+        "ServiceUser",
+        "Time"
+      ]
+    },
+    {
+      "path": "werewolf_web/static/img/portraits/xicao.png",
+      "source_sha256": "092837cb5155a171e22377e53ec6130b39af1a4289f4d8242abab19e75387526",
+      "sha256": "092837cb5155a171e22377e53ec6130b39af1a4289f4d8242abab19e75387526",
+      "redacted_fields": [
+        "ContentId",
+        "ServiceUser",
+        "Time"
+      ]
+    },
+    {
+      "path": "werewolf_web/static/img/portraits/yexiao.png",
+      "source_sha256": "6dffeee1eea78f278da2f980da18935c439db3278a44970c7a0f6592abe6d10b",
+      "sha256": "6dffeee1eea78f278da2f980da18935c439db3278a44970c7a0f6592abe6d10b",
+      "redacted_fields": [
+        "ContentId",
+        "ServiceUser",
+        "Time"
+      ]
+    },
+    {
+      "path": "werewolf_web/static/index.html",
+      "source_sha256": "97f2bce4bb9000604a6c76555d7350ef0f3f5e42b6c3f32ecee73d682874cc5d",
+      "sha256": "97f2bce4bb9000604a6c76555d7350ef0f3f5e42b6c3f32ecee73d682874cc5d",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/static/js/app.js",
+      "source_sha256": "42e21fa68026239d1edc6afedd46903b31475afe2c17ab3cee42e4f99cb0689d",
+      "sha256": "42e21fa68026239d1edc6afedd46903b31475afe2c17ab3cee42e4f99cb0689d",
+      "redacted_fields": []
+    },
+    {
+      "path": "werewolf_web/static/js/i18n.js",
+      "source_sha256": "bd46004277a8f48170758abb441334c6063d29a2386f9edba6a8031ccb06c765",
+      "sha256": "bd46004277a8f48170758abb441334c6063d29a2386f9edba6a8031ccb06c765",
+      "redacted_fields": []
+    }
+  ]
+}

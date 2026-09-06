@@ -1,0 +1,97 @@
+{
+  "boards": [
+    {
+      "id": "classic",
+      "name": "预女猎守",
+      "difficulty": "⭐ 入门",
+      "desc": "经典均衡场，4狼 vs 4神(预女猎守) vs 4民，纯逻辑驱动。",
+      "roles": ["seer", "witch", "hunter", "guard", "civilian", "civilian", "civilian", "civilian", "werewolf", "werewolf", "werewolf", "werewolf"]
+    },
+    {
+      "id": "divine_witch",
+      "name": "神女巫 · 无限药择一",
+      "difficulty": "🧪 实验",
+      "desc": "经典阵容，女巫解药与毒药总次数不限，每夜只能选一种。仅首夜可自救，守救同人仍会奶穿。平衡未定。",
+      "witch_rules": {"unlimited": true, "dual": false},
+      "round_limit": 20,
+      "roles": ["seer", "witch", "hunter", "guard", "civilian", "civilian", "civilian", "civilian", "werewolf", "werewolf", "werewolf", "werewolf"]
+    },
+    {
+      "id": "divine_witch_dual",
+      "name": "神女巫 · 无限药双开",
+      "difficulty": "🧪 极端实验",
+      "desc": "经典阵容，女巫每夜可各用一次解药和毒药，总次数不限。仅首夜可自救，守救同人仍会奶穿。平衡未定。",
+      "witch_rules": {"unlimited": true, "dual": true},
+      "round_limit": 20,
+      "roles": ["seer", "witch", "hunter", "guard", "civilian", "civilian", "civilian", "civilian", "werewolf", "werewolf", "werewolf", "werewolf"]
+    },
+    {
+      "id": "wolf_king",
+      "name": "狼王守卫",
+      "difficulty": "⭐⭐ 进阶",
+      "desc": "狼王被放逐/被猎带走可开枪换命，好人需掂量抗推对象。",
+      "roles": ["seer", "witch", "hunter", "guard", "civilian", "civilian", "civilian", "civilian", "werewolf", "werewolf", "werewolf", "wolf_king"]
+    },
+    {
+      "id": "white_wolf_knight",
+      "name": "白狼王骑士",
+      "difficulty": "⭐⭐ 进阶",
+      "desc": "白狼王自爆换人，骑士决斗换命，快节奏暴力博弈。",
+      "roles": ["seer", "witch", "hunter", "knight", "civilian", "civilian", "civilian", "civilian", "werewolf", "werewolf", "werewolf", "white_wolf_king"]
+    },
+    {
+      "id": "wolf_beauty_knight",
+      "name": "狼美人骑士",
+      "difficulty": "⭐⭐ 进阶",
+      "desc": "狼美人魅惑绑票，骑士决斗破局，防御型狼人博弈。",
+      "roles": ["seer", "witch", "hunter", "knight", "civilian", "civilian", "civilian", "civilian", "werewolf", "werewolf", "werewolf", "wolf_beauty"]
+    },
+    {
+      "id": "hidden_wolf_crow",
+      "name": "隐狼乌鸦",
+      "difficulty": "⭐⭐ 进阶",
+      "desc": "隐狼查验显示好人，乌鸦诽谤操控票型，信息战拉满。",
+      "roles": ["seer", "witch", "hunter", "crow", "civilian", "civilian", "civilian", "civilian", "werewolf", "werewolf", "werewolf", "hidden_wolf"]
+    },
+    {
+      "id": "bomber",
+      "name": "炸弹人",
+      "difficulty": "⭐⭐ 娱乐",
+      "desc": "炸弹人被放逐随机炸人，谁都不敢随便扛推，场面失控。",
+      "roles": ["seer", "witch", "hunter", "bomber", "civilian", "civilian", "civilian", "civilian", "werewolf", "werewolf", "werewolf", "werewolf"]
+    },
+    {
+      "id": "stone_ghost",
+      "name": "石像鬼守墓人",
+      "difficulty": "⭐⭐⭐ 高手",
+      "desc": "石像鬼精准查验身份，守墓人复核放逐，情报战巅峰。",
+      "roles": ["seer", "witch", "hunter", "gravekeeper", "civilian", "civilian", "civilian", "civilian", "werewolf", "werewolf", "werewolf", "stone_ghost"]
+    },
+    {
+      "id": "evil_knight",
+      "name": "恶灵骑士守卫",
+      "difficulty": "⭐⭐⭐ 高手",
+      "desc": "恶灵骑士一次被动反弹，神职投鼠忌器，技能噩梦。",
+      "roles": ["seer", "witch", "hunter", "guard", "civilian", "civilian", "civilian", "civilian", "werewolf", "werewolf", "werewolf", "evil_knight"]
+    }
+  ],
+  "roles": {
+    "seer": {"cn": "预言家", "faction": "god", "emoji": "🔮", "desc": "每晚验一人，得知其是好人还是狼人。"},
+    "witch": {"cn": "女巫", "faction": "god", "emoji": "🧪", "desc": "拥有解药(救一人)与毒药(毒一人)，不可同夜使用，首夜可自救。"},
+    "hunter": {"cn": "猎人", "faction": "god", "emoji": "🏹", "desc": "出局(非毒/非骑士决斗)时可开枪带走一名玩家。"},
+    "guard": {"cn": "守卫", "faction": "god", "emoji": "🛡️", "desc": "每晚守护一人，不可连续两晚守同一人；守+救=奶穿。"},
+    "knight": {"cn": "骑士", "faction": "god", "emoji": "⚔️", "desc": "整局一次，在自己白天发言前可决斗一人：对方是狼则狼出局并结束白天，否则骑士出局、白天继续。"},
+    "crow": {"cn": "乌鸦", "faction": "god", "emoji": "🐦‍⬛", "desc": "每轮放逐投票前可诽谤一名其他存活玩家，为其额外增加一票，仅当轮有效。"},
+    "gravekeeper": {"cn": "守墓人", "faction": "god", "emoji": "⚰️", "desc": "每晚得知上一轮被放逐者是好人或狼人，首夜不睁眼。"},
+    "bomber": {"cn": "炸弹人", "faction": "god", "emoji": "💣", "desc": "被放逐时引爆，随机炸死一名玩家。"},
+    "grave": {"cn": "守墓人", "faction": "god", "emoji": "⚰️", "desc": "守墓人"},
+    "wolf_king": {"cn": "狼王", "faction": "wolf", "emoji": "👑", "desc": "被放逐或被猎人带走时可开枪带走一名玩家；被毒/被骑士决斗不能开枪。"},
+    "white_wolf_king": {"cn": "白狼王", "faction": "wolf", "emoji": "🐺", "desc": "在自己白天发言前可自爆并带走一名其他存活玩家，结算死亡技能后结束白天。"},
+    "wolf_beauty": {"cn": "狼美人", "faction": "wolf", "emoji": "💋", "desc": "每晚魅惑一名玩家，狼美人出局时被魅惑者一同出局。"},
+    "hidden_wolf": {"cn": "隐狼", "faction": "wolf", "emoji": "👤", "desc": "属狼人阵营，但被预言家查验时显示为好。"},
+    "stone_ghost": {"cn": "石像鬼", "faction": "wolf", "emoji": "🗿", "desc": "每晚查验一名玩家具体身份；与普通狼人隔离。普狼全灭后获得刀人能力。"},
+    "evil_knight": {"cn": "恶灵骑士", "faction": "wolf", "emoji": "😈", "desc": "一次被动反弹：被预言家验→预言家死；被女巫毒→女巫死；被猎人带→猎人不能带。"},
+    "werewolf": {"cn": "狼人", "faction": "wolf", "emoji": "🐺", "desc": "每晚与狼队友统一刀人。"},
+    "civilian": {"cn": "平民", "faction": "civilian", "emoji": "👤", "desc": "无特殊技能，靠发言和投票找出狼人。"}
+  }
+}
