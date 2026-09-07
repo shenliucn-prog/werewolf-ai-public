@@ -28,6 +28,7 @@
   </section>
   <details id="gameSetup" class="game-setup" open>
     <summary data-i18n="网页版 · 开局设置">网页版 · 开局设置</summary>
+    <p class="setup-guidance" data-i18n="先选语言和本局设置，推荐经典板、本地表达、关闭猜想模式。创建对局后主持人会介绍规则，你确认准备好后才进入第一夜。">先选语言和本局设置，推荐经典板、本地表达、关闭猜想模式。创建对局后主持人会介绍规则，你确认准备好后才进入第一夜。</p>
     <div class="controls">
       <select id="board" title="选择板子"></select>
       <label><span data-i18n="你的角色">你的角色</span> <select id="playerRole" aria-label="你的角色"><option value="random" data-i18n="随机身份">随机身份</option></select></label>
@@ -72,6 +73,7 @@
       <details class="host-chat">
         <summary class="pc-title" id="hostChatTitle">🎙️ 问主持人（规则单聊）</summary>
         <div class="host-chat-log" id="hostChatLog">我只解释规则和公开流程，不会泄露身份或替你决策。</div>
+        <p data-i18n="也可查询：上一轮票型、第2天发言记录、座次。查询不消耗行动。">也可查询：上一轮票型、第2天发言记录、座次。查询不消耗行动。</p>
         <div class="host-chat-entry">
           <input id="hostQuestion" aria-labelledby="hostChatTitle" placeholder="例如：女巫怎么用药？" maxlength="320">
           <button id="askHost" data-i18n="提问">提问</button>
@@ -99,7 +101,7 @@
     </div>
   </div>
 
-  <script src="/js/i18n.js?v=conversation-1"></script>
-  <script src="/js/app.js?v=conversation-1"></script>
+  <script src="/js/i18n.js?v=public-play-1"></script>
+  <script src="/js/app.js?v=public-play-1"></script>
 </body>
 </html>

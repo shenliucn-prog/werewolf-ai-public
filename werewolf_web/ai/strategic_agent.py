@@ -162,6 +162,8 @@ class StrategicNPCAgent:
         This is a conservative guard, not a second strategic planner: locked
         claims and named accusation/defence targets must not be negated.
         """
+        if any(fact not in text for fact in speech.protected_facts):
+            return False
         compact = text.replace(" ", "")
         lower = text.lower().replace("’", "'")
         if speech.claim == "seer" and re.search(r"i(?: am|'m) not (?:the |a )?seer", lower):
@@ -175,6 +177,13 @@ class StrategicNPCAgent:
         return len(text.strip()) <= 900
 
     def vote(self, candidates: list[dict], sheriff: bool = False) -> int | None:
+        allow_peace = not sheriff and any(c["pos"] == 0 for c in candidates)
+        candidates = [c for c in candidates if c["pos"] != 0]
+        if allow_peace:
+            suspects = [self.brain.suspicion(c["name"]) for c in candidates if c["pos"] != self.seat.pos]
+            if suspects and max(suspects) < 0.55 and self.style.aggression < 0.5:
+                self.reasoning.append(f"[D{self.engine.day_count} vote] Peaceful Day: insufficient suspicion, cautious personality.")
+                return 0
         target, reason = self.brain.vote(
             [candidate["pos"] for candidate in candidates], sheriff=sheriff)
         self.reasoning.append(f"[D{self.engine.day_count} vote] {reason}")

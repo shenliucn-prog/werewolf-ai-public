@@ -221,6 +221,7 @@ function handleEvent(d) {
     case "flip": log(`🂠 ${escapeHtml(d.text)}`, "flip"); revealRole(d.seat, d.role_cn); break;
     case "exile": log(`⚖️ ${escapeHtml(d.text)}`, "exile"); markDead(d.seat); break;
     case "vote_result": showTally(d.tally); break;
+    case "ballots": log(escapeHtml(d.text).replace(/\n/g, "<br>"), "narr"); break;
     case "host_rule": log(`🎲 ${escapeHtml(d.text)}`, "host-rule"); break;
     case "conjecture":
       d.tables.forEach(table => {
@@ -293,7 +294,7 @@ function setPhase(phase) {
 
 function showTally(tally) {
   const entries = Object.entries(tally).sort((a, b) => b[1] - a[1]);
-  const lines = entries.map(([pos, v]) => `${seatText(pos)}: ${v} ${tr("票")}`).join("　");
+  const lines = entries.map(([pos, v]) => `${Number(pos) === 0 ? tr("平安日") : seatText(pos)}: ${v} ${tr("票")}`).join("　");
   log(`🗳️ ${tr("投票结果")}: ${lines || tr("无人投票（平安日）")}`, "narr");
 }
 
@@ -303,7 +304,16 @@ function showAction(d) {
   const kind = d.kind, data = d.data || {};
   panelEl.style.display = "block";
   panelEl.innerHTML = "";
-  if (kind === "conjecture") {
+  if (kind === "ready") {
+    const hint = document.createElement("p");
+    hint.textContent = tr("先阅读本局规则，有疑问可问主持人。确认后才进入第一夜。");
+    const button = document.createElement("button");
+    button.id = "readyGame"; button.textContent = tr("准备好了，进入第一夜");
+    button.onclick = () => submitAction({ready: true});
+    const ask = document.createElement("button"); ask.textContent = tr("提问");
+    ask.onclick = () => { document.querySelector(".host-chat").open = true; $("#hostQuestion").focus(); };
+    panelEl.append(hint, ask, button);
+  } else if (kind === "conjecture") {
     const hint = document.createElement("p"); hint.textContent = data.hint; panelEl.append(hint);
     const editors = {};
     for (const scope of ["private", "public"]) {
@@ -346,6 +356,10 @@ function showAction(d) {
       <button class="send-btn" id="sendTableReply">${tr("回应")}</button></div>`;
     $("#skipTableReply").onclick = () => submitAction({ text: "" });
     $("#sendTableReply").onclick = () => submitAction({ text: $("#tableReplyInput").value.trim() });
+  } else if (kind === "election_withdraw") {
+    panelEl.innerHTML = `<p>${tr("警上发言结束，是否退警？")}</p><button id="withdrawYes">${tr("退警")}</button><button id="withdrawNo">${tr("不退警")}</button>`;
+    $("#withdrawYes").onclick = () => submitAction({withdraw:true});
+    $("#withdrawNo").onclick = () => submitAction({withdraw:false});
   } else if (kind === "election_up") {
     panelEl.innerHTML = `<h4>${tr("是否上警竞选警长？")}</h4>
       <div class="btn-row">
@@ -362,7 +376,7 @@ function showAction(d) {
     cands.forEach((c) => {
       const b = document.createElement("button");
       b.className = "cand-btn";
-      b.textContent = `${seatText(c.pos)} ${c.name}${c.note ? " (" + c.note + ")" : ""}`;
+      b.textContent = c.pos === 0 ? tr("平安日") : `${seatText(c.pos)} ${c.name}${c.note ? " (" + c.note + ")" : ""}`;
       b.onclick = () => {
         sel = c.pos;
         [...btns.children].forEach((x) => x.classList.remove("sel"));
