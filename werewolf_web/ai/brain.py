@@ -152,6 +152,8 @@ class Speech:
     claim: Optional[str] = None     # 公开跳的身份
     accuse: Optional[str] = None    # 踩的人（名字）
     defend: Optional[str] = None    # 保的人（名字）
+    question_to: Optional[str] = None
+    protected_facts: tuple[str, ...] = ()
 
 
 @dataclass
@@ -517,9 +519,11 @@ class Brain:
             noise = self.match_state.decision_noise(
                 self.effective_ability("evidence_processing"))
             if self.rng.random() < noise:
-                alternatives = [pos for pos in candidates if pos != decision.target]
-                decision.target = self.rng.choice(alternatives)
-                decision.reason += " 当前状态让我保留一点不确定性，改选另一名合法目标。"
+                done = {r["target"] for r in self.engine.seer_results} if kind == "seer" else set()
+                alternatives = [pos for pos in candidates if pos != decision.target and pos not in done]
+                if alternatives:
+                    decision.target = self.rng.choice(alternatives)
+                    decision.reason += " 当前状态让我保留一点不确定性，改选另一名合法目标。"
         self._trace_night(kind, decision, candidates)
         return decision
 
@@ -754,6 +758,8 @@ class Brain:
         # ---------- 预言家 ----------
         elif self.role == "seer":
             sp = self._seer_speak(day, ranked, seer_claimants, accused_me)
+            if self.claims.get(self.name) == "seer" and sp.claim is None:
+                sp = Speech(text="我仍然认预言家身份，下面报完整查验口径。", claim="seer")
         # ---------- 其他神职 ----------
         elif self.role in ("witch", "guard", "hunter", "knight", "gravekeeper", "crow"):
             sp = self._god_speak(day, ranked, seer_claimants, accused_me)
@@ -768,7 +774,40 @@ class Brain:
             sp.text = prefix + sp.text
         if self.engine.locale == "en":
             sp.text = self._english_line(sp)
+        if sp.claim == "seer":
+            account = self.check_account(sp.accuse)
+            sp.text += "\n" + account
+            sp.protected_facts = (account,)
         return sp
+
+    def check_account(self, preferred=None):
+        """A real Seer's own results, or this actor's stable invented account.
+
+        Never read another role's check results to construct a bluff.
+        """
+        e = self.engine
+        if self.role == "seer":
+            records = list(e.seer_results)
+        else:
+            if not hasattr(self, "_bluff_checks"):
+                self._bluff_checks = {}
+            night = max(1, e.night_count)
+            if night not in self._bluff_checks:
+                prior = {r["target"] for r in self._bluff_checks.values()}
+                pool = [s for s in e.alive_seats() if s.name != self.name and s.pos not in prior]
+                if pool:
+                    target = next((s for s in pool if s.name == preferred), pool[0])
+                    self._bluff_checks[night] = {"night": night, "target": target.pos, "name": target.name, "result": "wolf"}
+            records = list(self._bluff_checks.values())
+        if e.locale == "en":
+            return "My claimed checks: " + ("; ".join(f"night {r['night']}: #{r['target']} {r['name']} — {'werewolf' if r['result'] == 'wolf' else 'good'}" for r in records) or "none to report.")
+        return "我的查验口径：" + ("；".join(f"第{r['night']}夜：{r['target']}号{r['name']}——{'查杀' if r['result'] == 'wolf' else '金水'}" for r in records) or "暂无查验结果。")
+
+    def answer_check_question(self):
+        if self.claims.get(self.name) != "seer":
+            return Speech(text="I have not publicly claimed Seer; I have no claimed checks to give." if self.engine.locale == "en" else "我没有公开跳预言家，没有宣称过查验结果。")
+        account = self.check_account()
+        return Speech(text=account, claim="seer", protected_facts=(account,))
 
     def _english_line(self, speech: Speech) -> str:
         """Offline English realization preserves the already locked intent."""
@@ -889,7 +928,7 @@ class Brain:
         if self.role == "seer":                       # 我亲手验的
             for r in e.seer_results:
                 if r["name"] == nm:
-                    return f"我昨晚亲手验的 {nm}"
+                    return f"我第{r['night']}夜验了 {nm}，结果是{'查杀' if r['result'] == 'wolf' else '金水'}"
         if self.role == "stone_ghost":
             for r in e.sg_results:
                 if r["name"] == nm:
@@ -965,8 +1004,7 @@ class Brain:
             victim = top_n
             self.claims[self.name] = "seer"
             return Speech(
-                text=self._say(f"我是预言家，昨晚验了 {e.seat_by_name(victim).pos}号"
-                               f"{victim}，查杀，今天我先出他"),
+                text=self._say(f"我是预言家，今天我先出 {victim}，下面报我的查验口径"),
                 claim="seer", accuse=victim)
         # 场上已经有人跳预言家了
         if seer_claimants:
@@ -980,17 +1018,21 @@ class Brain:
                                    f"他那个报法不对，大家别跟，先出他"),
                     claim="seer", accuse=rival)
             if mate_claim:
+                target = next((n for _score, n in ranked if n not in mates_set and n != mate_claim), top_n)
                 # 队友在悍跳，我配合他，顺手把水搅浑
                 return Speech(
                     text=self._say(f"我站 {mate_claim}，他报得比较实。"
-                                   f"{top_n} 今天有点飘，大家注意一下",
-                                   evidence=self._why_suspect(top_n), who=top_n),
-                    accuse=top_n)      # 话里点了名就得认账，否则推理链断了
+                                   f"{target} 值得继续解释",
+                                   evidence=self._why_suspect(target), who=target),
+                    accuse=target, defend=mate_claim)
             lead = seer_claimants[0]
+            if lead == top_n or lead in accused_me:
+                return Speech(text=self._say(f"我不接受 {lead} 的说法，需要他解释查验和判断依据",
+                                             evidence=self._why_suspect(lead), who=lead), accuse=lead)
             return Speech(
                 text=self._say(f"我先听 {lead} 的，{top_n} 今天有点飘，别被带节奏",
                                evidence=self._why_suspect(top_n), who=top_n),
-                accuse=top_n)      # 话里点了名就得认账，否则推理链断了
+                accuse=top_n, defend=lead)
         # 划水 / 倒钩
         if self.style.aggression < 0.4:
             return Speech(text=self._say("我是平民，信息不多，先跟着大家走，听预言家的"))
@@ -1056,9 +1098,11 @@ class Brain:
                                evidence=self._why_suspect(top_n), who=top_n),
                 accuse=top_n)
         if seer_claimants and self.style.logic > 0.5:
+            lead = min(seer_claimants, key=self.suspicion)
+            if lead in accused_me:
+                return Speech(text=self._accuse_speech(lead, lead="我不接受"), accuse=lead)
             return Speech(
-                text=self._say(f"我站 {seer_claimants[0]}，他报得比较实，"
-                               f"我自己是好人，先跟着他"))
+                text=self._say(f"我暂时站 {lead}，这是站边判断，还需要核对他的查验和票型"), defend=lead)
         return Speech(text=self._accuse_speech(top_n, lead="我比较怀疑"),
                       accuse=top_n)      # 话里点了名就得认账，否则推理链断了
 
@@ -1074,9 +1118,9 @@ class Brain:
             return Speech(text=self._accuse_speech(top_n, lead="我点一个"),
                           accuse=top_n)
         if seer_claimants:
+            lead = min(seer_claimants, key=self.suspicion)
             return Speech(
-                text=self._say(f"我跟 {seer_claimants[0]}，他是目前唯一有信息的，"
-                               f"我先站他"))
+                text=self._say(f"我暂时站 {lead}，需要继续核对他的查验和票型"), defend=lead)
         if self.style.aggression < 0.4:
             return Speech(text=self._say("我是平民，没信息，先过，听后面"))
         return Speech(text=self._accuse_speech(top_n, lead="暂时看"),

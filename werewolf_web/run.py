@@ -25,6 +25,7 @@ from .ai.strategic_agent import StrategicNPCAgent
 from .ai.host import HostAgent
 from .i18n import normalize_locale, t, list_sep, role_name, board_display, role_desc, board_role_name, witch_rule_text
 from .casting import random_names, persona_options, CAST_IDS, PLAYER_ID
+from .public_record import PublicRecord, ballot_event, target_label
 
 config.ensure_dirs()
 app = FastAPI(title="狼人杀 Web 版")
@@ -45,10 +46,11 @@ class GameSession:
                  session_id: str = "local", seed: int | None = None,
                  locale: str = "zh-CN", names: dict | None = None,
                  personalities: dict | None = None, conjecture: bool = False,
-                 player_role: str | None = None):
+                 player_role: str | None = None, onboarding: bool = False):
         if type(conjecture) is not bool:
             raise ValueError("Conjecture mode must be true or false.")
         self.conjecture = conjecture
+        self.onboarding = onboarding
         self.conjecture_ledger = None
         self.engine = eng_mod.GameEngine(board_id, seed=seed, locale=locale, names=names,
                                         personalities=personalities, player_role=player_role)
@@ -56,6 +58,7 @@ class GameSession:
         # memory, reviews, SSE events, or public state.
         self.llm = LLMClient(LLMRuntimeConfig.from_request(llm_options))
         self.host = HostAgent(self.llm, locale=self.engine.locale)
+        self.public_record = PublicRecord(self.engine.locale)
         # A hosted game's carry/memory is scoped to its random session, so one
         # user's games cannot influence another user's NPC profiles.
         self.memory_dir = os.path.join(config.DATA_DIR, "npc_memory", session_id)
@@ -73,6 +76,9 @@ class GameSession:
         self._table_extra_turns = 0
         self._table_extra_by_name: dict[str, int] = {}
         self._table_pairs: set[frozenset[str]] = set()
+        self._pending_questions = {}
+        self._questions_answered = 0
+        self._table_cooldown = False
 
     @property
     def q(self):
@@ -87,7 +93,15 @@ class GameSession:
         return self._event_q
 
     def emit(self, obj: dict):
+        self.public_record.observe(obj, self.engine.day_count)
         self.event_q.put_nowait(obj)
+
+    def answer_question(self, question):
+        if question.strip().casefold() in ("座次", "座次表", "/seats", "seats"):
+            from .onboarding import seating_text
+            return seating_text(self.engine.public_state())
+        record = self.public_record.query(question)
+        return record if record is not None else self.host.answer_rule_question(question, self.engine)
 
     async def ask_player(self, kind: str, data: dict) -> dict:
         self.pending = {"kind": kind, "data": data}
@@ -103,11 +117,14 @@ class GameSession:
                 self.conjecture_ledger.validate_human(resp)
             except (ValueError, TypeError, KeyError):
                 return False
+        elif kind == "ready":
+            if resp.get("ready") is not True:
+                return False
         elif kind in ("speech", "table_reply"):
             if not isinstance(resp.get("text"), str) or len(resp["text"]) > 4000:
                 return False
-        elif kind == "election_up":
-            if not isinstance(resp.get("up"), bool):
+        elif kind in ("election_up", "election_withdraw"):
+            if not isinstance(resp.get("up" if kind == "election_up" else "withdraw"), bool):
                 return False
         else:
             candidates = {c["pos"] for c in data.get("candidates", [])}
@@ -190,14 +207,22 @@ class GameSession:
             agent.assign_wolf_strategy(rank, len(wolf_agents))
 
         pv = e.player_view()
+        host_intro = (("Host Raven: Welcome to the Night Teahouse. Take your seat; we will explain the rules before night one." if e.locale == "en" else
+                       "主持人夜鸦：欢迎来到暗夜茶馆。请各位入座，先讲清规则，再开始第一夜。") if self.onboarding else
+                      self.host.intro(board_display(e.locale, e.board)["name"], self._seats_desc()))
         self.emit({"type": "init", "state": e.public_state(), "player": pv,
-                   "host_intro": self.host.intro(
-                       board_display(self.engine.locale, e.board)["name"],
-                       self._seats_desc()),
+                   "host_intro": host_intro,
                    "llm_status": self.llm.public_status(),
                    "settings": {"medium": "text", "voice_available": False,
                                 "visual_gameplay_available": False, "conjecture": self.conjecture}})
         self._remember_llm_status()
+
+        if self.onboarding:
+            from .onboarding import introduction
+            e.phase = "onboarding"
+            self.emit({"type": "narration", "phase": "onboarding",
+                       "text": introduction(e, self.conjecture)})
+            await self.ask_player("ready", {})
 
         if e.witch_unlimited:
             self.emit({"type": "narration", "text": witch_rule_text(e.locale, e.board)})
@@ -212,7 +237,8 @@ class GameSession:
             requests = e.start_night()
             self._deliver_grave_result()
             actions = await self._gather_night(requests)
-            for ev in e.resolve_night(actions):
+            night_events = e.resolve_night(actions)
+            for ev in night_events:
                 await self._emit_event(ev)
             await self._post_death_triggers()
             if e.check_win():
@@ -238,6 +264,8 @@ class GameSession:
             e.start_day()
             self._reset_table_talk()
             self.emit({"type": "narration", "phase": "day", "text": self.host.narrate("day_start", t(self.engine.locale, "day_start", d=e.day_count))})
+            if not any(ev.type == "death" for ev in night_events):
+                self.emit({"type": "narration", "text": "Host Raven: No one died last night." if e.locale == "en" else "主持人夜鸦：昨夜平安，无人死亡。"})
             await asyncio.sleep(0.3)
 
             if e.day_count == 1:
@@ -286,6 +314,7 @@ class GameSession:
                 self.emit({"type": "narration", "text": t(e.locale, "skill_ends_day")})
                 continue
 
+            await self._answer_table_questions()
             for seat in e.alive_seats():
                 if seat.role == "crow":
                     await self._day_skill(seat, crow=True)
@@ -311,6 +340,9 @@ class GameSession:
         self.host.evolve(e, review)
         for a in self.agents.values():
             a.save_memory()
+        reveal = "\n".join(f"#{s.pos} {s.name}: {s.role_cn}" for s in sorted(e.seats.values(), key=lambda s: s.pos))
+        review += "\n\n" + ("Final roles\n" if e.locale == "en" else "最终身份\n") + reveal
+        review += "\n\n" + self.public_record.query("/history")
         self.emit({"type": "review", "text": review, "winner": e.winner})
         self.emit({"type": "gameover", "winner": e.winner, "reason": e.end_reason})
 
@@ -327,6 +359,12 @@ class GameSession:
     def _player_speech(self, text: str) -> Speech:
         """Extract only explicit public claims/targets from human text."""
         claim = None
+        question_to = None
+        if re.search(r"验|查验|check|result", text, re.I) and re.search(r"吗|呢|谁|不说|报出来|请|[?？]|who|which|why|please", text, re.I):
+            for seat in self.engine.alive_seats():
+                if not seat.is_player and (re.search(rf"(?<!\d){seat.pos}\s*号|#\s*{seat.pos}\b|(?:seat|player)\s+{seat.pos}\b", text, re.I) or seat.name.casefold() in text.casefold()):
+                    question_to = seat.name
+                    break
         if self.engine.locale == "en":
             lower = text.casefold().replace("’", "'")
             for key in ("seer", "witch", "hunter", "guard"):
@@ -345,7 +383,7 @@ class GameSession:
                 if (re.search(rf"\b(?:trust|defend|clear)\s+{target}", lower)
                         or re.search(rf"{target}\s+is (?:good|innocent)\b", lower)):
                     defend = seat.name
-            return Speech(text=text, claim=claim, accuse=accuse, defend=defend)
+            return Speech(text=text, claim=claim, accuse=accuse, defend=defend, question_to=question_to)
         for role, role_name in (("seer", "预言家"), ("witch", "女巫"),
                                 ("hunter", "猎人"), ("guard", "守卫")):
             if f"我是{role_name}" in text.replace(" ", "") or (role == "witch" and "我是神女巫" in text.replace(" ", "")):
@@ -363,16 +401,35 @@ class GameSession:
             if re.search(rf"(?:保|金水|好人|站).{{0,8}}{seat.pos}号", compact):
                 defend = seat.name
                 break
-        return Speech(text=text, claim=claim, accuse=accuse, defend=defend)
+        return Speech(text=text, claim=claim, accuse=accuse, defend=defend, question_to=question_to)
 
     def _broadcast_speech(self, seat, speech: Speech):
+        if speech.question_to and speech.question_to in self.agents:
+            self._pending_questions[speech.question_to] = seat.name
         for agent in self.agents.values():
             agent.observe_speech(self.engine.day_count, seat.name, speech)
+
+    async def _answer_table_questions(self):
+        """A bounded public clarification window after ordered speeches."""
+        for target, asker in list(self._pending_questions.items()):
+            del self._pending_questions[target]
+            agent = self.agents.get(target)
+            if not agent or not agent.seat.alive or self._questions_answered >= 2:
+                continue
+            self._questions_answered += 1
+            self.emit({"type": "narration", "text":
+                       (f"Host: Before voting, {target}, answer {asker}'s check question. This is a claim, not a host-verified result." if self.engine.locale == "en" else
+                        f"主持人：投票前请 {target} 回答 {asker} 对查验的追问。这是玩家口径，不代表主持人认证。")})
+            response = agent.brain.answer_check_question()
+            await self._publish_table_speech(agent.seat, response, "clarification")
 
     def _reset_table_talk(self):
         self._table_extra_turns = 0
         self._table_extra_by_name = {}
         self._table_pairs = set()
+        self._pending_questions = {}
+        self._questions_answered = 0
+        self._table_cooldown = False
 
     async def _publish_table_speech(self, seat, speech: Speech, kind: str):
         """One public, ledgered extra utterance; it is never a hidden chat."""
@@ -390,7 +447,10 @@ class GameSession:
 
     async def _maybe_table_talk(self, source, source_speech: Speech):
         """Let the host allow a bounded public interruption after a main turn."""
-        if self._table_extra_turns >= 7:
+        if self._table_cooldown:
+            self._table_cooldown = False
+            return
+        if self._table_extra_turns >= 3 or source_speech.question_to:
             return
         # Most free chat follows a public point; a small fraction is social
         # colour around an otherwise neutral statement.
@@ -425,8 +485,13 @@ class GameSession:
             return
 
         interruption = interrupter.table_interject(source.name, source_speech)
+        self._table_cooldown = True
         self._table_pairs.add(pair)
         await self._publish_table_speech(interrupter.seat, interruption, "interrupt")
+
+        if self._table_extra_turns >= 3:
+            self.emit({"type": "narration", "text": "Host: Continue in speaking order." if self.engine.locale == "en" else "主持人：继续按顺序发言。"})
+            return
 
         # The original speaker may give exactly one short reply.  This keeps
         # the interaction human, while the host closes it before it becomes a
@@ -444,7 +509,10 @@ class GameSession:
                 "from": interrupter.name,
                 "text": interruption.text,
             })
-            text = response.get("text", "").strip() or t(self.engine.locale, "default_reply")
+            text = response.get("text", "").strip()
+            if not text:
+                self.emit({"type": "narration", "text": "Host: Continue in speaking order." if self.engine.locale == "en" else "主持人：继续按顺序发言。"})
+                return
             reply = self._player_speech(text)
         else:
             reply = self.agents[source.name].table_reply(interrupter.name)
@@ -672,6 +740,8 @@ class GameSession:
         if not up_players:
             self.emit({"type": "narration", "text": t(e.locale, "sheriff_nobody")})
             return
+        self.emit({"type": "narration", "text": ("Sheriff candidates: " if e.locale == "en" else "本轮上警名单：") +
+                   ", ".join(f"#{s.pos} {s.name}" for s in up_players)})
         for s in sorted(up_players, key=lambda x: x.pos):
             if s.is_player:
                 resp = await self.ask_player("speech", {"phase": t(e.locale, "election_phase")})
@@ -688,6 +758,26 @@ class GameSession:
             )
             self.emit({"type": "speech", "seat": s.pos, "name": s.name, "text": text, "election": True})
             await asyncio.sleep(0.3)
+        await self._answer_table_questions()
+        # Human-facing adapters expose a withdrawal window; unattended
+        # research callers retain their existing no-prompt election protocol.
+        if self.onboarding:
+            remaining = []
+            for s in up_players:
+                if s.is_player:
+                    response = await self.ask_player("election_withdraw", {})
+                    withdraw = response["withdraw"]
+                else:
+                    own_claim = next(sp.claim for name, sp in election_speeches if name == s.name)
+                    withdraw = own_claim != "seer" and any(sp.claim == "seer" for name, sp in election_speeches if name != s.name) and self.agents[s.name].style.aggression < 0.9
+                if withdraw:
+                    self.emit({"type": "narration", "text": f"#{s.pos} {s.name} " + ("withdraws." if e.locale == "en" else "退警。")})
+                else:
+                    remaining.append(s)
+            up_players = remaining
+            if not up_players:
+                self.emit({"type": "narration", "text": t(e.locale, "sheriff_nobody")})
+                return
         votes = {}
         for s in e.alive_seats():
             if s.is_player:
@@ -702,6 +792,7 @@ class GameSession:
         for v in votes.values():
             if v:
                 tally[v] = tally.get(v, 0) + 1
+        self.emit(ballot_event(e, votes, tally, sheriff=True))
         leaders = [pos for pos in tally if tally[pos] == max(tally.values())] if tally else []
         if len(leaders) == 1:
             sheriff = leaders[0]
@@ -730,13 +821,15 @@ class GameSession:
         votes = {}
         for s in alive:
             if s.is_player:
-                resp = await self.ask_player("vote", {"candidates": [c for c in candidates if c["pos"] != s.pos]})
+                resp = await self.ask_player("vote", {"candidates": [c for c in candidates if c["pos"] != s.pos] +
+                                             [{"pos": 0, "name": target_label(0, e.locale)}]})
                 votes[s.pos] = resp.get("target")
             else:
-                cands = [{"pos": x.pos, "name": x.name} for x in alive]
+                cands = [{"pos": x.pos, "name": x.name} for x in alive] + [{"pos": 0, "name": target_label(0, e.locale)}]
                 votes[s.pos] = self.agents[s.name].vote(cands)
         self._broadcast_votes(votes)
         tally = e.vote_tally(votes)
+        self.emit(ballot_event(e, votes, tally))
         self.emit({"type": "vote_result", "tally": tally})
         exiled = None
         if tally:
@@ -750,7 +843,7 @@ class GameSession:
         e = self.engine
         for voter_pos, target_pos in votes.items():
             voter_name = e.seat_at(voter_pos).name
-            target_name = e.seat_at(target_pos).name if target_pos else None
+            target_name = target_label(0, e.locale) if target_pos == 0 else e.seat_at(target_pos).name if target_pos else None
             for agent in self.agents.values():
                 agent.observe_vote(e.day_count, voter_name, target_name)
 
@@ -871,7 +964,7 @@ async def start(req: Request):
                              locale=body.get("locale", "zh-CN"), names=body.get("names"),
                              personalities=body.get("personalities"),
                              conjecture=body.get("conjecture", False),
-                             player_role=body.get("player_role"))
+                             player_role=body.get("player_role"), onboarding=True)
     except (ValueError, KeyError, TypeError) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     GAMES[game_id] = runner
@@ -928,7 +1021,7 @@ async def host_chat(req: Request):
     if not isinstance(question, str) or not question.strip() or len(question) > 320:
         return {"ok": False, "error": "invalid question"}
     return {"ok": True,
-            "reply": runner.host.answer_rule_question(question, runner.engine)}
+            "reply": runner.answer_question(question)}
 
 
 @app.get("/api/host_style")

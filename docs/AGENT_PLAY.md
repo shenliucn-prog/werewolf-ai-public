@@ -13,6 +13,22 @@ The recommended player experience is conversation with your own Agent. The playe
 
 ### Relay contract
 
+During play use `/seats`, `/history`, `latest votes` or `day 2 speeches` to
+retrieve public records without advancing the pending action. Natural queries
+go through the host (`?Show the last ballots`). Always render the returned
+statements verbatim. Exile voting accepts `peaceful day`; the post-speech
+election window accepts `withdraw` or `stay`. These are explicit decisions,
+never inferred from a rules question. A declined table reply is silent.
+
+First-time users should fork/clone locally and run `python -m werewolf_web.setup --lang en`.
+Use `--check` for an environment-only check. The wizard explains the
+Agent/browser choices, costs and settings, then launches the selected interface.
+When the user's choices are already known, the direct chat command remains valid.
+Both player interfaces now pause before night one: show the complete host rules
+and seats, answer questions, and submit `ready` only after the player confirms.
+Do not claim to restore a terminated process: only an already live session can
+continue. Read the repository's `AGENTS.md` for the complete relay obligations.
+
 1. Read the README, prepare only this project's local environment and launch one real game process. Keep that process and its input session alive across user turns; do not launch a new game for every message.
 2. Relay the public statements and only the private prompts actually emitted for this player. Preserve seat numbers, claims, timing and uncertainty. Do not inspect engine memory, hidden role allocations, private NPC state or developer-observer output to gain extra information.
 3. When the game requests a decision, wait for the player. Convert their explicit choice into the supported input vocabulary. Ask if ambiguous; do not silently choose targets, alter a statement or autoplay.
@@ -31,6 +47,18 @@ The terminal parser recognizes a limited action vocabulary; the Agent supplies t
 **尚无通用 Agent 插件、MCP 服务、各宿主的一键安装适配或断线续局协议；未验证所有 Agent 产品。** 没有本地工具的纯聊天 Agent 无法按此方式运行。`--offline` 只关闭游戏自身的模型调用，不免除宿主 Agent 的使用成本。
 
 转接时必须：
+
+- 局中可查 `座次`、`上一轮票型`、`第2天发言记录`、`公开记录`；自然语言查询
+  用 `?把上一轮的票型拿出来`。查询不推进当前行动，记录逐条原样展示。
+- 放逐可投 `平安日`；警上发言结束后可选 `退警` 或 `不退警`。必须由玩家
+  明确决定，不能把询问规则当成提交行动。玩家暂不回应时保持沉默。
+
+- 首次使用先 fork/clone 到本地，运行 `python -m werewolf_web.setup --lang zh-CN`；
+  `--check` 仅检查环境。引导解释入口、费用和设置，然后启动所选界面。
+- 文字与网页均在首夜前等待确认。完整展示主持人介绍、座次和规则；回答问题后，
+  只有玩家明确准备好才提交“开始”。已知配置可直接运行原有 chat 命令。
+- 逐条原样展示公开发言，带座位和名字。摘要不能代替原话；不得编造 NPC 准备回应，
+  不得把含糊的“昨晚验过”解释成已经确认的重复查验。参见仓库 `AGENTS.md`。
 
 - 只展示实际进程输出的公开信息和属于该玩家的私密信息；不查看隐藏身份、NPC 私有状态、引擎内存或全知观察器输出来作弊。
 - 等待玩家明确决定；不代打、不擅自选目标或改发言。有歧义就问清楚。

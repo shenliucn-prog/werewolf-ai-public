@@ -1,5 +1,11 @@
 // Presentation only: actions and roles always use stable keys from the session.
 const EN = {
+  "也可查询：上一轮票型、第2天发言记录、座次。查询不消耗行动。": "Also ask for latest votes, day 2 speeches, or seats. Queries do not spend your action.",
+  "平安日": "Peaceful Day", "退警": "Withdraw", "不退警": "Stay in election",
+  "警上发言结束，是否退警？": "Candidacy speeches are over. Withdraw or stay?",
+  "先选语言和本局设置，推荐经典板、本地表达、关闭猜想模式。创建对局后主持人会介绍规则，你确认准备好后才进入第一夜。": "Choose your language and game settings. Start with Classic, local expression and Conjecture off. After creating the game, the host explains the rules; night one waits for your Ready confirmation.",
+  "先阅读本局规则，有疑问可问主持人。确认后才进入第一夜。": "Read this game's rules and ask the Host any questions. Night one waits for your confirmation.",
+  "准备好了，进入第一夜": "Ready — start night one",
   "推荐：在自己的 Agent 里玩": "Recommended: play in your own Agent",
   "你在 Agent 对话里发言和行动，由 Agent 连接游戏。网页版是可选界面，不是核心体验。": "Speak and act in your Agent's conversation while it connects to the game. The browser is optional, not the core experience.",
   "给 Agent 的开局说明": "Instructions for your Agent",

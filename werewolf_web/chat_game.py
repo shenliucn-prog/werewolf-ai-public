@@ -26,6 +26,14 @@ def _number(text: str, candidates: list[dict]) -> int | None:
 def parse_action(kind: str, data: dict, text: str) -> dict | None:
     """Convert a deliberately small, unambiguous chat vocabulary to actions."""
     text = text.strip()
+    if kind == "ready":
+        return {"ready": True} if text.casefold() in ("ready", "start", "开始", "准备好了", "准备好") else None
+    if kind == "election_withdraw":
+        if text.casefold() in ("退警", "withdraw"):
+            return {"withdraw": True}
+        if text.casefold() in ("不退", "不退警", "继续竞选", "stay"):
+            return {"withdraw": False}
+        return None
     if kind == "conjecture":
         if text.casefold() in ("keep", "保留", "done", "提交"):
             return {key: data[key] for key in ("private", "public")}
@@ -46,6 +54,8 @@ def parse_action(kind: str, data: dict, text: str) -> dict | None:
 
     candidates = data.get("candidates", [])
     if kind == "vote":
+        if text.casefold() in ("平安日", "支持平安日", "peaceful day", "peace") and not data.get("sheriff"):
+            return {"target": 0} if any(c["pos"] == 0 for c in candidates) else None
         target = _number(text, candidates)
         return {"target": target} if target is not None else None
     if kind == "night" and (data.get("role_key") == "witch" or data.get("role") == "女巫"):
@@ -86,6 +96,8 @@ def _render(event: dict, locale: str = "zh-CN"):
     if kind == "init":
         player = event["player"]
         print(f"\n🎙️ {event['host_intro']}")
+        from .onboarding import seating_text
+        print(seating_text(event["state"]))
         print(f"\n🔒 {'Your role: ' if en else '你的身份：'}{seat_label(player['pos'])} {player['name']} · {player['role_cn']}")
         if player.get("ability"):
             print(player["ability"])
@@ -93,13 +105,14 @@ def _render(event: dict, locale: str = "zh-CN"):
             print(("🔒 Wolf teammates: " if en else "🔒 狼队友：") + ", ".join(seat_label(pos) for pos in player["wolfmates"]))
     elif kind == "speech":
         prefix = "💬" if event.get("table_talk") else "🗣️"
-        print(f"{prefix} {event['name']}：{event['text']}")
+        print(f"{prefix} {seat_label(event['seat'])} {event['name']}：{event['text']}")
     elif kind == "private":
         print(f"🔒 {event['text']}")
-    elif kind in ("narration", "death", "flip", "exile", "gameover"):
+    elif kind in ("narration", "death", "flip", "exile", "gameover", "ballots"):
         print(f"🎙️ {event.get('text') or event.get('reason', '')}")
     elif kind == "vote_result":
-        print("🗳️ " + ", ".join(f"{seat_label(pos)}: {votes} {'votes' if en else '票'}" for pos, votes in event["tally"].items()))
+        from .public_record import target_label
+        print("🗳️ " + ", ".join(f"{target_label(pos, locale)}: {votes} {'votes' if en else '票'}" for pos, votes in event["tally"].items()))
     elif kind == "review":
         print(("\n📋 Post-game review\n" if en else "\n📋 赛后复盘\n") + event["text"])
     elif kind == "error":
@@ -138,6 +151,10 @@ def edit_conjecture(data, text):
 
 def _ordinary_request_prompt(kind: str, data: dict, locale: str = "zh-CN") -> str:
     en = locale == "en"
+    if kind == "ready":
+        return "\nAsk ?question, or type ready to start night one:\n> " if en else "\n输入 ?规则问题，或输入 开始 进入第一夜：\n> "
+    if kind == "election_withdraw":
+        return "\nCandidacy withdrawal window: withdraw / stay:\n> " if en else "\n警上发言结束，是否退警？输入 退警 / 不退警：\n> "
     if kind == "speech":
         return ("\nYour turn to speak. Type your statement; use ? followed by a rules question:\n> " if en
                 else f"\n轮到你发言（{data.get('phase', '')}）。直接输入发言；输入 ?规则问题 可问主持人：\n> ")
@@ -146,7 +163,7 @@ def _ordinary_request_prompt(kind: str, data: dict, locale: str = "zh-CN") -> st
                 else f"\n{data.get('from', '有人')} 打断你：{data.get('text', '')}\n简短回应，或直接回车暂不回应：\n> ")
     if kind == "election_up":
         return "\nRun for sheriff? Type yes or no:\n> " if en else "\n是否上警？输入 上警 / 不上警：\n> "
-    candidates = ", ".join((f"#{item['pos']} {item['name']}" if en else f"{item['pos']}号{item['name']}")
+    candidates = ", ".join(item["name"] if item["pos"] == 0 else (f"#{item['pos']} {item['name']}" if en else f"{item['pos']}号{item['name']}")
                            for item in data.get("candidates", []))
     if kind == "vote":
         return f"\nVote now ({candidates}). Example: vote 3:\n> " if en else f"\n请投票（{candidates}）。例如：投 3 号：\n> "
@@ -167,9 +184,12 @@ async def play(board_id: str, seed: int | None, offline: bool, locale: str, name
     llm_options = {"enabled": False} if offline else None
     session = GameSession(board_id, llm_options, session_id="chat-" + secrets.token_urlsafe(12),
                           seed=seed, locale=locale, names=names,
-                          personalities=personalities, conjecture=conjecture, player_role=player_role)
+                          personalities=personalities, conjecture=conjecture, player_role=player_role,
+                          onboarding=True)
     print("Text only; voice and visual gameplay are not designed or implemented." if locale == "en" else
           "当前仅文字驱动；语音和视觉玩法尚无方案、尚未实现。")
+    print("At any prompt: /seats, /history, votes, speeches, or ?question. These never submit an action." if locale == "en" else
+          "任何等待行动时都可输入：座次、公开记录、上一轮票型、第2天发言记录、?规则问题。这些查询不消耗行动。")
     async for event in session.events():
         if event["type"] != "request":
             _render(event, session.engine.locale)
@@ -177,8 +197,9 @@ async def play(board_id: str, seed: int | None, offline: bool, locale: str, name
         kind, data = event["kind"], event.get("data", {})
         while True:
             raw = await asyncio.to_thread(input, _request_prompt(kind, data, locale))
-            if raw.startswith("?"):
-                print("🎙️ " + session.host.answer_rule_question(raw[1:], session.engine))
+            record_command = re.fullmatch(r"/history|history|公开记录|历史|(?:第\d+天)?(?:发言记录|完整发言|票型|投票记录)|(?:上一轮|最近)(?:的)?票型|(?:day \d+ )?(?:votes|ballots|speeches)|(?:last|latest) (?:votes|ballots)", raw.strip().casefold())
+            if raw.startswith("?") or raw.strip().casefold() in ("/seats", "seats", "座次", "座次表") or record_command:
+                print("🎙️ " + session.answer_question(raw[1:] if raw.startswith("?") else raw))
                 continue
             if kind == "conjecture" and edit_conjecture(data, raw):
                 continue
