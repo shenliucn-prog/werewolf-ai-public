@@ -49,14 +49,14 @@ class OnboardingTest(unittest.IsolatedAsyncioTestCase):
                 if engine.witch_unlimited:
                     self.assertIn("unlimited" if locale == "en" else "不限", text)
 
-    def test_setup_default_path_launches_local_chat(self):
+    def test_setup_default_path_launches_model_chat(self):
         with patch("sys.argv", ["setup", "--lang", "en"]), patch("builtins.input", side_effect=[""] * 7), \
              patch("werewolf_web.setup.subprocess.call", return_value=0) as launch, \
              contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(main(), 0)
         command = launch.call_args.args[0]
         self.assertIn("werewolf_web.chat_game", command)
-        self.assertIn("--offline", command)
+        self.assertNotIn("--offline", command)
         self.assertNotIn("--conjecture", command)
 
     def test_ready_requires_explicit_confirmation(self):

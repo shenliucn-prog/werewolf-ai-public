@@ -876,7 +876,11 @@ class Brain:
     def table_interjection(self, speaker: str, speech: Speech) -> Speech:
         """A deliberately short public interruption, never a new action."""
         target = speech.accuse or speech.defend
-        if target == self.name:
+        if speech.defend == self.name and speech.accuse != self.name:
+            text = (f"{speaker}, thanks for hearing me out. Please keep checking my claims against the public record."
+                    if self.engine.locale == "en" else f"{speaker}，谢谢你愿意听我的说法，但大家仍要对照公开记录核实。")
+            return Speech(text=text)
+        if speech.accuse == self.name:
             text = self._say(f"{speaker}，你这个点我不同意，别只凭一句话就定我",
                              evidence=self._why_suspect(speaker), who=speaker)
             return self._english_table(Speech(text=text, accuse=speaker), speaker, target)

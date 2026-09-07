@@ -21,6 +21,7 @@ from . import config
 from .game import engine as eng_mod
 from .ai.brain import Speech
 from .ai.llm import LLMClient, LLMRuntimeConfig
+from .ai.codex_player import ModelTurnError
 from .ai.strategic_agent import StrategicNPCAgent
 from .ai.host import HostAgent
 from .i18n import normalize_locale, t, list_sep, role_name, board_display, role_desc, board_role_name, witch_rule_text
@@ -46,7 +47,13 @@ class GameSession:
                  session_id: str = "local", seed: int | None = None,
                  locale: str = "zh-CN", names: dict | None = None,
                  personalities: dict | None = None, conjecture: bool = False,
-                 player_role: str | None = None, onboarding: bool = False):
+                 player_role: str | None = None, onboarding: bool = False,
+                 planner=None):
+        if planner is not None and not planner.verified:
+            raise ValueError("Model preflight required before opening a game.")
+        if planner is not None and conjecture:
+            raise ValueError("Codex normal play does not yet support conjecture tables; choose normal mode.")
+        self.planner = planner
         if type(conjecture) is not bool:
             raise ValueError("Conjecture mode must be true or false.")
         self.conjecture = conjecture
@@ -56,7 +63,7 @@ class GameSession:
                                         personalities=personalities, player_role=player_role)
         # Freeze provider settings at game start.  No key is persisted in NPC
         # memory, reviews, SSE events, or public state.
-        self.llm = LLMClient(LLMRuntimeConfig.from_request(llm_options))
+        self.llm = LLMClient(LLMRuntimeConfig.from_request({"enabled": False} if planner is not None else llm_options))
         self.host = HostAgent(self.llm, locale=self.engine.locale)
         self.public_record = PublicRecord(self.engine.locale)
         # A hosted game's carry/memory is scoped to its random session, so one
@@ -100,6 +107,15 @@ class GameSession:
         if question.strip().casefold() in ("座次", "座次表", "/seats", "seats"):
             from .onboarding import seating_text
             return seating_text(self.engine.public_state())
+        if (re.search(r"上警|退警|sheriff|candid", question, re.I) and
+                re.search(r"只有|名单|还能|什么时候|only|list|when|still", question, re.I) and
+                not re.search(r"该|建议|should|recommend|谁是狼", question, re.I)):
+            rows = [row["event"]["text"] for row in self.public_record.entries
+                    if row["event"].get("type") == "narration" and
+                    row["event"].get("text", "").startswith(("本轮上警名单：", "Sheriff candidates:"))]
+            rules = ("Candidacy opens once before day-one speeches; no late entry. Withdrawal follows speeches."
+                     if self.engine.locale == "en" else "仅首日发言前统一报名上警，之后不能加入；警上发言结束后可退警。")
+            return "\n".join(rows[-1:] + [rules])
         record = self.public_record.query(question)
         return record if record is not None else self.host.answer_rule_question(question, self.engine)
 
@@ -177,6 +193,10 @@ class GameSession:
     async def _game_task(self):
         try:
             await self._play()
+        except ModelTurnError:
+            self.emit({"type": "error", "text": (
+                "Model decision failed, timed out or exceeded budget. Game stopped; no offline substitution. Resume is not supported."
+                if self.engine.locale == "en" else "模型决策失败、超时或调用额度耗尽。对局已停止，未切换离线玩家；目前不支持断线续局。")})
         except Exception:
             logging.getLogger(__name__).exception("Game session failed")
             self.emit({"type": "error", "text": (
@@ -195,8 +215,14 @@ class GameSession:
             self.conjecture_ledger = GameConjectures(e)
         for s in e.seats.values():
             if not s.is_player:
-                self.agents[s.name] = StrategicNPCAgent(
-                    s.name, e, self.llm, memory_dir=self.memory_dir)
+                if self.planner is not None:
+                    from .ai.codex_player import CodexNPCAgent
+                    self.agents[s.name] = CodexNPCAgent(
+                        s.name, e, self.llm, memory_dir=self.memory_dir,
+                        planner=self.planner, public_record=self.public_record)
+                else:
+                    self.agents[s.name] = StrategicNPCAgent(
+                        s.name, e, self.llm, memory_dir=self.memory_dir)
         wolf_agents = sorted(
             (agent for agent in self.agents.values()
              if agent.is_wolf and agent.brain.role != "stone_ghost"),
@@ -212,9 +238,10 @@ class GameSession:
                       self.host.intro(board_display(e.locale, e.board)["name"], self._seats_desc()))
         self.emit({"type": "init", "state": e.public_state(), "player": pv,
                    "host_intro": host_intro,
-                   "llm_status": self.llm.public_status(),
+                   "llm_status": self._model_status(),
                    "settings": {"medium": "text", "voice_available": False,
-                                "visual_gameplay_available": False, "conjecture": self.conjecture}})
+                                "visual_gameplay_available": False, "conjecture": self.conjecture,
+                                "npc_driver": "codex" if self.planner is not None else "legacy_rules"}})
         self._remember_llm_status()
 
         if self.onboarding:
@@ -360,6 +387,18 @@ class GameSession:
         """Extract only explicit public claims/targets from human text."""
         claim = None
         question_to = None
+        # Addressed clauses, not merely the first seat mentioned in a paragraph.
+        # No model is allowed to rewrite or manufacture the human's statement.
+        if self.planner is not None:
+            for clause in re.split(r"[。！？!?；;]|另外|also", text, flags=re.I):
+                if not re.search(r"怎么|为什么|凭什么|为何|请问|解释|why|how|explain", clause, re.I):
+                    continue
+                match = re.search(r"(?<!\d)(\d+)\s*号|#\s*(\d+)\b|(?:seat|player)\s+(\d+)\b", clause, re.I)
+                if match:
+                    pos = int(next(g for g in match.groups() if g is not None))
+                    target = next((s for s in self.engine.alive_seats() if s.pos == pos and not s.is_player), None)
+                    if target:
+                        self._pending_questions[target.name] = self.engine.player_seat().name
         if re.search(r"验|查验|check|result", text, re.I) and re.search(r"吗|呢|谁|不说|报出来|请|[?？]|who|which|why|please", text, re.I):
             for seat in self.engine.alive_seats():
                 if not seat.is_player and (re.search(rf"(?<!\d){seat.pos}\s*号|#\s*{seat.pos}\b|(?:seat|player)\s+{seat.pos}\b", text, re.I) or seat.name.casefold() in text.casefold()):
@@ -418,9 +457,9 @@ class GameSession:
                 continue
             self._questions_answered += 1
             self.emit({"type": "narration", "text":
-                       (f"Host: Before voting, {target}, answer {asker}'s check question. This is a claim, not a host-verified result." if self.engine.locale == "en" else
-                        f"主持人：投票前请 {target} 回答 {asker} 对查验的追问。这是玩家口径，不代表主持人认证。")})
-            response = agent.brain.answer_check_question()
+                       (f"Host: Before voting, {target}, answer {asker}'s question. This is a claim, not a host-verified result." if self.engine.locale == "en" else
+                        f"主持人：投票前请 {target} 回答 {asker} 的追问。这是玩家口径，不代表主持人认证。")})
+            response = agent.table_reply(asker) if self.planner is not None else agent.brain.answer_check_question()
             await self._publish_table_speech(agent.seat, response, "clarification")
 
     def _reset_table_talk(self):
@@ -526,15 +565,18 @@ class GameSession:
             self.emit({"type": "narration", "text": closing})
 
     def _remember_llm_status(self):
-        state = self.llm.public_status()
+        state = self._model_status()
         self._last_llm_status = (state["mode"], state.get("reason", ""))
 
     def _emit_llm_status_if_changed(self):
-        state = self.llm.public_status()
+        state = self._model_status()
         marker = (state["mode"], state.get("reason", ""))
         if marker != self._last_llm_status:
             self.emit({"type": "llm_status", "llm_status": state})
             self._last_llm_status = marker
+
+    def _model_status(self):
+        return self.planner.public_status() if self.planner is not None else self.llm.public_status()
 
     # ---------------- 夜晚 ----------------
     async def _gather_night(self, requests) -> dict:
@@ -713,8 +755,9 @@ class GameSession:
                 "desc": t(e.locale, seat.role + "_desc"), "candidates": candidates})
             target = response.get("target")
         else:
-            target = self.agents[seat.name].brain.day_skill(
-                [c["pos"] for c in candidates]).target
+            agent = self.agents[seat.name]
+            target = (agent.night_action(seat.role, candidates).get("target") if self.planner is not None else
+                      agent.brain.day_skill([c["pos"] for c in candidates]).target)
         for event in e.resolve_day_skill(seat.pos, target):
             await self._emit_event(event)
         await self._post_death_triggers()
@@ -732,7 +775,7 @@ class GameSession:
                     up_players.append(s)
             else:
                 agent = self.agents[s.name]
-                up = (s.role == "seer" or
+                up = agent.election_choice() if self.planner is not None else (s.role == "seer" or
                       (s.is_wolf and agent.brain.wolf_strategy == "bluff") or
                       agent.style.aggression > 0.82)
                 if up:
@@ -769,7 +812,8 @@ class GameSession:
                     withdraw = response["withdraw"]
                 else:
                     own_claim = next(sp.claim for name, sp in election_speeches if name == s.name)
-                    withdraw = own_claim != "seer" and any(sp.claim == "seer" for name, sp in election_speeches if name != s.name) and self.agents[s.name].style.aggression < 0.9
+                    withdraw = (self.agents[s.name].election_choice(withdraw=True) if self.planner is not None else
+                                own_claim != "seer" and any(sp.claim == "seer" for name, sp in election_speeches if name != s.name) and self.agents[s.name].style.aggression < 0.9)
                 if withdraw:
                     self.emit({"type": "narration", "text": f"#{s.pos} {s.name} " + ("withdraws." if e.locale == "en" else "退警。")})
                 else:
@@ -881,6 +925,8 @@ class GameSession:
                 "candidates": [{"pos": p, "name": e.seat_at(p).name} for p in cands]})
             return resp.get("target")
         candidates = [{"pos": pos, "name": e.seat_at(pos).name} for pos in cands]
+        if self.planner is not None and candidates:
+            return self.agents[shooter.name].night_action("death-trigger shot", candidates).get("target")
         return self.agents[shooter.name].vote(candidates) if candidates else None
 
     # ---------------- 事件广播 ----------------

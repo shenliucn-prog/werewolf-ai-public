@@ -180,12 +180,32 @@ def _ordinary_request_prompt(kind: str, data: dict, locale: str = "zh-CN") -> st
 
 
 async def play(board_id: str, seed: int | None, offline: bool, locale: str, names=None,
-               personalities=None, conjecture=False, player_role=None):
-    llm_options = {"enabled": False} if offline else None
+               personalities=None, conjecture=False, player_role=None, backend="codex",
+               model="gpt-5.6-terra", effort="medium", max_calls=240):
+    from .ai.codex_player import CodexPlayerRuntime, ModelTurnError
+    planner = None
+    if not offline and backend == "codex":
+        if conjecture:
+            print("Codex conjecture tables are not integrated yet / Codex 猜想表尚未接入；请选择普通模式。")
+            return 1
+        print(f"Codex NPC decisions: {model} / {effort}; max {max_calls} calls. Checking connection before dealing roles…" if locale == "en" else
+              f"Codex 驱动 NPC 决策：{model} / {effort}；本局最多 {max_calls} 次调用。发身份前检查连接……", flush=True)
+        planner = CodexPlayerRuntime(model=model, effort=effort, max_calls=max_calls)
+        try:
+            await asyncio.to_thread(planner.preflight)
+        except ModelTurnError as error:
+            print(str(error))
+            return 1
+        print("Model connection verified. No silent offline fallback." if locale == "en" else
+              "模型连接验证通过；本局不会静默切换离线玩家。", flush=True)
+    else:
+        print("TEST MODE: local decisions, optional wording only. Not model-player gameplay." if locale == "en" else
+              "测试模式：本地规则决策，模型至多润色台词。这不是大模型玩家对局。", flush=True)
+    llm_options = {"enabled": False} if offline or planner is not None else None
     session = GameSession(board_id, llm_options, session_id="chat-" + secrets.token_urlsafe(12),
                           seed=seed, locale=locale, names=names,
                           personalities=personalities, conjecture=conjecture, player_role=player_role,
-                          onboarding=True)
+                          onboarding=True, planner=planner)
     print("Text only; voice and visual gameplay are not designed or implemented." if locale == "en" else
           "当前仅文字驱动；语音和视觉玩法尚无方案、尚未实现。")
     print("At any prompt: /seats, /history, votes, speeches, or ?question. These never submit an action." if locale == "en" else
@@ -193,6 +213,8 @@ async def play(board_id: str, seed: int | None, offline: bool, locale: str, name
     async for event in session.events():
         if event["type"] != "request":
             _render(event, session.engine.locale)
+            if event["type"] == "error":
+                return 1
             continue
         kind, data = event["kind"], event.get("data", {})
         while True:
@@ -212,11 +234,16 @@ async def play(board_id: str, seed: int | None, offline: bool, locale: str, name
 
 def main():
     parser = argparse.ArgumentParser(description="对话式狼人杀")
-    parser.add_argument("--board", default="classic", help="板子 ID")
+    parser.add_argument("--board", help="板子 ID；省略时先选择 / select before dealing")
     parser.add_argument("--role", default="random", help="Your role ID, or random (default); see --list-roles")
     parser.add_argument("--list-roles", action="store_true", help="List roles available on the selected board")
     parser.add_argument("--seed", type=int, help="可复现随机种子")
     parser.add_argument("--offline", action="store_true", help="只使用本地表达")
+    parser.add_argument("--backend", choices=("codex", "legacy"), default="codex",
+                        help="codex: model decisions (default); legacy: rule decisions with optional rephrasing")
+    parser.add_argument("--model", default="gpt-5.6-terra")
+    parser.add_argument("--effort", choices=("low", "medium", "high"), default="medium")
+    parser.add_argument("--max-model-calls", type=int, default=240)
     parser.add_argument("--lang", default="zh-CN", choices=("zh-CN", "en"), help="game language")
     parser.add_argument("--name", help="Your display name; omitted means random")
     parser.add_argument("--rename", action="append", default=[], metavar="PLAYER_ID=NAME",
@@ -229,6 +256,17 @@ def main():
     args = parser.parse_args()
     from .game.engine import BOARD_MAP, ROLE_META
     from .i18n import board_role_name
+    if args.max_model_calls < 1 or args.max_model_calls > 1000:
+        parser.error("--max-model-calls must be between 1 and 1000")
+    if args.board is None:
+        if args.list_roles or args.list_cast or args.list_personalities:
+            args.board = "classic"
+        else:
+            from .setup import choose
+            from .i18n import board_display
+            for key, board in BOARD_MAP.items():
+                print(f"{key}: {board_display(args.lang, board)['name']}")
+            args.board = choose("Board / 板子", tuple(BOARD_MAP), "classic")
     if args.board not in BOARD_MAP:
         parser.error("Unknown board ID")
     available_roles = list(dict.fromkeys(BOARD_MAP[args.board]["roles"]))
@@ -269,7 +307,10 @@ def main():
         assign_personas(args.seed, personalities)
     except ValueError as error:
         parser.error(str(error))
-    asyncio.run(play(args.board, args.seed, args.offline, args.lang, names, personalities, args.conjecture, args.role))
+    result = asyncio.run(play(args.board, args.seed, args.offline, args.lang, names, personalities,
+                              args.conjecture, args.role, args.backend, args.model, args.effort, args.max_model_calls))
+    if result == 1:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

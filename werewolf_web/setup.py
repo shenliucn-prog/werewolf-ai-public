@@ -43,11 +43,11 @@ def main():
     entry = choose("Entry / 入口", ("agent", "web", "exit"), "agent")
     if entry == "exit":
         return 0
-    say("Local expression needs no game API key. Optional models rephrase speech; local strategy decides actions. Your Agent may charge separately.",
-        "本地表达无需游戏 API Key。可选模型润色发言，行动由本地策略决定。宿主 Agent 可能另行收费。")
+    say("Agent play uses Codex model decisions by default and requires a working local Codex login. It consumes account usage. Offline mode is only a rule-flow test; the legacy API path only rephrases local decisions.",
+        "Agent 对局默认由 Codex 模型决策，需要本机 Codex 已登录，会消耗账户用量。离线模式仅供规则流程测试；旧 API 路径只润色本地决策。")
     if entry == "web":
-        say("Open http://127.0.0.1:8000. Choose language, Classic, Local AI only and Conjecture off. Edit names/personalities, start a game, read rules, ask questions, then click Ready. Keep this server running.",
-            "打开 http://127.0.0.1:8000。选择语言、经典板、只用本地 AI、关闭猜想模式；可修改名字和人格。开始对局后阅读规则、提问，再点击准备好。保持此服务运行。")
+        say("Browser currently uses legacy rule-driven NPCs, not Codex decision players. For model gameplay choose the Agent entry. Open http://127.0.0.1:8000, choose settings and read rules before Ready. Keep this server running.",
+            "网页版当前仍使用旧规则驱动 NPC，不是 Codex 决策玩家。体验模型对局请选择 Agent 入口。打开 http://127.0.0.1:8000，选择设置、阅读规则后再准备。保持此服务运行。")
         return subprocess.call([sys.executable, "-m", "uvicorn", "werewolf_web.run:app", "--host", "127.0.0.1", "--port", "8000"])
     from .game.engine import BOARD_MAP, ROLE_META
     from .i18n import board_display, board_role_name
@@ -77,10 +77,13 @@ def main():
     name = input("Your name (blank = random) / 你的名字（留空随机）: ").strip()
     if name:
         command.extend(("--name", name))
-    say("Choose local to avoid game model calls. Configured uses the provider environment described in README and may incur costs. Set keys locally, not in Agent chat.",
-        "选择 local 不调用游戏模型。configured 使用 README 所述的环境配置，可能产生费用；请在本地设置密钥，不要发到 Agent 聊天里。")
-    if choose("Expression / 表达", ("local", "configured"), "local") == "local":
+    say("Codex checks a real model response before dealing roles. Failure stops the game; no silent fallback. Local is a test, not model gameplay. Codex conjecture tables are not yet integrated.",
+        "Codex 在发身份前验证真实模型响应，失败会停止，不静默降级。local 是测试，不是模型对局。Codex 猜想表暂未接入。")
+    backend = choose("NPC decisions / NPC 决策", ("codex", "local", "legacy"), "codex")
+    if backend == "local":
         command.append("--offline")
+    elif backend == "legacy":
+        command.extend(("--backend", "legacy"))
     say("Setup complete. Next: meet the host, check seats/rules, ask questions, then confirm Ready. Night one has not started.",
         "设置完成。接下来认识主持人、查看座次和规则、提问，再确认开始。第一夜尚未开始。")
     return subprocess.call(command)

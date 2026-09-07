@@ -1,6 +1,12 @@
 # Playing and developing Werewolf AI
 
 When the user asks to play, read `docs/AGENT_PLAY.md`. Work in their local fork.
+Before each new game, ask for the board (or offer confirmed previous settings),
+then role/personality/conjecture choices. Never infer these from "next game".
+Normal Agent play uses the Codex decision backend, not `--offline` or legacy
+model rephrasing. Verify the real model preflight before dealing identities.
+Use offline only when the user explicitly selects a rule-flow test, and label
+it as such. Never silently substitute local NPCs when model calls fail.
 Use `python -m werewolf_web.setup` for first-time setup, or the documented chat
 command when their choices are already known. Keep one persistent interactive
 process (PTY when required) across turns. Never launch a second game merely
