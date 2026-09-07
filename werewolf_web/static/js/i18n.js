@@ -1,5 +1,14 @@
 // Presentation only: actions and roles always use stable keys from the session.
 const EN = {
+  "推荐：在自己的 Agent 里玩": "Recommended: play in your own Agent",
+  "你在 Agent 对话里发言和行动，由 Agent 连接游戏。网页版是可选界面，不是核心体验。": "Speak and act in your Agent's conversation while it connects to the game. The browser is optional, not the core experience.",
+  "给 Agent 的开局说明": "Instructions for your Agent",
+  "当前可由支持本地终端和持续交互进程的 Agent 转接；尚无通用 Agent 插件或 MCP 接入。不会迁移当前网页对局。": "Agents with local terminal access and persistent interactive processes can use the terminal bridge. No universal Agent plugin or MCP integration is provided yet. This does not transfer your browser game.",
+  "复制给 Agent": "Copy for your Agent", "已复制": "Copied",
+  "请选中上方命令手动复制。": "Select the instructions above and copy them manually.",
+  "安装说明": "Installation guide", "网页版 · 开局设置": "Browser game · Setup",
+  "对局对话": "Game conversation", "本局玩家": "Players",
+  "选择上方的设置并开始网页版对局。发言记录会显示在这里；轮到你时，在下方回应。": "Choose your settings above and start a browser game. Statements appear here; respond below when it is your turn.",
   "第一次玩？两分钟规则": "First game? Two-minute rules",
   "先选经典板、只用本地AI、关闭猜想模式。夜晚按私密提示行动；白天发言、比较声明、投票放逐。": "Start with Classic, Local AI only and Conjecture off. Act on private prompts at night; discuss claims and vote to eliminate a player during the day.",
   "全部狼人出局则好人胜；全部神职或全部平民出局则狼人胜。死者公开翻牌，警长放逐票重1.5票，平票无人出局。": "Good wins when all wolves are out. Wolves win when either all special good roles or all villagers are out. Deaths reveal roles; the sheriff has 1.5 exile votes; tied exile tallies eliminate nobody.",
