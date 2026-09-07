@@ -3,6 +3,55 @@
 These are this prototype's explicit rules, not a claim that all Werewolf tables
 use the same variant. Browser and terminal chat use the same `GameSession`.
 
+## Elections, Peaceful Day and public records
+
+Player-facing chat and browser games collect candidacy before first-day
+speeches, announce all candidates, then offer one withdrawal window after the
+speeches. No late entry or re-entry is allowed. All living players, including
+remaining candidates and withdrawn candidates, vote. A tie elects nobody.
+Unattended research callers with `onboarding=False` retain the earlier election
+protocol without the human withdrawal prompt.
+
+Exile ballots now offer **Peaceful Day** alongside living players. This is a
+public vote for no exile, not a silent abstention. It has the same weight as a
+player vote (including the sheriff's 1.5). If Peaceful Day leads, or any options
+tie for highest votes, nobody is exiled. The Crow's extra vote still applies only
+to its marked living player. This experimental option changes incentives;
+balance is not yet established. Cautious NPCs can support it when none of their
+suspicions reach the local decision threshold; personalities and beliefs remain
+relevant. No independent abstention option is provided.
+
+Both elections and exile votes publish each voter's target and weight, the
+Crow's bonus when applicable, and totals. At a chat prompt use `votes`,
+`latest votes`, `day 2 speeches`, `/history` or `/seats`. Chinese equivalents
+include `上一轮票型`, `第2天发言记录`, `公开记录` and `座次`.
+For natural-language requests, ask the host with `?` (for example
+`?把上一轮的票型拿出来`); in the browser use the existing host chat field.
+Queries never submit actions or reveal private night results. Speech records
+are verbatim. Declining an interruption emits no player statement. Final review
+includes all identities and the public timeline after the game ends. These
+records belong to the live process; restarting does not restore a lost game.
+
+## Claims, clarification and interruptions
+
+Seer claims include a dated account of checks. A true Seer uses only their own
+results; a bluffing NPC maintains its own invented account without consulting
+the Seer's hidden results. Both are player claims, not host certifications. A
+language-model rewrite must retain the account verbatim or local wording is used.
+These safeguards improve consistency; they do not certify all NPC reasoning.
+
+During your statement, directly asking a numbered player for their checks
+(for example, “12号不说自己验了谁吗？” or “#12, who did you check?”) queues a public
+clarification after ordered speeches and before voting. The host allows at most
+two such replies per day. Someone who has not publicly claimed Seer does not
+disclose private checks in this window. Duplicate questions to one player are
+combined. This first version recognizes check questions, not arbitrary debate
+questions. Rules questions sent with `?` remain private and never enter this queue.
+
+Spontaneous exchanges have a three-extra-utterance budget and cannot follow two
+consecutive main speeches. Main speeches always retain their order. The separate
+clarification window may add up to two responses. Declining a reply is silent.
+
 ## Public and private information
 
 - Eliminated players publicly reveal their role in the current variant. Living

@@ -394,7 +394,7 @@ class GameEngine:
         tally = {}
         alive = {s.pos for s in self.alive_seats()}
         for voter, target in votes.items():
-            if voter not in alive or target not in alive or voter == target:
+            if voter not in alive or (target != 0 and target not in alive) or voter == target:
                 continue
             tally[target] = tally.get(target, 0) + (1.5 if voter == self.sheriff else 1.0)
         if self.crow_target in alive:
@@ -429,16 +429,19 @@ class GameEngine:
     def resolve_vote(self, votes: dict[int, int], exiled: Optional[int]) -> list[GameEvent]:
         """votes: {voter_pos: target_pos}。exiled 已确定（由runner计算）。"""
         vote_text = list_sep(self.locale).join(
-            t(self.locale, "vote_arrow", v=voter, t=target)
-            for voter, target in votes.items() if target
+            ((f"#{voter}→Peaceful Day" if self.locale == "en" else f"{voter}号→平安日")
+             if target == 0 else t(self.locale, "vote_arrow", v=voter, t=target))
+            for voter, target in votes.items() if target is not None
         ) or t(self.locale, "vote_none")
         events: list[GameEvent] = [GameEvent(
             type="vote",
             text=t(self.locale, "vote_header", d=self.day_count, votes=vote_text),
             data={"day": self.day_count, "votes": dict(votes)},
         )]
-        if exiled is None:
-            events.append(GameEvent(type="system", text=t(self.locale, "vote_tie")))
+        if exiled is None or exiled == 0:
+            text = (("Peaceful Day wins: nobody is exiled." if self.locale == "en" else "平安日最高票，今日无人被放逐。")
+                    if exiled == 0 else t(self.locale, "vote_tie"))
+            events.append(GameEvent(type="system", text=text))
             self.history.extend(events)
             return events
         seat = self.seat_at(exiled)

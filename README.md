@@ -28,6 +28,13 @@ seven-seat experimental games, not the twelve-seat playable board.
 
 ## Quick start
 
+Fork this repository on GitHub, then clone your fork locally (or clone the
+upstream below to try it). Both Agent and browser games run on your machine.
+After installing dependencies, run `python -m werewolf_web.setup --lang en`.
+Onboarding checks your environment, explains costs and entry points, guides
+game settings, and leads into the host's rules/question phase. Night one waits
+for Ready. Check without starting: `python -m werewolf_web.setup --check --lang en`.
+
 Use Python 3.10 or newer. Run commands from the repository root.
 
 ```bash
@@ -64,6 +71,10 @@ research-only [mechanics lab](docs/MECHANICS_LAB.md).
 | Claim a role / accuse a player | `I am the Seer. I suspect #3.` |
 | Run for sheriff | `yes` or `no` |
 | Vote | `vote 3` |
+| Support no exile | `peaceful day` |
+| Withdraw after candidacy speeches | `withdraw` or `stay` |
+| Review public ballots / statements | `latest votes`, `day 2 speeches`, `/history` |
+| See current seats | `/seats` |
 | Choose a night target | `choose 3` |
 | Use one Witch potion | `save 3` **or** `poison 4` |
 | Skip an optional night action | `pass` |

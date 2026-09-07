@@ -74,6 +74,10 @@ class RuleGuide:
                 any(word in question for word in strategy_words)):
             return "我可以解释规则和公开流程，但不能判断某位玩家的身份、提供投票或夜间行动建议。请根据公开发言、票型和你自己的合法私密信息决定。"
 
+        if any(word in question for word in ("上警", "退警", "竞选")):
+            return "仅首日发言前统一报名上警，之后不能加入。玩家界面在警上发言结束后可退警；所有存活玩家（含候选人）投票选警长，平票则无警长。"
+        if any(word in question for word in ("平安日", "弃票")):
+            return "放逐时可以投平安日，公开主张今天不放逐。平安日单独最高票或与最高票打平时无人出局；任意最高票并列也无人出局。平安日不是不表态的弃票，警长票权同样适用。"
         if engine.witch_unlimited and any(word in question for word in ("女巫", "药", "自救", "复活")):
             return witch_rule_text(engine.locale, engine.board)
         board_roles = [self.roles[role] for role in engine.board["roles"]]
@@ -102,6 +106,10 @@ class RuleGuide:
                 or any(re.search(rf"\b{re.escape(name)}\b", q) for name in names)
                 or re.search(r"\bwho\b|\bshould i\b|recommend|choose for me|reveal.*identit", q)):
             return "I can explain rules, but I cannot identify players or recommend a vote or night target."
+        if re.search(r"\b(candidacy|candidate|withdraw|withdrawal|election|run for sheriff)\b", q):
+            return "Declare candidacy once before speeches on day one. Player interfaces offer withdrawal after speeches; no late entry. All living players, including candidates, vote; a tied election elects nobody."
+        if re.search(r"\b(abstain|abstention|peaceful day)\b", q):
+            return "Vote Peaceful Day to publicly support no exile. A Peaceful Day lead or any tie for highest votes eliminates nobody. Sheriff weighting applies. This is a vote for no exile, not an abstention."
         if engine.witch_unlimited and re.search(r"\b(witch|potion|potions|antidote|poison|revive|resurrect|self-save)\b", q):
             return witch_rule_text(engine.locale, engine.board)
         # Match specific compound roles before generic ones (Wolf King before
