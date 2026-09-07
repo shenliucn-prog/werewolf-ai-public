@@ -4,15 +4,33 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>狼人杀 · 暗夜茶馆</title>
-  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="/css/style.css?v=conversation-2" />
 </head>
 <body>
   <header class="topbar">
     <div class="brand" id="brand">🐺 暗夜茶馆 · 狼人杀</div>
+    <span id="status" class="status" role="status"></span>
+    <select id="locale" title="Language"><option value="zh-CN">中文</option><option value="en">English</option></select>
+  </header>
+  <section class="play-intro" aria-labelledby="playTitle">
+    <div>
+      <h1 id="playTitle" data-i18n="推荐：在自己的 Agent 里玩">推荐：在自己的 Agent 里玩</h1>
+      <p data-i18n="你在 Agent 对话里发言和行动，由 Agent 连接游戏。网页版是可选界面，不是核心体验。">你在 Agent 对话里发言和行动，由 Agent 连接游戏。网页版是可选界面，不是核心体验。</p>
+    </div>
+    <details id="textGuide">
+      <summary data-i18n="给 Agent 的开局说明">给 Agent 的开局说明</summary>
+      <p data-i18n="当前可由支持本地终端和持续交互进程的 Agent 转接；尚无通用 Agent 插件或 MCP 接入。不会迁移当前网页对局。">当前可由支持本地终端和持续交互进程的 Agent 转接；尚无通用 Agent 插件或 MCP 接入。不会迁移当前网页对局。</p>
+      <code id="textCommand"></code>
+      <button type="button" id="copyTextCommand" data-i18n="复制给 Agent">复制给 Agent</button>
+      <span id="copyStatus" role="status"></span>
+      <a href="https://github.com/shenliucn-prog/werewolf-ai-public#quick-start" target="_blank" rel="noopener noreferrer" data-i18n="安装说明">安装说明</a>
+    </details>
+  </section>
+  <details id="gameSetup" class="game-setup" open>
+    <summary data-i18n="网页版 · 开局设置">网页版 · 开局设置</summary>
     <div class="controls">
       <select id="board" title="选择板子"></select>
       <label><span data-i18n="你的角色">你的角色</span> <select id="playerRole" aria-label="你的角色"><option value="random" data-i18n="随机身份">随机身份</option></select></label>
-      <select id="locale" title="Language"><option value="zh-CN">中文</option><option value="en">English</option></select>
       <label><input id="conjectureMode" type="checkbox"><span data-i18n="猜想模式（测试版）">猜想模式（测试版）</span></label>
       <details class="llm-settings">
         <summary data-i18n="名字与人格">名字与人格</summary>
@@ -35,44 +53,40 @@
         </div>
       </details>
       <button id="newGame">开始新游戏</button>
-      <span id="status" class="status" role="status"></span>
     </div>
-  </header>
-  <p class="mode-note" style="margin:12px 24px" data-i18n="当前仅文字驱动。语音与视觉玩法尚无方案、尚未实现；头像仅作装饰。猜想模式要求双表并保留公开历史，不等于完美推理。">当前仅文字驱动。语音与视觉玩法尚无方案、尚未实现；头像仅作装饰。猜想模式要求双表并保留公开历史，不等于完美推理。</p>
+  <p class="mode-note" data-i18n="当前仅文字驱动。语音与视觉玩法尚无方案、尚未实现；头像仅作装饰。猜想模式要求双表并保留公开历史，不等于完美推理。">当前仅文字驱动。语音与视觉玩法尚无方案、尚未实现；头像仅作装饰。猜想模式要求双表并保留公开历史，不等于完美推理。</p>
 
-  <p id="boardDescription" style="margin:12px 24px" aria-live="polite"></p>
+  <p id="boardDescription" aria-live="polite"></p>
+  </details>
+  <main class="layout">
+    <section class="conversation" aria-labelledby="conversationTitle">
+      <div class="conversation-heading"><h2 id="conversationTitle" data-i18n="对局对话">对局对话</h2><div id="phase-banner" class="phase-banner" role="status"></div></div>
+      <div class="log" id="log" role="log" aria-live="polite" aria-relevant="additions"><p class="empty-log" data-i18n="选择上方的设置并开始网页版对局。发言记录会显示在这里；轮到你时，在下方回应。">选择上方的设置并开始网页版对局。发言记录会显示在这里；轮到你时，在下方回应。</p></div>
+      <div class="action-panel" id="actionPanel" role="region" aria-label="当前行动 / Current action" style="display:none"></div>
+    </section>
+    <aside class="game-context" aria-label="身份与玩家 / Role and players">
+      <div class="player-card" id="playerCard">
+        <div class="pc-title" id="identityTitle">你的身份</div>
+        <div class="pc-body" id="playerBody">尚未入局</div>
+      </div>
+      <details class="host-chat">
+        <summary class="pc-title" id="hostChatTitle">🎙️ 问主持人（规则单聊）</summary>
+        <div class="host-chat-log" id="hostChatLog">我只解释规则和公开流程，不会泄露身份或替你决策。</div>
+        <div class="host-chat-entry">
+          <input id="hostQuestion" aria-labelledby="hostChatTitle" placeholder="例如：女巫怎么用药？" maxlength="320">
+          <button id="askHost" data-i18n="提问">提问</button>
+        </div>
+      </details>
+      <details class="roster" open>
+        <summary data-i18n="本局玩家">本局玩家</summary>
+        <div class="table" id="table"><span class="moon" id="moon" hidden>🌕</span><span class="center-logo" hidden>狼人杀</span></div>
+      </details>
   <details class="quick-help">
     <summary data-i18n="第一次玩？两分钟规则">第一次玩？两分钟规则</summary>
     <p data-i18n="先选经典板、只用本地AI、关闭猜想模式。夜晚按私密提示行动；白天发言、比较声明、投票放逐。">先选经典板、只用本地AI、关闭猜想模式。夜晚按私密提示行动；白天发言、比较声明、投票放逐。</p>
     <p data-i18n="全部狼人出局则好人胜；全部神职或全部平民出局则狼人胜。死者公开翻牌，警长放逐票重1.5票，平票无人出局。">全部狼人出局则好人胜；全部神职或全部平民出局则狼人胜。死者公开翻牌，警长放逐票重1.5票，平票无人出局。</p>
     <p data-i18n="不懂就问主持人，不消耗行动。原有女巫每局两瓶药，每夜择一；神女巫看本局规则。断线不能续局。">不懂就问主持人，不消耗行动。原有女巫每局两瓶药，每夜择一；神女巫看本局规则。断线不能续局。</p>
   </details>
-  <main class="layout">
-    <!-- 左侧：牌桌 -->
-    <section class="table-wrap">
-      <div id="phase-banner" class="phase-banner"></div>
-      <div class="table" id="table">
-        <div class="moon" id="moon">🌕</div>
-        <div class="center-logo">狼<br>人<br>杀</div>
-      </div>
-    </section>
-
-    <!-- 右侧：信息流 -->
-    <aside class="sidebar">
-      <div class="player-card" id="playerCard">
-        <div class="pc-title" id="identityTitle">你的身份</div>
-        <div class="pc-body" id="playerBody">尚未入局</div>
-      </div>
-      <div class="host-chat">
-        <div class="pc-title" id="hostChatTitle">🎙️ 问主持人（规则单聊）</div>
-        <div class="host-chat-log" id="hostChatLog">我只解释规则和公开流程，不会泄露身份或替你决策。</div>
-        <div class="host-chat-entry">
-          <input id="hostQuestion" aria-labelledby="hostChatTitle" placeholder="例如：女巫怎么用药？" maxlength="320">
-          <button id="askHost" data-i18n="提问">提问</button>
-        </div>
-      </div>
-      <div class="log" id="log" role="log" aria-live="polite" aria-relevant="additions"></div>
-      <div class="action-panel" id="actionPanel" role="region" aria-label="当前行动 / Current action" style="display:none"></div>
     </aside>
   </main>
 
@@ -85,7 +99,7 @@
     </div>
   </div>
 
-  <script src="/js/i18n.js"></script>
-  <script src="/js/app.js"></script>
+  <script src="/js/i18n.js?v=conversation-1"></script>
+  <script src="/js/app.js?v=conversation-1"></script>
 </body>
 </html>

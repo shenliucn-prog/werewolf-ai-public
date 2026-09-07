@@ -189,3 +189,90 @@ button:hover { background: var(--accent); border-color: var(--accent); }
 /* 滚动条 */
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-thumb { background: #3a2c63; border-radius: 4px; }
+
+/* Conversation-first interface. The roster supplements, never crowds, the log. */
+[hidden] { display: none !important; }
+body { height: 100dvh; background: var(--bg); }
+:root { --muted: #b1a8cc; --accent2: #ff8198; }
+button:disabled, select:disabled { opacity: .55; cursor: default; }
+a { color: var(--gold); }
+summary { cursor: pointer; line-height: 1.6; }
+.topbar { padding: 12px 24px; }
+.brand { font-size: 18px; letter-spacing: 0; }
+.play-intro { padding: 18px 24px; flex-shrink: 0; background: linear-gradient(110deg, #251d40, #171225);
+  display: flex; align-items: start; justify-content: space-between; gap: 24px; max-height: 40vh; overflow: auto; }
+.play-intro h1 { margin: 0 0 5px; font-size: 21px; }
+.play-intro p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; max-width: 650px; }
+#textGuide { max-width: 540px; min-width: 190px; font-size: 13px; }
+#textGuide summary { color: var(--gold); font-weight: 600; padding: 5px 0; }
+#textCommand { display: block; white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; margin: 10px 0; background: var(--bg); border-radius: 8px; user-select: all; }
+#textGuide a { display: inline-block; margin: 8px; }
+#copyStatus { color: var(--good); }
+.playing .play-intro { display: none; }
+.game-setup { padding: 8px 24px; border-bottom: 1px solid #322552; flex-shrink: 0; max-height: 42vh; overflow: auto; }
+.game-setup > summary { color: var(--muted); font-size: 14px; }
+.controls { padding-top: 10px; }
+#newGame, .send-btn { background: #7130a6; font-weight: 600; }
+.mode-note { margin: 12px 0 6px; }
+#boardDescription { margin: 6px 0; font-size: 13px; }
+.llm-settings-body { position: fixed; right: 24px; top: 74px; width: min(390px, calc(100vw - 32px)); max-height: 70vh; overflow: auto; padding: 18px; gap: 10px; }
+.layout { grid-template-columns: 290px minmax(0, 1fr); gap: 16px; padding: 16px 24px; }
+.conversation { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0;
+  border: 1px solid #322552; background: var(--panel); border-radius: 12px; overflow: hidden; }
+.conversation-heading { display: flex; gap: 12px; align-items: center; justify-content: space-between;
+  padding: 14px 20px; border-bottom: 1px solid #322552; flex-shrink: 0; }
+.conversation-heading h2 { font-size: 15px; margin: 0; }
+.phase-banner { position: static; transform: none; font-size: 13px; padding: 0; background: none; border: 0; }
+.game-context { grid-column: 1; grid-row: 1; min-width: 0; min-height: 0; overflow-y: auto;
+  border: 1px solid #322552; border-radius: 12px; background: var(--panel); }
+.player-card, .roster, .host-chat, .quick-help { padding: 14px; border-bottom: 1px solid #322552; max-height: none; margin: 0; }
+.pc-title, .roster > summary, .quick-help > summary { font-size: 13px; color: var(--muted); letter-spacing: 0; }
+.pc-body { font-size: 15px; margin-top: 8px; line-height: 1.6; overflow-wrap: anywhere; }
+.pc-body details { font-size: 13px; }
+.table { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 10px;
+  width: auto; height: auto; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.seat { position: relative; width: auto; transform: none; min-width: 0; padding: 8px 5px; background: var(--panel2); border: 1px solid transparent; border-radius: 8px;
+  display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 5px; align-items: center; text-align: left; }
+.seat .avatar { width: 24px; height: 24px; font-size: 14px; }
+.seat .name { font-size: 12px; margin: 0; overflow-wrap: anywhere; }
+.seat .role-badge { grid-column: 2; }
+.seat.sheriff { border-color: var(--gold); }
+.seat.sheriff::after { right: 4px; top: 4px; font-size: 12px; }
+.seat.speaking { border-color: var(--accent2); }
+.host-chat-log { max-height: 200px; font-size: 13px; line-height: 1.6; }
+.quick-help { font-size: 13px; line-height: 1.6; }
+.quick-help summary { color: var(--gold); }
+.log { padding: 20px; font-size: 15px; line-height: 1.8; overflow-wrap: anywhere; min-height: 120px; }
+.empty-log { color: var(--muted); max-width: 520px; margin: 32px auto; }
+.log .row { margin-bottom: 14px; padding: 4px 12px; }
+#actionPanel { max-height: 48%; padding: 16px 20px; }
+.action-panel textarea { min-height: 80px; font: inherit; }
+.action-panel button { min-height: 40px; }
+.action-panel select { max-width: 100%; }
+#actionPanel details label { gap: 8px; margin: 10px 0; }
+#actionPanel details input { width: 100%; }
+.review-text { overflow-wrap: anywhere; }
+@media (min-width: 761px) {
+  body { overflow: hidden; height: 100dvh; }
+  .layout { display: grid; flex: 1; }
+}
+@media (max-width: 760px) {
+  body { height: auto; min-height: 100dvh; overflow: auto; }
+  .topbar { padding: 12px; }
+  .brand { font-size: 15px; }
+  .play-intro { display: block; padding: 16px; max-height: none; }
+  #textGuide { margin-top: 12px; max-width: none; }
+  .game-setup { padding: 10px 16px; max-height: none; }
+  .controls { align-items: stretch; }
+  .controls > label, .controls > select { width: 100%; }
+  .layout { display: flex; flex-direction: column; padding: 12px; gap: 12px; }
+  .conversation { height: 76dvh; min-height: 440px; }
+  .game-context { overflow: visible; }
+  .table { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .conversation-heading, .log, #actionPanel { padding: 12px; }
+  #actionPanel { max-height: 50%; }
+}
+@media (max-height: 600px) and (min-width: 761px) {
+  body { height: auto; overflow: auto; }
+  .layout { min-height: 500px; flex: none; height: 80vh; }
+}

@@ -2,6 +2,8 @@
 
 ## English — two-minute guide
 
+**Recommended experience: your own Agent's conversation.** Ask a capable local Agent to follow [Agent play](AGENT_PLAY.md) and relay the actual game, waiting for your decisions. The current bridge requires persistent terminal interaction; it is not a universal Agent integration. The browser is optional; switching interfaces does not transfer an ongoing game.
+
 You are one of twelve players. The other eleven are local AI characters; the
 host explains rules and keeps time. This is **one human per game**, not an
 online lobby. Text is the evidence: portraits do not encode tells.
@@ -54,6 +56,8 @@ Keep the server on your own machine. Online wording is optional and sends game
 context to your configured provider; do not include sensitive real-world details.
 
 ## 中文——两分钟上手
+
+**推荐体验：在自己的 Agent 对话里玩。** 让具备本地执行能力的 Agent 按 [Agent 游玩说明](AGENT_PLAY.md) 连接真实游戏进程，等待你的决定。当前需要持续终端交互能力，并非通用 Agent 接入。网页版是可选界面，不能迁移正在进行的对局。
 
 这是“一位真人 + 十一位 AI + 自动主持人”的十二人对局，不是多人联网大厅。
 头像只是装饰，判断依据来自文字发言、行动、公开翻牌及你合法知道的私密信息。
