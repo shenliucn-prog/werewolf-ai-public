@@ -140,6 +140,14 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 10));
     const sent=requests.filter(r=>r.url==='/api/action').at(-1).body;
     assert.equal(sent.save,dual?2:null); assert.equal(sent.poison,3);
   }
+  for (const retryChoice of [true, false]) {
+    w.eval('showAction({kind:"model_retry",data:{}})');
+    const buttons = w.document.querySelectorAll('#actionPanel button');
+    assert.equal(buttons[0].textContent, 'Retry');
+    assert.equal(buttons[1].textContent, 'Stop game');
+    buttons[retryChoice ? 0 : 1].click(); await flush();
+    assert.equal(requests.filter(r=>r.url==='/api/action').at(-1).body.retry, retryChoice);
+  }
   assert.deepEqual(errors,[]);
   console.log('PASS: setup, locale, fixed/random selection, start payload, dual-table editing, public-only rendering, unlock, Divine Witch labels and dual/single potion controls');
   w.close();

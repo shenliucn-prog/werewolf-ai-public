@@ -3,8 +3,9 @@
 When the user asks to play, read `docs/AGENT_PLAY.md`. Work in their local fork.
 Before each new game, ask for the board (or offer confirmed previous settings),
 then role/personality/conjecture choices. Never infer these from "next game".
-Normal Agent play uses the Codex decision backend, not `--offline` or legacy
-model rephrasing. Verify the real model preflight before dealing identities.
+Normal play is provider-neutral: API/local model service or a configured Agent
+adapter (Codex is optional). See docs/MODEL_CONNECTIONS.md. All interfaces use
+model decisions, not offline rules or legacy rephrasing. Verify preflight before dealing.
 Use offline only when the user explicitly selects a rule-flow test, and label
 it as such. Never silently substitute local NPCs when model calls fail.
 Use `python -m werewolf_web.setup` for first-time setup, or the documented chat

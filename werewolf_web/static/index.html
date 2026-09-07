@@ -28,7 +28,7 @@
   </section>
   <details id="gameSetup" class="game-setup" open>
     <summary data-i18n="网页版 · 开局设置">网页版 · 开局设置</summary>
-    <p class="setup-guidance" data-i18n="网页版目前使用规则驱动 NPC，模型仅润色台词；体验 Codex 决策玩家请在 Agent 对话中玩。先选本局设置，主持人介绍规则后再确认开始。">网页版目前使用规则驱动 NPC，模型仅润色台词；体验 Codex 决策玩家请在 Agent 对话中玩。先选本局设置，主持人介绍规则后再确认开始。</p>
+    <p class="setup-guidance" data-i18n="所有正式入口共用 LLM 决策玩家，不限定 Agent 品牌。先配置模型连接、选择板子；模型预检通过后再发身份。离线仅供规则测试。">所有正式入口共用 LLM 决策玩家，不限定 Agent 品牌。先配置模型连接、选择板子；模型预检通过后再发身份。离线仅供规则测试。</p>
     <div class="controls">
       <select id="board" title="选择板子"></select>
       <label><span data-i18n="你的角色">你的角色</span> <select id="playerRole" aria-label="你的角色"><option value="random" data-i18n="随机身份">随机身份</option></select></label>
@@ -45,7 +45,7 @@
       <details class="llm-settings">
         <summary data-i18n="模型设置">模型设置</summary>
         <div class="llm-settings-body">
-          <label><span data-i18n="模式">模式</span> <select id="llmMode"><option value="" data-i18n="使用服务器默认">使用服务器默认</option><option value="local" data-i18n="只用本地 AI">只用本地 AI</option><option value="custom" data-i18n="本局自带 Key">本局自带 Key</option></select></label>
+          <label><span data-i18n="模式">模式</span> <select id="llmMode"><option value="" data-i18n="使用服务器默认">使用服务器默认</option><option value="local" data-i18n="离线规则测试（非 LLM 对局）">离线规则测试（非 LLM 对局）</option><option value="custom" data-i18n="本局模型连接（API 或本地服务）">本局模型连接（API 或本地服务）</option></select></label>
           <label><span data-i18n="接口地址">接口地址</span> <input id="llmBaseUrl" placeholder="https://.../v1" autocomplete="off"></label>
           <label><span data-i18n="模型名">模型名</span> <input id="llmModel" placeholder="例如 gpt-4o-mini" autocomplete="off"></label>
           <label>API Key <input id="llmApiKey" type="password" placeholder="仅用于本局，不保存" autocomplete="off"></label>
@@ -85,7 +85,7 @@
       </details>
   <details class="quick-help">
     <summary data-i18n="第一次玩？两分钟规则">第一次玩？两分钟规则</summary>
-    <p data-i18n="先选经典板、只用本地AI、关闭猜想模式。夜晚按私密提示行动；白天发言、比较声明、投票放逐。">先选经典板、只用本地AI、关闭猜想模式。夜晚按私密提示行动；白天发言、比较声明、投票放逐。</p>
+    <p data-i18n="先连接模型、选择板子、关闭猜想模式。夜晚按私密提示行动；白天发言、比较声明、投票放逐。">先连接模型、选择板子、关闭猜想模式。夜晚按私密提示行动；白天发言、比较声明、投票放逐。</p>
     <p data-i18n="全部狼人出局则好人胜；全部神职或全部平民出局则狼人胜。死者公开翻牌，警长放逐票重1.5票，平票无人出局。">全部狼人出局则好人胜；全部神职或全部平民出局则狼人胜。死者公开翻牌，警长放逐票重1.5票，平票无人出局。</p>
     <p data-i18n="不懂就问主持人，不消耗行动。原有女巫每局两瓶药，每夜择一；神女巫看本局规则。断线不能续局。">不懂就问主持人，不消耗行动。原有女巫每局两瓶药，每夜择一；神女巫看本局规则。断线不能续局。</p>
   </details>

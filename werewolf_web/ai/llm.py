@@ -81,7 +81,7 @@ class LLMRuntimeConfig:
             model=text("model", base.model),
             temperature=number("temperature", base.temperature, 0.0, 2.0),
             timeout_seconds=number("timeout_seconds", base.timeout_seconds, 1.0, 30.0),
-            max_calls=int(number("max_calls", base.max_calls, 0, 120)),
+            max_calls=int(number("max_calls", base.max_calls, 0, 1000)),
             reasoning_effort=text("reasoning_effort", base.reasoning_effort, 32),
             reasoning_param=text("reasoning_param", base.reasoning_param, 64),
         )

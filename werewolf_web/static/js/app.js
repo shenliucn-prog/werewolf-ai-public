@@ -304,7 +304,14 @@ function showAction(d) {
   const kind = d.kind, data = d.data || {};
   panelEl.style.display = "block";
   panelEl.innerHTML = "";
-  if (kind === "ready") {
+  if (kind === "model_retry") {
+    const hint = document.createElement("p"); hint.textContent = tr("模型连接暂停，不会切换离线玩家。");
+    const retry = document.createElement("button"); retry.textContent = tr("重试");
+    retry.onclick = () => submitAction({retry: true});
+    const stop = document.createElement("button"); stop.textContent = tr("结束本局");
+    stop.onclick = () => submitAction({retry: false});
+    panelEl.append(hint, retry, stop);
+  } else if (kind === "ready") {
     const hint = document.createElement("p");
     hint.textContent = tr("先阅读本局规则，有疑问可问主持人。确认后才进入第一夜。");
     const button = document.createElement("button");

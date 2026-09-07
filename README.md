@@ -4,13 +4,13 @@ English | [简体中文](README.zh-CN.md)
 
 A 12-player social deduction game with 11 independent AI opponents and an automated host. **The recommended experience is playing inside your own AI Agent's conversation**, in English or Chinese. The browser is optional. Currently, a capable local Agent can relay the terminal interface; a universal Agent plugin/MCP integration is not yet provided. See [Agent play](docs/AGENT_PLAY.md).
 
-The core experience is the conversation: players form suspicions, make claims, interrupt one another, and respond before the host brings the table back to the game. Browser and chat share rules and public records. **Agent chat now defaults to Codex decision players; the browser still uses legacy rule-driven NPCs.** These are not equivalent reasoning experiences.
+The core experience is the conversation: players form suspicions, make claims, interrupt one another, and respond before the host brings the table back to the game. Browser and chat share rules and public records. **Agent chat, CLI, browser and app integrations share provider-neutral LLM decision players.** Connect an API/local model service or a configured Agent adapter; Codex is optional. See [model connections](docs/MODEL_CONNECTIONS.md).
 
 **Status:** an experimental, local-first prototype. Start with the Classic board. Eight original boards plus two Divine Witch experimental variants have playable ability paths under this project's [rule variant](docs/RULE_VARIANT.md); edge cases and balance still need testing. See [known limitations](docs/KNOWN_LIMITATIONS.md).
 
 ## What you can do
 
-- Choose normal conversation (default). **Conjecture mode (beta)** remains available in the legacy test backend; Codex dual tables are not integrated yet and are explicitly rejected instead of silently substituted.
+- Choose normal conversation (default). **Conjecture mode (beta)** remains available in the legacy test backend; Model-player dual tables are not integrated yet and are explicitly rejected instead of silently substituted.
 - Try **Divine Witch**: unlimited potions, either one type or both types per night. Choose the experimental board and select the Witch as your role. [Rules and stress tests](docs/DIVINE_WITCH.md).
 - Assign each NPC a **fixed preset** or **random each game**, independently of names and hidden roles.
 - Play with text only. **Voice and visual gameplay have no design or implementation yet**; portraits are decorative, not behavioral evidence.
@@ -23,8 +23,8 @@ seven-seat experimental games, not the twelve-seat playable board.
 - Ask the host private rules questions without consuming your action.
 - Take part in brief public exchanges that other players can react to; the host limits repeated two-person debates.
 - Switch between English and Chinese before starting a game, including NPC names, catchphrases, prompts, and reviews.
-- Codex players independently choose speech, votes, candidacy and abilities using public history and their own lawful private information. A working local Codex login is required and account usage applies.
-- Model play stops on failure, timeout, invalid decisions or budget exhaustion. It never silently switches to local templates. Offline rule-flow tests remain explicitly available with `--offline`.
+- Model players independently choose speech, votes, candidacy and abilities using public history and their own lawful private information. Configure your model provider or Agent adapter; usage costs depend on that connection.
+- Model play pauses for explicit retry/stop on failure, timeout, invalid decisions or budget exhaustion. It never silently switches to local templates. Offline rule-flow tests remain explicitly available with `--offline`.
 
 ## Quick start
 
@@ -53,19 +53,17 @@ Ask your Agent to read this repository and [the Agent play instructions](docs/AG
 
 ### Terminal bridge — for the Agent, or direct testing
 
-The Agent can use the following command after installation and local Codex login. It first asks for the board, then verifies a real model response before dealing roles. Manual terminal play is also available. No browser server is needed.
+The Agent can use the following command after installation and model connection setup. It first asks for the board, then verifies a real model response before dealing roles. Manual terminal play is also available. No browser server is needed.
 
 ```bash
 python -u -m werewolf_web.chat_game --lang en
 ```
 
 Choose your identity before play with `--role seer`, or leave it random.
-Use `--model` and `--effort` for per-game configuration; defaults are
-`gpt-5.6-terra` / `medium`. The default cap is 240 calls (including preflight),
-adjustable with `--max-model-calls` up to 1000; each call times out after 180s.
-Model turns can take tens of seconds each. This adapter requires a Codex CLI
-supporting the isolation/structured-output flags it uses; unsupported versions
-fail closed. It does not install tools, create keys or alter global settings.
+Use `--backend api` (default), `command` for a trusted Agent wrapper, or optional
+`codex`. `--model`, `--effort` and `--max-model-calls` configure the selected
+adapter. Default cap is 240 calls including preflight. Model availability and
+latency depend on the connection. See [connection protocol](docs/MODEL_CONNECTIONS.md).
 `--board classic --list-roles --lang en` lists legal choices. The browser has
 the same **Your role** selector. Other identities remain hidden and board
 role counts stay unchanged. See [game setup](docs/GAME_MODES.md) and the
@@ -99,7 +97,7 @@ Use `--lang zh-CN` for Chinese or `--seed 42` for a repeatable initial setup. Th
 python -m uvicorn werewolf_web.run:app --host 127.0.0.1 --port 8000
 ```
 
-Open [localhost:8000](http://127.0.0.1:8000), choose **English** or **中文**, and start a game. Choose **Local AI only** in Model settings for offline play.
+Open [localhost:8000](http://127.0.0.1:8000), choose **English** or **中文**, and start a game. Configure the model connection in Model settings. Offline rule tests are explicitly labeled.
 
 The conversation and current action occupy the main area; your role and compact player roster are on the left, alongside expandable private rules help. On narrow screens the conversation comes first and supporting details follow. Setup collapses after a successful start. Changing interfaces starts a new game, not a transfer of the current session.
 
@@ -113,12 +111,12 @@ python -m werewolf_web.cli_game --board classic --seed 42 --no-think
 
 This developer-oriented mode is in Chinese and may expose every role and private reasoning. It is separate from the human-playable chat interface.
 
-## Legacy API rephrasing (browser / `--backend legacy`)
+## Model API connection
 
-This older path uses local rule decisions and optionally rephrases them with
-an API model. It is **not** Codex decision play. `--offline` is a rule-flow test
-requiring no game API key. Legacy rephrasing may fall back to local wording;
-the normal Codex backend never does.
+API connections now drive decisions in all normal interfaces. Keyless local
+servers are supported. Only explicit `--backend legacy` retains the old rule
+planner/rephrasing path; `--offline` is a rule-flow test. Normal gameplay never
+silently substitutes local NPCs. See [adapters and protocol](docs/MODEL_CONNECTIONS.md).
 
 Copy the template and configure your own provider:
 
@@ -128,7 +126,7 @@ cp werewolf_web/.env.example werewolf_web/.env
 
 | Setting | Purpose |
 | --- | --- |
-| `LLM_ENABLED` | Enable or disable model expression |
+| `LLM_ENABLED` | Enable or disable model use (disabled means a rule test) |
 | `LLM_BASE_URL` | OpenAI-compatible Chat Completions endpoint |
 | `LLM_API_KEY` | Provider credential |
 | `LLM_MODEL` | Model ID offered by that endpoint |
@@ -140,7 +138,7 @@ Leave reasoning settings empty unless your endpoint explicitly supports them. Na
 
 Browser users can supply a key for one game. That key is sent to this game's Python backend, then used for requests to the configured provider; it is not a browser-only integration. The application omits keys from its game events, memory, and review files. Provider policies and server logs are outside that guarantee.
 
-When online expression is enabled, the provider receives the speaking NPC's context, including its legal private role information and prior player statements. Do not include sensitive real-world information in game chat.
+When a model connection is enabled, the provider receives the speaking NPC's context, including its legal private role information and prior player statements. Do not include sensitive real-world information in game chat.
 
 ## Architecture
 
@@ -151,13 +149,13 @@ Browser / terminal chat
       /   |    \
  Rules  NPC adapter  Host
           |
- Codex decisions (Agent) / local Brain + optional rephrasing (legacy browser)
+ Shared ModelNPCAgent -> API / local model server / Agent adapter
 ```
 
 - `werewolf_web/run.py`: shared playable session and FastAPI/SSE adapter.
 - `werewolf_web/game/`: seats, phases, actions, outcomes, and events.
 - `werewolf_web/ai/brain.py`: local beliefs and decisions for each NPC.
-- `werewolf_web/ai/codex_player.py`: isolated model calls, lawful context, per-seat decision memory and validated actions. Full public records are supplied each turn; no context truncation or cross-game model learning is implemented yet.
+- `werewolf_web/ai/model_player.py`, `decision_runtime.py`: provider-neutral model players, lawful context, per-seat memory, validated actions and API/Agent adapters. Full public records are supplied each turn; no context truncation or cross-game model learning is implemented yet.
 - `werewolf_web/ai/strategy.py`, `growth.py`, `affect.py`: decision traces, cognitive profiles, and bounded state changes.
 - `werewolf_web/ai/host.py`: narration, public-rule help, table moderation, and post-game review.
 - `werewolf_web/i18n.py`: localized NPC identities and game text.

@@ -93,7 +93,7 @@ class CodexPlayerTest(unittest.IsolatedAsyncioTestCase):
     async def test_failed_preflight_does_not_create_or_deal_game(self):
         with patch.object(CodexPlayerRuntime, "preflight", side_effect=ModelTurnError("failed")), \
              patch("werewolf_web.chat_game.GameSession") as session, contextlib.redirect_stdout(io.StringIO()):
-            await play("classic", 1, False, "en")
+            await play("classic", 1, False, "en", backend="codex")
         session.assert_not_called()
 
     async def test_failure_mid_game_emits_error_and_no_substitute_vote(self):
