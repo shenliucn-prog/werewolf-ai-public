@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md)
 
-A 12-player social deduction game with 11 independent AI opponents and an automated host. Play in your browser or through terminal conversation, in English or Chinese.
+A 12-player social deduction game with 11 independent AI opponents and an automated host. **The recommended experience is playing inside your own AI Agent's conversation**, in English or Chinese. The browser is optional. Currently, a capable local Agent can relay the terminal interface; a universal Agent plugin/MCP integration is not yet provided. See [Agent play](docs/AGENT_PLAY.md).
 
 The core experience is the conversation: players form suspicions, make claims, interrupt one another, and respond before the host brings the table back to the game. The browser and chat interface share the same game session, local strategy engine, and event history.
 
@@ -40,22 +40,16 @@ python -m pip install -r werewolf_web/requirements.txt
 
 On Windows PowerShell, activate with `.venv\Scripts\Activate.ps1` instead.
 
-### Browser game
+### Play inside your Agent — recommended experience
+
+Ask your Agent to read this repository and [the Agent play instructions](docs/AGENT_PLAY.md), run the game and relay it in your conversation. You speak, ask rules questions and choose actions in the Agent, not in a terminal yourself. The Agent needs local command execution and a persistent interactive process. This is a capability-dependent bridge, not verified native support for every Agent product.
+
+### Terminal bridge — for the Agent, or direct testing
+
+The Agent can use the following command after installation. Manual terminal play is also available as a fallback, but is not what “play in your Agent” means. Offline disables the game's optional provider calls, not the host Agent's own usage or charges. No browser server is needed.
 
 ```bash
-python -m uvicorn werewolf_web.run:app --host 127.0.0.1 --port 8000
-```
-
-Open [localhost:8000](http://127.0.0.1:8000), choose **English** or **中文**, and start a game. Choose **Local AI only** in Model settings for offline play.
-
-Your seat is assigned at the start of the game. The right panel shows your role, rules chat, and current action. The language stays fixed for that match.
-
-New to Werewolf? Read the [two-minute player guide](docs/PLAYER_GUIDE.md).
-
-### Conversation game
-
-```bash
-python -m werewolf_web.chat_game --board classic --lang en --offline
+python -u -m werewolf_web.chat_game --board classic --lang en --offline
 ```
 
 Choose your identity before play with `--role seer`, or leave it random.
@@ -82,7 +76,19 @@ available potions are shown in the prompt. Rules questions do not consume your t
 
 Use `--lang zh-CN` for Chinese or `--seed 42` for a repeatable initial setup. The chat action parser accepts a small explicit vocabulary; it is not a general natural-language command interpreter.
 
-### AI-only observer mode
+### Browser game — optional
+
+```bash
+python -m uvicorn werewolf_web.run:app --host 127.0.0.1 --port 8000
+```
+
+Open [localhost:8000](http://127.0.0.1:8000), choose **English** or **中文**, and start a game. Choose **Local AI only** in Model settings for offline play.
+
+The conversation and current action occupy the main area; your role and compact player roster are on the left, alongside expandable private rules help. On narrow screens the conversation comes first and supporting details follow. Setup collapses after a successful start. Changing interfaces starts a new game, not a transfer of the current session.
+
+New to Werewolf? Read the [two-minute player guide](docs/PLAYER_GUIDE.md).
+
+### AI-only observer mode — developer tool, not the recommended player entry
 
 ```bash
 python -m werewolf_web.cli_game --board classic --seed 42 --no-think

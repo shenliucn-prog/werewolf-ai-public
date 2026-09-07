@@ -39,6 +39,11 @@ function applyLocale(value) {
   $("#brand").textContent = t.brand; $("#newGame").textContent = t.start;
   $("#identityTitle").textContent = t.identity; $("#hostChatTitle").textContent = t.host;
   $("#hostChatLog").textContent = t.hint;
+  const command = `python -u -m werewolf_web.chat_game --board classic --lang ${uiLocale} --offline`;
+  $("#textCommand").textContent = uiLocale === "en"
+    ? `Help me play Werewolf here in our conversation. Repository: https://github.com/shenliucn-prog/werewolf-ai-public\nRead README.md and docs/AGENT_PLAY.md, prepare the local environment, then keep this interactive process alive:\n${command}\nRelay the game's statements and my private prompts. Wait for my decisions; do not autoplay, invent game events or inspect hidden roles. If you cannot maintain an interactive process, tell me rather than simulating a game.`
+    : `请让我在当前 Agent 对话里玩狼人杀。仓库：https://github.com/shenliucn-prog/werewolf-ai-public\n阅读 README.md 和 docs/AGENT_PLAY.md，准备本地环境，并持续保留以下交互进程：\n${command}\n转述游戏发言和属于我的私密提示，等待我的决定，不代打、不编造事件、不读取其他人的隐藏身份。如果无法保持交互进程，请说明限制，不要模拟一局冒充真实游戏。`;
+  $("#copyStatus").textContent = "";
 }
 
 // ---------- 板子选择 ----------
@@ -131,15 +136,9 @@ function renderSeats(state) {
   Object.values(seats).forEach((s) => s.el.remove());
   seats = {};
   const list = state.seats;
-  const R = 41;
-  list.forEach((s, i) => {
-    const angle = (-90 + i * 30) * Math.PI / 180;
-    const x = 50 + R * Math.cos(angle);
-    const y = 50 + R * Math.sin(angle);
+  list.forEach((s) => {
     const el = document.createElement("div");
     el.className = "seat";
-    el.style.left = x + "%";
-    el.style.top = y + "%";
     const file = PORTRAITS[s.player_id] || PORTRAITS[s.name] || "";
     const initial = s.name.slice(0, 1);
     el.innerHTML = `
@@ -437,6 +436,7 @@ function finishStream(status) {
   $("#locale").disabled = false;
   panelEl.style.display = "none";
   gameId = null;
+  document.body.classList.remove("playing");
   lockNames(false);
 }
 
@@ -488,6 +488,9 @@ async function newGame() {
     finishStream(UI[uiLocale].failed);
     return;
   }
+  document.body.classList.add("playing");
+  $("#gameSetup").open = false;
+  $("#textGuide").open = false;
   es = new EventSource(`/api/stream?game_id=${encodeURIComponent(gameId)}`);
   es.onmessage = (ev) => {
     try { handleEvent(JSON.parse(ev.data)); } catch (e) { console.error(e); }
@@ -503,6 +506,14 @@ async function newGame() {
 }
 
 $("#newGame").onclick = newGame;
+$("#copyTextCommand").onclick = async () => {
+  try {
+    await navigator.clipboard.writeText($("#textCommand").textContent);
+    $("#copyStatus").textContent = tr("已复制");
+  } catch (_) {
+    $("#copyStatus").textContent = tr("请选中上方命令手动复制。");
+  }
+};
 $("#board").onchange = loadRoleChoices;
 $("#locale").onchange = () => { applyLocale($("#locale").value); loadBoards(); loadCast(); };
 $("#randomNames").onclick = loadCast;

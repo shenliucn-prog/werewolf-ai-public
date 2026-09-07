@@ -5,22 +5,25 @@
 12 人狼人杀 AI 对战沙盘。11 个 AI 各有独立人格、独立信念、独立推理链——
 **同一局面下 12 个人会得出 12 套不同的判断**，狼队刀人也是各自提案再收敛。
 
-三种入口：
+推荐体验与现有工具：
 
-当前三种入口都以文字驱动。**语音与视觉玩法尚无方案、尚未实现**；头像只是装饰，不能作为行为证据。
+当前游戏都以文字驱动。**语音与视觉玩法尚无方案、尚未实现**；头像只是装饰，不能作为行为证据。
 开局前可以选择普通模式（默认）或猜想模式（测试版），并为每位 NPC 选择每局随机或固定预设人格。
 名字、人设、座位和隐藏身份相互独立；真人的行为不由 AI 人格强制控制。
 详见 [游戏模式与设置](docs/GAME_MODES.md)；[极端人格研究](docs/EXTREME_EXPERIMENT.md) 是独立的七人完整研究局。
 
 | 模式 | 说明 |
 |:---|:---|
-| **CLI 纯文本** | 无 UI，跑完整一局并打印每个人的内心推理。适合观察 AI 怎么思考。 |
-| **Web 界面** | 圆桌 + 立绘，你亲自下场对打 11 个 AI，座位随本局分配。 |
-| **对话式** | 在终端与主持人聊天、发言和行动，与 Web 共用对局核心。 |
+| **自己的 Agent 对话（推荐体验）** | 玩家在 Agent 里发言和行动；目前需 Agent 用持续交互终端转接游戏，尚无通用插件/MCP。 |
+| **终端桥接入口** | 供有本地执行能力的 Agent 调用，也可手动测试；不是要求普通玩家操作终端。 |
+| **Web 界面（可选）** | 以对话和操作为中心，身份与紧凑玩家列表辅助阅读。 |
+| **CLI 观察器（开发用）** | 自动跑局并打印私密推理，不是推荐的真人游玩入口。 |
 
 ---
 
 ## 快速开始
+
+**推荐在自己的 AI Agent 对话里玩**：玩家对 Agent 发言、提问和行动，由 Agent 连接游戏，不是要求玩家直接操作终端。当前可通过有本地执行能力、能持续保留交互进程的 Agent 转接；尚未提供通用 Agent 插件或 MCP 接入，也未验证所有 Agent 产品。详见[Agent 游玩说明](docs/AGENT_PLAY.md)。网页版为可选界面。
 
 需要 Python 3.10 或更新版本。从仓库根目录运行：
 
@@ -35,22 +38,17 @@ python -m pip install -r werewolf_web/requirements.txt
 Windows PowerShell 改用 `.venv\Scripts\Activate.ps1` 激活环境。
 玩游戏无需 Node；只有开发检查与前端测试需要 Node.js 24.15+（24.x）。
 
-### CLI：看 AI 自己打一局
+### 在 Agent 里玩（推荐体验）
+
+让 Agent 阅读仓库与 [Agent 游玩说明](docs/AGENT_PLAY.md)，启动游戏，并在当前对话里转述发言和等待你的决定。它应连接实际游戏进程，而不是自行编造或模拟一局。
+
+### 终端桥接入口：供 Agent 调用或手动测试
+
+以下命令由具备持续终端交互能力的 Agent 运行；也保留给想手动测试的人。`--offline` 仅关闭游戏自身的模型调用，不代表宿主 Agent 的服务免费。
 
 ```bash
-python -m werewolf_web.cli_game                        # 随机开一局
-python -m werewolf_web.cli_game --board wolf_king      # 换板子
-python -m werewolf_web.cli_game --seed 42              # 复现同一局
-python -m werewolf_web.cli_game --delay 0.4            # 逐条慢慢看
-python -m werewolf_web.cli_game --no-think             # 只看发言，不看思考
-python -m werewolf_web.cli_game --log game.md          # 落盘
-```
-
-### 对话式：以主持人聊天的方式亲自玩
-
-```bash
-python -m werewolf_web.chat_game --board classic --seed 42
-# 断网/不使用云端表达：加 --offline
+python -u -m werewolf_web.chat_game --board classic --lang zh-CN --offline
+# 英文版：
 python -m werewolf_web.chat_game --board classic --lang en --offline
 ```
 
@@ -112,7 +110,9 @@ without consuming your turn. The host explains rules but does not choose targets
        好人，我比较怀疑 细草，他今天最不对劲」
 ```
 
-### Web：自己下场
+### Web（可选）：对话为中心的辅助界面
+
+发言记录与当前操作占据主区域；身份、紧凑的玩家名单放在左侧，规则单聊可按需展开。窄屏先展示对话，再展示辅助信息。成功开局后设置自动收起。两种入口不能迁移正在进行的对局，切换需要新开一局。
 
 这是本机开发原型，请优先使用 classic 板子。特殊身份的实现范围和服务部署限制见 [已知限制](docs/KNOWN_LIMITATIONS.md)。
 
