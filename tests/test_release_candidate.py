@@ -6,6 +6,9 @@ import struct
 import tempfile
 import tarfile
 import unittest
+from unittest.mock import patch
+
+from scripts import check_release
 
 from scripts.prepare_release import ROOT, allowed_path, prepare, redact_portrait, source_inventory, bundle
 
@@ -30,6 +33,28 @@ def description_and_provenance(exif):
 
 
 class ReleaseCandidateTest(unittest.TestCase):
+    def test_checker_rejects_tracked_and_historical_local_artifacts(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / ".git").mkdir()
+            (root / "werewolf_web/data").mkdir(parents=True)
+            (root / "werewolf_web/data/boards.json").write_text('{"boards": [], "roles": {}}')
+            for name in ("LICENSE", "README.md", "README.zh-CN.md", "CONTRIBUTING.md", "SECURITY.md", "docs/ASSETS.md"):
+                target = root / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.touch()
+            (root / "outputs").mkdir()
+            (root / "outputs/game.json").write_text('{}')
+            def fake_git(*args):
+                if args[0] == "rev-list":
+                    return b"abc outputs/old-game.json\n"
+                return b"blob" if args[1] == "-t" else b"{}"
+            with patch.object(check_release, "ROOT", root), patch.object(check_release, "source_inventory", return_value=(["outputs/game.json"], None)), patch.object(check_release, "git", side_effect=fake_git), patch("builtins.print") as output:
+                self.assertTrue(check_release.check(history=True))
+            report = json.loads(output.call_args.args[0])
+            self.assertEqual(len(report["failures"]), 2)
+            self.assertTrue(all("local-only artifact" in item for item in report["failures"]))
+
     def test_all_portraits_preserve_pixels_and_provenance_without_old_ids(self):
         paths = sorted((ROOT / "werewolf_web/static/img/portraits").glob("*.png"))
         self.assertEqual(len(paths), 12)
@@ -52,9 +77,12 @@ class ReleaseCandidateTest(unittest.TestCase):
     def test_sensitive_paths_cannot_enter_candidate_even_if_tracked(self):
         for path in (".git/config", "werewolf_web/.env", "x/.env.local", "key.pem", "a.key",
                      "werewolf_web/data/reviews/a.md", "werewolf_web/data/npc_memory/a.json",
-                     "werewolf_web/data/host_style.en.json", "../escape", "/tmp/escape", "x/.venv/a.py"):
+                     "werewolf_web/data/host_style.en.json", "../escape", "/tmp/escape", "x/.venv/a.py",
+                     "docs/research-runs/a.json", "docs/research-runs/source.tar.gz",
+                     "docs/audit-assets/screen.png", "outputs/game.json", "output/log.json",
+                     "playtest/notes.md", "PUBLICATION_MANIFEST.json"):
             self.assertFalse(allowed_path(path), path)
-        for path in ("werewolf_web/.env.example", "LICENSE", ".github/workflows/ci.yml", "docs/research-runs/a.json"):
+        for path in ("werewolf_web/.env.example", "LICENSE", ".github/workflows/ci.yml", "tests/test_debate.py"):
             self.assertTrue(allowed_path(path), path)
 
     def test_refuses_existing_and_source_paths(self):
