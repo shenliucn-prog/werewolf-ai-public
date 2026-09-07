@@ -14,9 +14,9 @@ import tarfile
 from urllib.parse import unquote
 
 try:
-    from .prepare_release import source_inventory, MANIFEST
+    from .prepare_release import source_inventory, MANIFEST, allowed_path
 except ImportError:
-    from prepare_release import source_inventory, MANIFEST
+    from prepare_release import source_inventory, MANIFEST, allowed_path
 
 ROOT = Path(__file__).resolve().parents[1]
 PATTERNS = {
@@ -24,6 +24,8 @@ PATTERNS = {
     "github-token": re.compile(rb"\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{50,})"),
     "private-key": re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
     "credential-url": re.compile(rb"https?://[^\s/:@]+:[^\s/@]+@"),
+    "machine-home-path": re.compile(rb"/(?:Users|home)/[A-Za-z0-9_.-]+/"),
+    "machine-temp-path": re.compile(rb"/(?:private/)?var/folders/[A-Za-z0-9/_.-]+"),
 }
 
 
@@ -52,6 +54,8 @@ def check(history=False):
         path = ROOT / name
         if not path.is_file():
             continue
+        if not allowed_path(name) and not (not has_git and name == MANIFEST):
+            failures.append(f"{name}: local-only artifact must not be published")
         if name.endswith(".tar.gz"):
             with tarfile.open(path, "r:gz") as archive:
                 for member in archive.getmembers():
@@ -82,6 +86,8 @@ def check(history=False):
         for entry in git("rev-list", "--objects", "--all").decode().splitlines():
             oid, _, name = entry.partition(" ")
             if name and git("cat-file", "-t", oid).strip() == b"blob":
+                if not allowed_path(name):
+                    failures.append(f"history:{oid[:12]}:{name}: local-only artifact")
                 inspect(f"history:{oid[:12]}:{name}", git("cat-file", "blob", oid))
                 history_blobs += 1
     print(json.dumps({"status": "failed" if failures else "passed", "candidate_files": len(files),

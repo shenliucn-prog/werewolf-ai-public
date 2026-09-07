@@ -44,3 +44,10 @@ Thumbs.db
 htmlcov/
 output/playwright/
 .playwright-cli/
+
+# Local sessions, experiments and publication packaging are never source.
+/docs/research-runs/
+/docs/audit-assets/
+/outputs/
+/output/
+/PUBLICATION_MANIFEST.json
