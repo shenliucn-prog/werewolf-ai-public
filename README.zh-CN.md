@@ -13,13 +13,14 @@
 
 [English](README.md) | 简体中文
 
-12 人狼人杀 AI 对战沙盘。11 个 AI 各有独立人格、独立信念、独立推理链——
-**同一局面下 12 个人会得出 12 套不同的判断**，狼队刀人也是各自提案再收敛。
+12 人狼人杀 AI 对战沙盘。11 个 AI 各有独立人格和本局决策记忆，狼队刀人各自提案再收敛。
+独立调用不保证判断一定不同，也不保证推理没有错误。
 
 推荐体验与现有工具：
 
 当前游戏都以文字驱动。**语音与视觉玩法尚无方案、尚未实现**；头像只是装饰，不能作为行为证据。
-开局前可以选择普通模式（默认）或猜想模式（测试版），并为每位 NPC 选择每局随机或固定预设人格。
+Codex 玩家目前支持普通模式；猜想模式（测试版）仍属于旧规则驱动路径，尚未接入 Codex。
+开局前可为每位 NPC 选择每局随机或固定预设人格。
 名字、人设、座位和隐藏身份相互独立；真人的行为不由 AI 人格强制控制。
 详见 [游戏模式与设置](docs/GAME_MODES.md)；[极端人格研究](docs/EXTREME_EXPERIMENT.md) 是独立的七人完整研究局。
 
@@ -27,7 +28,7 @@
 |:---|:---|
 | **自己的 Agent 对话（推荐体验）** | 玩家在 Agent 里发言和行动；目前需 Agent 用持续交互终端转接游戏，尚无通用插件/MCP。 |
 | **终端桥接入口** | 供有本地执行能力的 Agent 调用，也可手动测试；不是要求普通玩家操作终端。 |
-| **Web 界面（可选）** | 以对话和操作为中心，身份与紧凑玩家列表辅助阅读。 |
+| **Web 界面（可选）** | 目前仍是规则驱动 NPC，模型仅润色台词，不等同于 Codex 决策玩家。 |
 | **CLI 观察器（开发用）** | 自动跑局并打印私密推理，不是推荐的真人游玩入口。 |
 
 ---
@@ -55,13 +56,20 @@ Windows PowerShell 改用 `.venv\Scripts\Activate.ps1` 激活环境。
 
 ### 终端桥接入口：供 Agent 调用或手动测试
 
-以下命令由具备持续终端交互能力的 Agent 运行；也保留给想手动测试的人。`--offline` 仅关闭游戏自身的模型调用，不代表宿主 Agent 的服务免费。
+以下命令由具备持续终端交互能力的 Agent 运行；也保留给想手动测试的人。默认使用本机已登录的 Codex，由模型直接决定 NPC 发言、投票、上退警和技能行动，会消耗账户用量；不再只润色台词。
 
 ```bash
-python -u -m werewolf_web.chat_game --board classic --lang zh-CN --offline
+python -u -m werewolf_web.chat_game --lang zh-CN
 # 英文版：
-python -m werewolf_web.chat_game --board classic --lang en --offline
+python -m werewolf_web.chat_game --lang en
 ```
+
+未指定板子时先选板子，发身份前必须验证真实模型连接；失败不静默降级。
+模型默认 `gpt-5.6-terra / medium`，可用 `--model`、`--effort` 为本局设置。
+默认最多 240 次调用（含预检），`--max-model-calls` 可调整，最高 1000；单次超时 180 秒。
+每次模型决策可能等待数十秒。需要支持当前隔离和结构化输出参数的 Codex CLI；不支持会明确失败，不自动安装或改全局配置。
+`--offline` 仅用于明确选择的规则流程测试；`--backend legacy` 是旧的本地决策加可选台词润色。
+Codex 普通模式尚未接入猜想表，选择猜想模式会明确停止，而不会偷换成旧策略。
 
 开局前可以选自己的身份：网页使用“你的角色”，聊天加 `--role seer`；
 默认仍随机。用 `--board classic --list-roles` 查看当前板子的可选身份。
@@ -70,8 +78,8 @@ python -m werewolf_web.chat_game --board classic --lang en --offline
 
 对话模式会逐条显示主持人播报、NPC 发言、插话和你的私密信息；轮到你时直接输入发言，
 或使用明确动作如“投 3 号”“救 3”“毒 4”（原有板子的女巫不能同夜用两瓶药；神女巫双开板可输入“救 3 毒 4”）。任何行动等待期间都可输入 `?女巫怎么用药？`
-向主持人私下问规则，不消耗行动。它与 Web 共用同一个 `GameSession`、规则引擎、NPC
-思考与事件账本，区别只在呈现方式。
+向主持人私下问规则，不消耗行动。它与 Web 共用 `GameSession`、规则引擎和公开事件账本；
+网页版目前仍是旧规则驱动 NPC，尚未接入 Codex 决策，不能视为同等推理体验。
 
 ### 中文 / English
 
@@ -83,7 +91,7 @@ NPC 的稳定身份、行为参数、认知能力和规则不会因翻译而改�
 To play in English, select **English** before starting in the browser, or run:
 
 ```bash
-python -m werewolf_web.chat_game --lang en --offline
+python -m werewolf_web.chat_game --lang en
 ```
 
 Type your statement when invited to speak. Use `yes` / `no` to run for sheriff,
@@ -93,7 +101,7 @@ On original boards the Witch uses `save 3` **or** `poison 4`; the experimental
 At any action prompt, type `?How does the Witch work?` to ask the host privately
 without consuming your turn. The host explains rules but does not choose targets for you.
 
-外部模型仅润色既定意图；英文局若收到中文输出、空输出或调用失败，会保留本地英文表达。
+旧 API 表达路径仅润色既定意图，可在失败时回退本地表达。Codex 路径则直接决策，失败、超时、非法输出或额度耗尽时停止对局，不替换为离线玩家。暂不支持断线续局。
 旧的 `cli_game` 是含私密推理的中文开发观察入口；面向玩家的双语文本入口是 `chat_game`。
 
 验证：`python3 -m unittest discover -s tests -q`。回归包含 10 种板子 × 两种语言 × 两种模式的
@@ -275,7 +283,8 @@ cp werewolf_web/.env.example werewolf_web/.env
 配了 Key 之后，**每个角色仍是各自独立调用 LLM**，思路不共享——
 不会变成一个人用 12 张嘴说话。
 
-模型服务只是“表达层”：投票、夜间行动、规则结算与胜负仍由本地策略/规则引擎锁定。
+本节描述的是旧 API 表达路径（网页版或 `--backend legacy`），不是默认 Codex 决策路径。
+在旧路径中模型服务只是“表达层”：投票、夜间行动、规则结算与胜负仍由本地策略/规则引擎锁定。
 每局会冻结当前模型配置；调用超时、额度耗尽、返回空内容或连续失败时，自动改用本地
 表达继续游戏。`LLM_TIMEOUT_SECONDS` 和 `LLM_GAME_MAX_CALLS` 可控制等待时间与成本。
 推理强度只会在服务商明确支持且配置了 `LLM_REASONING_PARAM` 时才发送，普通兼容接口

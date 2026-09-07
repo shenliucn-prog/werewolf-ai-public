@@ -7,9 +7,14 @@ The recommended player experience is conversation with your own Agent. The playe
 ### What exists today
 
 - `werewolf_web.chat_game` is an interactive stdin/stdout adapter over the same `GameSession` used by the browser.
-- A local Agent with command execution and a persistent interactive process can act as its relay. Start it unbuffered with `python -u -m werewolf_web.chat_game --board classic --lang en --offline` after following the README setup. Use a PTY/session handle when the Agent's tools require one for ongoing input.
+- A local Agent with command execution and a persistent interactive process can act as its relay. Start it unbuffered with `python -u -m werewolf_web.chat_game --lang en` after following the README setup and logging in to Codex locally. Use a PTY/session handle when the Agent's tools require one for ongoing input.
 - This repository does **not** yet ship a universal Agent plugin, MCP server, installable host-specific integration or a resumable session protocol. Compatibility with arbitrary Agent hosts has not been established. A chat-only Agent without local tools cannot run the game this way.
-- `--offline` disables the game's optional model service, not the hosting Agent's own model usage, subscription requirements or charges.
+- Default NPC decisions use Codex, with a real preflight before identities are dealt. `--offline` is an explicitly chosen rule-flow test, not model gameplay. `--backend legacy` only rephrases local decisions. Never choose either silently. Codex conjecture tables are not integrated yet; do not claim otherwise.
+
+Before each new game, offer board selection and confirm role, personality and
+conjecture settings. "Next game" alone does not authorize reusing last settings.
+Display the backend/model/effort and call limit. A model failure stops the game;
+do not invent a continuation. No cross-game model learning or disk resume yet.
 
 ### Relay contract
 
@@ -42,7 +47,12 @@ The terminal parser recognizes a limited action vocabulary; the Agent supplies t
 
 推荐的是**玩家在自己的 Agent 对话里游玩**，不是要求玩家在终端敲命令。Agent 负责连接游戏、转述发言与提示、提交玩家决定；网页版只是可选界面。
 
-目前的 `chat_game` 是和网页共用 `GameSession` 的终端桥接入口。有本地命令执行能力、能持续保留交互进程的 Agent 可以转接它：按 README 安装后，运行 `python -u -m werewolf_web.chat_game --board classic --lang zh-CN --offline`，跨对话轮次保留同一个输入会话。宿主工具需要时使用 PTY。
+目前的 `chat_game` 是和网页共用规则与公开记录的终端桥接入口。有本地命令执行能力、能持续保留交互进程的 Agent 可以转接它：按 README 安装、在本机登录 Codex 后，运行 `python -u -m werewolf_web.chat_game --lang zh-CN`，跨对话轮次保留同一个输入会话。宿主工具需要时使用 PTY。
+
+每次新局先让玩家选板子，再确认身份、人格和猜想设置；“下一局”不等于沿用旧设置。
+默认 Codex 直接决策，发身份前必须通过真实模型预检，并展示模型、推理强度和调用上限。
+`--offline` 仅用于玩家明确选择的规则测试，`--backend legacy` 仅润色本地决策，不能冒充模型玩家。
+Codex 猜想表尚未接入，不能静默替换为旧策略。模型失败即停止，不编造续局；暂无模型跨局成长。
 
 **尚无通用 Agent 插件、MCP 服务、各宿主的一键安装适配或断线续局协议；未验证所有 Agent 产品。** 没有本地工具的纯聊天 Agent 无法按此方式运行。`--offline` 只关闭游戏自身的模型调用，不免除宿主 Agent 的使用成本。
 

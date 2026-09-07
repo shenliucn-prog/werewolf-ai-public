@@ -32,11 +32,11 @@ class RoleSelectionTest(unittest.TestCase):
                 GameEngine("classic", player_role=value)
 
     def test_chat_role_argument(self):
-        with patch("sys.argv", ["chat", "--role", "seer", "--offline"]), \
+        with patch("sys.argv", ["chat", "--board", "classic", "--role", "seer", "--offline"]), \
              patch("werewolf_web.chat_game.play", new_callable=AsyncMock) as play:
             main()
-            self.assertEqual(play.call_args.args[-1], "seer")
-        with patch("sys.argv", ["chat", "--role", "bad"]), \
+            self.assertEqual(play.call_args.args[7], "seer")
+        with patch("sys.argv", ["chat", "--board", "classic", "--role", "bad"]), \
              patch("sys.stderr"), self.assertRaises(SystemExit) as error:
             main()
         self.assertEqual(error.exception.code, 2)

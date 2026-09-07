@@ -3,7 +3,7 @@ const EN = {
   "也可查询：上一轮票型、第2天发言记录、座次。查询不消耗行动。": "Also ask for latest votes, day 2 speeches, or seats. Queries do not spend your action.",
   "平安日": "Peaceful Day", "退警": "Withdraw", "不退警": "Stay in election",
   "警上发言结束，是否退警？": "Candidacy speeches are over. Withdraw or stay?",
-  "先选语言和本局设置，推荐经典板、本地表达、关闭猜想模式。创建对局后主持人会介绍规则，你确认准备好后才进入第一夜。": "Choose your language and game settings. Start with Classic, local expression and Conjecture off. After creating the game, the host explains the rules; night one waits for your Ready confirmation.",
+  "网页版目前使用规则驱动 NPC，模型仅润色台词；体验 Codex 决策玩家请在 Agent 对话中玩。先选本局设置，主持人介绍规则后再确认开始。": "The browser currently uses rule-driven NPCs; models only rephrase speech. Play in your Agent for Codex decision players. Choose settings and read the host's rules before confirming Ready.",
   "先阅读本局规则，有疑问可问主持人。确认后才进入第一夜。": "Read this game's rules and ask the Host any questions. Night one waits for your confirmation.",
   "准备好了，进入第一夜": "Ready — start night one",
   "推荐：在自己的 Agent 里玩": "Recommended: play in your own Agent",
