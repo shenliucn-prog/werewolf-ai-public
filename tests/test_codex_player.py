@@ -37,7 +37,7 @@ class CodexPlayerTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(agent.vote([{"pos": target.pos, "name": target.name}]), target.pos)
         self.assertEqual(agent.model_decisions[-1]["decision"], {"target": target.pos})
 
-    def test_model_receives_full_public_history_not_other_private_results(self):
+    def test_model_receives_budgeted_context_not_other_private_results(self):
         agent, planner, record = self.make_agent()
         agent.engine.seer_results = [{"name": "SECRET_CHECK_CANARY"}]
         record.observe({"type": "private", "text": "SECRET_PLAYER_CANARY"}, 1)
@@ -49,9 +49,57 @@ class CodexPlayerTest(unittest.IsolatedAsyncioTestCase):
         request = planner.complete.call_args.args[0]
         encoded = json.dumps(request, ensure_ascii=False)
         self.assertNotIn("SECRET_", encoded)
-        self.assertEqual(len(request["public_history"]), 4)
+        # The bounded public context carries recent speeches verbatim and the
+        # flip as a settled fact — not the whole unbounded transcript.
+        self.assertIn("public_context", request)
         self.assertIn("D1公开口径", encoded)
         self.assertIn("11号阿岚翻牌", encoded)
+        self.assertLessEqual(len(request["own_previous_decisions"]), 8)
+
+    def test_own_decision_memory_is_bounded(self):
+        agent, planner, record = self.make_agent()
+        agent.model_decisions = [
+            {"day": 1, "night": 1, "task": f"t{i}", "decision": {"target": 0}}
+            for i in range(20)
+        ]
+        planner.complete.return_value = {"target": 0}
+        agent.vote([{"pos": 0, "name": "平安日"}])
+        request = planner.complete.call_args.args[0]
+        # Only the most recent decisions are shown to the model.
+        self.assertEqual(len(request["own_previous_decisions"]), 8)
+        self.assertEqual(request["own_previous_decisions"][-1]["task"], "t19")
+
+    def test_final_request_stays_within_budget(self):
+        from werewolf_web.ai import model_context
+        agent, planner, record = self.make_agent()
+        # Flood the public record with long speeches — far beyond the verbatim
+        # window — so the budget, not the per-field counts, is what binds.
+        for i in range(40):
+            record.observe({"type": "speech", "seat": 8, "name": "阿承",
+                            "text": "长篇公开发言" + "具体内容" * 60 + str(i)}, 1)
+        planner.complete.return_value = {"target": 0}
+        agent.vote([{"pos": 0, "name": "平安日"}])
+        request = planner.complete.call_args.args[0]
+        size = len(json.dumps(request, ensure_ascii=False))
+        self.assertLessEqual(size, model_context.MAX_REQUEST_CHARS)
+
+    def test_long_legal_speeches_do_not_raise_budget_error(self):
+        """Shawn's repro: 14 legal 1600-char in-round speeches pushed the request
+        over budget even after other history was trimmed, raising ValueError.
+
+        ``details.earlier_this_round`` duplicates the public statements, so the
+        budget must trim it too — legal long speeches must never stop the game.
+        """
+        from werewolf_web.ai import model_context
+        agent, planner, record = self.make_agent()
+        long_text = "长" * 1600
+        today = [(f"p{i}", Speech(text=long_text)) for i in range(14)]
+        planner.complete.return_value = dict(text="回答", claim=None, accuse=None,
+                                             defend=None, question_to=None)
+        agent.speak(today)   # must not raise
+        request = planner.complete.call_args.args[0]
+        size = len(json.dumps(request, ensure_ascii=False))
+        self.assertLessEqual(size, model_context.MAX_REQUEST_CHARS)
 
     def test_private_check_is_available_only_to_own_seer(self):
         agent, planner, _ = self.make_agent("seer")
