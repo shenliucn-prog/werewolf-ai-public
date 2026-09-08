@@ -24,15 +24,20 @@ class ModelNPCAgent(StrategicNPCAgent):
 
     def decide(self, task, properties, **details):
         from ..onboarding import introduction
-        context = asdict(self.information_set())
+        from . import model_context
+        context = model_context.bound_information(asdict(self.information_set()))
         context["rules"] = introduction(self.engine, False)
         request = {
             "task": task, "language": self.engine.locale, "actor": self.seat.pos,
             "information": context, "persona": self.persona,
             "personality_parameters": asdict(self.style),
             "cognitive_parameters": self.brain.cognition.to_dict(),
-            "public_history": self.public_record.entries,
-            "own_previous_decisions": self.model_decisions,
+            # §9 context budget: the model never receives the whole transcript.
+            # The full archive stays whole in ``public_record`` / the event
+            # ledger; this is the bounded slice (recent verbatim + attributed
+            # summaries of older speech + settled public facts).
+            "public_context": model_context.build_public_context(self),
+            "own_previous_decisions": self.model_decisions[-model_context.DECISION_MEMORY:],
             "details": details,
             "instructions": (
                 "Choose your own strategy, not a prescribed template. Public flips are facts; claims are not. "
@@ -45,6 +50,9 @@ class ModelNPCAgent(StrategicNPCAgent):
                 "Return only requested fields. Do not include private reasoning in public speech by default."
             ),
         }
+        # §9 request-size budget: the final serialized request is bounded, not
+        # just the history counts.
+        request = model_context.fit_request_budget(request)
         value = self.planner.complete(request, object_schema(properties))
         if not isinstance(value, dict) or set(value) != set(properties):
             raise ModelTurnError("Invalid decision fields; no offline substitution.")

@@ -24,8 +24,10 @@ class ModelTurnError(RuntimeError):
 
 class DecisionRuntime(Protocol):
     verified: bool
+    def reserve(self) -> None: ...
     def complete(self, request: dict, schema: dict) -> dict: ...
     def preflight(self) -> None: ...
+    def preflight_check(self) -> None: ...
     def public_status(self) -> dict: ...
     def snapshot(self) -> dict: ...
     def restore(self, data: dict) -> None: ...
@@ -43,7 +45,34 @@ class RuntimeBase:
             raise ModelTurnError("Model call budget exhausted; no offline substitution.")
         self.calls += 1
 
+    def reserve(self) -> None:
+        """Reserve one model-call budget unit *before* the external request.
+
+        This is the durable reservation seam: the game loop checkpoints *after*
+        ``reserve()`` and before the actual request, so a crash between the
+        reservation and the post-result commit still restores the consumed
+        budget.  ``complete()`` no longer reserves — every path that actually
+        performs a request (the preflight and each per-decision call) must call
+        ``reserve()`` first.
+        """
+        self._reserve()
+
     def preflight(self):
+        """Reserve a budget unit, then run the live readiness check.
+
+        This is the *fresh-start* path (a new game): the reservation and the
+        check happen back-to-back before the game opens.
+        """
+        self.reserve()
+        self.preflight_check()
+
+    def preflight_check(self):
+        """Run the live readiness check against an already-reserved budget unit.
+
+        Split out of ``preflight()`` so a *restore* can reserve and persist the
+        budget unit first (crash-safe), then run the check.  On success the
+        runtime is marked live; on failure ``verified`` stays False.
+        """
         result = self.complete({"task": "Connection check: return ready=true."},
             {"type": "object", "properties": {"ready": {"type": "boolean"}},
              "required": ["ready"], "additionalProperties": False})
@@ -114,7 +143,6 @@ output support. The common player validates every decision before applying it.
         cfg = self.config
         if not cfg.enabled or not cfg.model:
             raise ModelTurnError("Model is not configured/enabled; choose a working LLM connection.")
-        self._reserve()
         headers = {"Authorization": "Bearer " + cfg.api_key} if cfg.api_key else {}
         body = {"model": cfg.model, "messages": [
             {"role": "system", "content": "You play a fictional Werewolf game. Use only supplied lawful data. "
@@ -205,7 +233,6 @@ this protocol. Commands are local configuration, never accepted over HTTP.
         self.argv = argv
 
     def complete(self, request, schema):
-        self._reserve()
         try:
             with tempfile.TemporaryDirectory(prefix="werewolf-agent-") as directory:
                 result = subprocess.run(self.argv, cwd=directory, input=json.dumps({

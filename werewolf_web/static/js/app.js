@@ -10,6 +10,9 @@ const PORTRAITS = {
 
 let es = null;
 let gameId = null;
+let lastEventNo = 0;
+let rejoinAttempts = 0;
+const SAVE_KEY = "werewolf.game";
 let seats = {};        // pos -> seat DOM
 let mySeat = null;
 let pendingReq = null;
@@ -459,6 +462,117 @@ function finishStream(status) {
   gameId = null;
   document.body.classList.remove("playing");
   lockNames(false);
+  persistState();
+}
+
+// ---------- 断线重连 / 恢复（§6）----------
+function persistState() {
+  try {
+    if (gameId) localStorage.setItem(SAVE_KEY, JSON.stringify({ game_id: gameId, last_event_no: lastEventNo }));
+    else localStorage.removeItem(SAVE_KEY);
+  } catch (_) { /* storage unavailable — rejoin only within this page load */ }
+}
+
+function savedGame() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) { return null; }
+}
+
+function dispatch(d) {
+  const no = d.event_no || 0;
+  if (no && no <= lastEventNo) return;   // 已处理过：不重复渲染
+  if (no) lastEventNo = no;
+  handleEvent(d);
+  persistState();
+}
+
+function openStream(after) {
+  if (es) es.close();
+  es = new EventSource(`/api/stream?game_id=${encodeURIComponent(gameId)}&after=${Math.max(0, after || 0)}`);
+  es.onmessage = (ev) => {
+    try { dispatch(JSON.parse(ev.data)); } catch (e) { console.error(e); }
+  };
+  es.onerror = () => {
+    es.close();
+    if (!gameId) return;
+    // 服务端可能尚未清掉旧流的 active 标记；用退避重试，绝不因瞬时断线结束对局。
+    rejoinAttempts += 1;
+    if (rejoinAttempts > 12) { finishStream(tr("连接断开")); return; }
+    setTimeout(rejoin, Math.min(3000, 400 * rejoinAttempts));
+  };
+}
+
+async function rejoin() {
+  if (!gameId) return;
+  try {
+    const response = await fetch(`/api/rejoin?game_id=${encodeURIComponent(gameId)}&last_event_no=${lastEventNo}`);
+    if (response.status === 404) { finishStream(tr("对局已结束")); return; }
+    if (!response.ok) throw new Error("rejoin failed");
+    const data = await response.json();
+    if (!data.ok) throw new Error("rejoin failed");
+    rejoinAttempts = 0;
+    applyRecoveryView(data.view);
+  } catch (_) {
+    rejoinAttempts += 1;
+    if (rejoinAttempts > 12) { finishStream(tr("连接断开")); return; }
+    setTimeout(rejoin, Math.min(3000, 400 * rejoinAttempts));
+  }
+}
+
+function applyRecoveryView(view) {
+  document.body.classList.add("playing");
+  lockNames(true);
+
+  if (lastEventNo === 0) {
+    // 页面重新加载：从 init 完整重建牌桌与身份，再回放公开/私密事件。
+    logEl.innerHTML = "";
+    panelEl.style.display = "none";
+    pendingReq = null;
+    mySeat = null;
+    if (view.init) {
+      applyLocale(view.init.state.locale);
+      $("#locale").disabled = true;
+      renderSeats(view.init.state);
+      showPlayer(view.init.player);
+      showLlmStatus(view.init.llm_status);
+      log(`🎙️ ${escapeHtml(view.init.host_intro)}`, "narr");
+      lastEventNo = view.init.event_no || 0;
+    }
+  }
+
+  if (view.private) showPlayer(view.private);
+
+  for (const ev of view.public_events || []) dispatch(ev);
+  for (const ev of view.private_events || []) dispatch(ev);
+
+  if (view.pending) {
+    showAction(view.pending);
+  } else {
+    pendingReq = null;
+    panelEl.style.display = "none";
+  }
+
+  // 终局信号（gameover/review/error）最后回放，避免提前关流。
+  for (const ev of view.terminal || []) dispatch(ev);
+
+  if (view.finished) {
+    finishStream(tr("对局结束"));
+    return;
+  }
+
+  lastEventNo = Math.max(lastEventNo, (view.next_event_no || 1) - 1);
+  persistState();
+  openStream(Math.max(0, lastEventNo));
+}
+
+function restoreSavedGame() {
+  const saved = savedGame();
+  if (!saved || !saved.game_id) return;
+  gameId = saved.game_id;
+  lastEventNo = 0;   // 完整重建（init + 事件回放）
+  rejoin();
 }
 
 // ---------- 复盘弹窗 ----------
@@ -512,11 +626,10 @@ async function newGame() {
   document.body.classList.add("playing");
   $("#gameSetup").open = false;
   $("#textGuide").open = false;
-  es = new EventSource(`/api/stream?game_id=${encodeURIComponent(gameId)}`);
-  es.onmessage = (ev) => {
-    try { handleEvent(JSON.parse(ev.data)); } catch (e) { console.error(e); }
-  };
-  es.onerror = () => finishStream(tr("连接断开"));
+  lastEventNo = 0;
+  rejoinAttempts = 0;
+  persistState();
+  openStream(0);
   // The init event replaces this with a safe model/local-runtime status.
   } catch (_) {
     finishStream(UI[uiLocale].failed);
@@ -545,3 +658,4 @@ $("#hostQuestion").addEventListener("keydown", (event) => {
 loadBoards();
 applyLocale($("#locale").value);
 loadCast();
+restoreSavedGame();

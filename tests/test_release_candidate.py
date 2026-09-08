@@ -77,6 +77,7 @@ class ReleaseCandidateTest(unittest.TestCase):
     def test_sensitive_paths_cannot_enter_candidate_even_if_tracked(self):
         for path in (".git/config", "werewolf_web/.env", "x/.env.local", "key.pem", "a.key",
                      "werewolf_web/data/reviews/a.md", "werewolf_web/data/npc_memory/a.json",
+                     "werewolf_web/data/checkpoints/game.json", "werewolf_web/data/checkpoints/game.json.tmp",
                      "werewolf_web/data/host_style.en.json", "../escape", "/tmp/escape", "x/.venv/a.py",
                      "docs/research-runs/a.json", "docs/research-runs/source.tar.gz",
                      "docs/audit-assets/screen.png", "outputs/game.json", "output/log.json",
@@ -84,6 +85,34 @@ class ReleaseCandidateTest(unittest.TestCase):
             self.assertFalse(allowed_path(path), path)
         for path in ("werewolf_web/.env.example", "LICENSE", ".github/workflows/ci.yml", "tests/test_debate.py"):
             self.assertTrue(allowed_path(path), path)
+
+    def test_checkpoints_directory_is_gitignored(self):
+        # The checkpoint store holds full identities + NPC private state; it must
+        # be ignored by Git AND excluded from the release candidate even if a
+        # file were force-added to the index.
+        root = ROOT / ".gitignore"
+        self.assertTrue(root.is_file())
+        ignored = set(
+            line.strip() for line in root.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        )
+        self.assertIn("werewolf_web/data/checkpoints/", ignored)
+        probe = ROOT / "werewolf_web/data/checkpoints/game.json"
+        try:
+            probe.parent.mkdir(parents=True, exist_ok=True)
+            probe.touch()
+            import subprocess
+            result = subprocess.run(
+                ["git", "check-ignore", "-q", "werewolf_web/data/checkpoints/game.json"],
+                cwd=ROOT)
+            self.assertEqual(result.returncode, 0,
+                             "werewolf_web/data/checkpoints/ must be git-ignored")
+        finally:
+            probe.unlink(missing_ok=True)
+            try:
+                probe.parent.rmdir()
+            except OSError:
+                pass
 
     def test_refuses_existing_and_source_paths(self):
         for path in (ROOT, ROOT / "new-candidate", ROOT.parent):

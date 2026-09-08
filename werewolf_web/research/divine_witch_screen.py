@@ -45,7 +45,7 @@ class ScreenSession(GameSession):
         self.host.evolve = lambda *args: None
         self.last_speech = None
 
-    def emit(self, event):
+    def emit(self, event, publish=True):
         if event["type"] == "init":
             e = self.engine
             human = e.player_seat()
@@ -63,7 +63,7 @@ class ScreenSession(GameSession):
                             key=lambda a: -(a.style.bluff * .6 + a.style.aggression * .4))
             for rank, agent in enumerate(wolves): agent.assign_wolf_strategy(rank, len(wolves))
         if event["type"] == "error": self.errors.append(event["text"])
-        super().emit(event)
+        super().emit(event, publish=publish)
 
     async def ask_player(self, kind, data):
         e = self.engine; human = self.agents[e.player_seat().name]

@@ -187,37 +187,9 @@ def _ordinary_request_prompt(kind: str, data: dict, locale: str = "zh-CN") -> st
     return f"\n{data.get('role', 'Action')}: {data.get('desc', '')}\nCandidates: {candidates}. Use choose N or pass:\n> " if en else f"\n{data.get('role', '角色')}：{data.get('desc', '')}\n行动目标（{candidates}）。例如：选 3 号，或 跳过：\n> "
 
 
-async def play(board_id: str, seed: int | None, offline: bool, locale: str, names=None,
-               personalities=None, conjecture=False, player_role=None, backend=None,
-               model=None, effort=None, max_calls=None, agent_command=None):
-    from .ai.decision_runtime import create_runtime, ModelTurnError
-    planner = None
-    if not offline and backend != "legacy":
-        if conjecture:
-            print("Model-player conjecture tables are not integrated yet / 模型玩家猜想表尚未接入；请选择普通模式。")
-            return 1
-        try:
-            planner = create_runtime(backend, model=model, effort=effort, max_calls=max_calls, command=agent_command)
-            print(json.dumps(planner.public_status(), ensure_ascii=False), flush=True)
-            print("Checking LLM before dealing roles… / 发身份前验证 LLM 连接……", flush=True)
-            await asyncio.to_thread(planner.preflight)
-        except (ModelTurnError, ValueError) as error:
-            print(str(error))
-            return 1
-        print("Model connection verified. No silent offline fallback." if locale == "en" else
-              "模型连接验证通过；本局不会静默切换离线玩家。", flush=True)
-    else:
-        print("TEST MODE: local decisions, optional wording only. Not model-player gameplay." if locale == "en" else
-              "测试模式：本地规则决策，模型至多润色台词。这不是大模型玩家对局。", flush=True)
-    llm_options = {"enabled": False} if offline or planner is not None else None
-    session = GameSession(board_id, llm_options, session_id="chat-" + secrets.token_urlsafe(12),
-                          seed=seed, locale=locale, names=names,
-                          personalities=personalities, conjecture=conjecture, player_role=player_role,
-                          onboarding=True, planner=planner)
-    print("Text only; voice and visual gameplay are not designed or implemented." if locale == "en" else
-          "当前仅文字驱动；语音和视觉玩法尚无方案、尚未实现。")
-    print("At any prompt: /seats, /history, votes, speeches, or ?question. These never submit an action." if locale == "en" else
-          "任何等待行动时都可输入：座次、公开记录、上一轮票型、第2天发言记录、?规则问题。这些查询不消耗行动。")
+async def _repl(session: GameSession) -> int:
+    """Drive one live session through the terminal; returns a process exit code."""
+    locale = session.engine.locale
     async for event in session.events():
         if event["type"] != "request":
             _render(event, session.engine.locale)
@@ -238,6 +210,88 @@ async def play(board_id: str, seed: int | None, offline: bool, locale: str, name
                 break
             print("🎙️ I did not understand that action. Use a clear seat number or ? for rules." if locale == "en"
                   else "🎙️ 我没听懂这个行动。可以换成明确的座位号，或输入 ? 加规则问题。")
+    return 0
+
+
+async def play(board_id: str, seed: int | None, offline: bool, locale: str, names=None,
+               personalities=None, conjecture=False, player_role=None, backend=None,
+               model=None, effort=None, max_calls=None, agent_command=None,
+               resume_game_id=None):
+    from .ai.decision_runtime import create_runtime, ModelTurnError
+    from . import checkpoint
+    if resume_game_id is not None:
+        # Rehydrate an interrupted chat game from its checkpoint (§7).  Board,
+        # roles and locale come from the save; only the trusted local model
+        # runtime is re-derived and re-verified before play resumes.
+        try:
+            path = checkpoint.checkpoint_path(resume_game_id)
+            payload = checkpoint.load_checkpoint(path)
+        except (ValueError, OSError) as error:
+            print(str(error))
+            return 1
+        if payload.get("session_id") != resume_game_id:
+            print("Save does not match that game id." if locale == "en" else "存档与该对局编号不符。")
+            return 1
+        planner = None
+        planner_snap = payload.get("planner")
+        if planner_snap is not None:
+            try:
+                planner = create_runtime(planner_snap.get("backend"), model=model,
+                                         effort=effort, max_calls=max_calls, command=agent_command)
+                print(json.dumps(planner.public_status(), ensure_ascii=False), flush=True)
+            except (ModelTurnError, ValueError) as error:
+                print(str(error))
+                return 1
+        session = GameSession(payload.get("board_id", "classic"),
+                              {"enabled": False} if planner is None else None,
+                              session_id=resume_game_id, planner=planner,
+                              checkpoint_path=path, _defer_preflight=True)
+        try:
+            # Restore config + budget first, then persist the preflight
+            # reservation, then run the liveness check — so a crash between the
+            # reservation and the check still restores the consumed call, and
+            # success leaves the runtime verified (not clobbered by restore).
+            session.restore(payload)
+            if planner is not None:
+                planner.reserve()
+                session._checkpoint()
+                await asyncio.to_thread(planner.preflight_check)
+        except (ValueError, KeyError, TypeError, ModelTurnError) as error:
+            print("Could not resume this game: " + str(error))
+            return 1
+        return await _repl(session)
+    planner = None
+    if not offline and backend != "legacy":
+        if conjecture:
+            print("Model-player conjecture tables are not integrated yet / 模型玩家猜想表尚未接入；请选择普通模式。")
+            return 1
+        try:
+            planner = create_runtime(backend, model=model, effort=effort, max_calls=max_calls, command=agent_command)
+            print(json.dumps(planner.public_status(), ensure_ascii=False), flush=True)
+            print("Checking LLM before dealing roles… / 发身份前验证 LLM 连接……", flush=True)
+            await asyncio.to_thread(planner.preflight)
+        except (ModelTurnError, ValueError) as error:
+            print(str(error))
+            return 1
+        print("Model connection verified. No silent offline fallback." if locale == "en" else
+              "模型连接验证通过；本局不会静默切换离线玩家。", flush=True)
+    else:
+        print("TEST MODE: local decisions, optional wording only. Not model-player gameplay." if locale == "en" else
+              "测试模式：本地规则决策，模型至多润色台词。这不是大模型玩家对局。", flush=True)
+    llm_options = {"enabled": False} if offline or planner is not None else None
+    session_id = "chat-" + secrets.token_urlsafe(12)
+    session = GameSession(board_id, llm_options, session_id=session_id,
+                          seed=seed, locale=locale, names=names,
+                          personalities=personalities, conjecture=conjecture, player_role=player_role,
+                          onboarding=True, planner=planner,
+                          checkpoint_path=checkpoint.checkpoint_path(session_id))
+    print("Text only; voice and visual gameplay are not designed or implemented." if locale == "en" else
+          "当前仅文字驱动；语音和视觉玩法尚无方案、尚未实现。")
+    print("At any prompt: /seats, /history, votes, speeches, or ?question. These never submit an action." if locale == "en" else
+          "任何等待行动时都可输入：座次、公开记录、上一轮票型、第2天发言记录、?规则问题。这些查询不消耗行动。")
+    print(f"Game id: {session_id} — resume with --resume {session_id}" if locale == "en" else
+          f"对局编号：{session_id}；中断后可用 --resume {session_id} 续局。")
+    return await _repl(session)
 
 
 def main():
@@ -262,11 +316,24 @@ def main():
     parser.add_argument("--personality", action="append", default=[], metavar="NPC_ID=PRESET_ID",
                         help="Fixed personality per NPC, or random; repeatable")
     parser.add_argument("--list-personalities", action="store_true")
+    parser.add_argument("--resume", metavar="GAME_ID",
+                        help="Resume an interrupted game from its checkpoint (board/role come from the save)")
     args = parser.parse_args()
     from .game.engine import BOARD_MAP, ROLE_META
     from .i18n import board_role_name
     if args.max_model_calls is not None and not 1 <= args.max_model_calls <= 1000:
         parser.error("--max-model-calls must be between 1 and 1000")
+    if args.resume is not None:
+        # Resume rehydrates board/roles/locale from the save; board selection,
+        # renaming and personality flags do not apply to a resumed game.
+        result = asyncio.run(play(None, None, args.offline, args.lang,
+                                  resume_game_id=args.resume, backend=args.backend,
+                                  model=args.model, effort=args.effort,
+                                  max_calls=args.max_model_calls,
+                                  agent_command=args.agent_command))
+        if result == 1:
+            raise SystemExit(1)
+        return
     if args.board is None:
         if args.list_roles or args.list_cast or args.list_personalities:
             args.board = "classic"

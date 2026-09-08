@@ -28,13 +28,15 @@ class CodexPlayerRuntime:
         self.calls = 0
         self.verified = False
 
-    def complete(self, request, schema):
+    def reserve(self) -> None:
         if self.calls >= self.max_calls:
             raise ModelTurnError("Model call budget exhausted; no offline substitution.")
+        self.calls += 1
+
+    def complete(self, request, schema):
         binary = shutil.which("codex")
         if not binary:
             raise ModelTurnError("Codex CLI missing; no game started. Install/login locally first.")
-        self.calls += 1
         with tempfile.TemporaryDirectory(prefix="werewolf-model-") as directory:
             schema_path = Path(directory) / "response.json"
             schema_path.write_text(json.dumps(schema), encoding="utf-8")
@@ -94,6 +96,10 @@ class CodexPlayerRuntime:
                 raise ModelTurnError("Codex turn failed or timed out; no offline substitution.") from None
 
     def preflight(self):
+        self.reserve()
+        self.preflight_check()
+
+    def preflight_check(self):
         result = self.complete({"task": "Connectivity check. Return ready=true."},
             {"type": "object", "properties": {"ready": {"type": "boolean"}},
              "required": ["ready"], "additionalProperties": False})
