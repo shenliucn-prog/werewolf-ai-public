@@ -21,7 +21,7 @@ from . import config
 from .game import engine as eng_mod
 from .ai.brain import Speech
 from .ai.llm import LLMClient, LLMRuntimeConfig
-from .ai.codex_player import ModelTurnError
+from .ai.decision_runtime import ModelTurnError, create_runtime
 from .ai.strategic_agent import StrategicNPCAgent
 from .ai.host import HostAgent
 from .i18n import normalize_locale, t, list_sep, role_name, board_display, role_desc, board_role_name, witch_rule_text
@@ -52,7 +52,7 @@ class GameSession:
         if planner is not None and not planner.verified:
             raise ValueError("Model preflight required before opening a game.")
         if planner is not None and conjecture:
-            raise ValueError("Codex normal play does not yet support conjecture tables; choose normal mode.")
+            raise ValueError("Model-player conjecture tables are not yet integrated; choose normal mode.")
         self.planner = planner
         if type(conjecture) is not bool:
             raise ValueError("Conjecture mode must be true or false.")
@@ -136,6 +136,9 @@ class GameSession:
         elif kind == "ready":
             if resp.get("ready") is not True:
                 return False
+        elif kind == "model_retry":
+            if type(resp.get("retry")) is not bool:
+                return False
         elif kind in ("speech", "table_reply"):
             if not isinstance(resp.get("text"), str) or len(resp["text"]) > 4000:
                 return False
@@ -207,6 +210,24 @@ class GameSession:
             self.finished = True
             self.event_q.put_nowait(_SENTINEL)
 
+    async def _npc_call(self, call, *args, **kwargs):
+        if self.planner is None:
+            return call(*args, **kwargs)
+        agent = getattr(call, "__self__", None)
+        while True:
+            memory = getattr(agent, "model_decisions", [])
+            checkpoint = len(memory)
+            try:
+                return await asyncio.to_thread(call, *args, **kwargs)
+            except ModelTurnError:
+                del memory[checkpoint:]
+                self.emit({"type": "narration", "text": (
+                    "Model response failed. Game paused without substituting a local player. Retry after checking the connection, or stop. Budget limits still apply."
+                    if self.engine.locale == "en" else "模型响应失败，对局已暂停，未替换为离线玩家。检查连接后可重试，或结束本局；调用上限仍有效。")})
+                response = await self.ask_player("model_retry", {})
+                if not response["retry"]:
+                    raise ModelTurnError("Player stopped after model failure.") from None
+
     async def _play(self):
         e = self.engine
         e.setup()
@@ -216,8 +237,8 @@ class GameSession:
         for s in e.seats.values():
             if not s.is_player:
                 if self.planner is not None:
-                    from .ai.codex_player import CodexNPCAgent
-                    self.agents[s.name] = CodexNPCAgent(
+                    from .ai.model_player import ModelNPCAgent
+                    self.agents[s.name] = ModelNPCAgent(
                         s.name, e, self.llm, memory_dir=self.memory_dir,
                         planner=self.planner, public_record=self.public_record)
                 else:
@@ -241,7 +262,7 @@ class GameSession:
                    "llm_status": self._model_status(),
                    "settings": {"medium": "text", "voice_available": False,
                                 "visual_gameplay_available": False, "conjecture": self.conjecture,
-                                "npc_driver": "codex" if self.planner is not None else "legacy_rules"}})
+                                "npc_driver": self._model_status().get("backend", "model") if self.planner is not None else "legacy_rules"}})
         self._remember_llm_status()
 
         if self.onboarding:
@@ -320,7 +341,7 @@ class GameSession:
                     self.player_last_speech = text
                     speech = self._player_speech(text)
                 else:
-                    speech = self.agents[seat.name].speak(
+                    speech = await self._npc_call(self.agents[seat.name].speak,
                         self.speech_events, self.player_last_speech)
                     text = speech.text
                     self._emit_llm_status_if_changed()
@@ -459,7 +480,7 @@ class GameSession:
             self.emit({"type": "narration", "text":
                        (f"Host: Before voting, {target}, answer {asker}'s question. This is a claim, not a host-verified result." if self.engine.locale == "en" else
                         f"主持人：投票前请 {target} 回答 {asker} 的追问。这是玩家口径，不代表主持人认证。")})
-            response = agent.table_reply(asker) if self.planner is not None else agent.brain.answer_check_question()
+            response = await self._npc_call(agent.table_reply, asker) if self.planner is not None else agent.brain.answer_check_question()
             await self._publish_table_speech(agent.seat, response, "clarification")
 
     def _reset_table_talk(self):
@@ -523,7 +544,7 @@ class GameSession:
             self.emit({"type": "narration", "text": opening})
             return
 
-        interruption = interrupter.table_interject(source.name, source_speech)
+        interruption = await self._npc_call(interrupter.table_interject, source.name, source_speech)
         self._table_cooldown = True
         self._table_pairs.add(pair)
         await self._publish_table_speech(interrupter.seat, interruption, "interrupt")
@@ -554,7 +575,7 @@ class GameSession:
                 return
             reply = self._player_speech(text)
         else:
-            reply = self.agents[source.name].table_reply(interrupter.name)
+            reply = await self._npc_call(self.agents[source.name].table_reply, interrupter.name)
         await self._publish_table_speech(source, reply, "reply")
         closing = self.host.moderate_table_talk(
             topic_turns=3, extra_turns=self._table_extra_turns,
@@ -620,7 +641,7 @@ class GameSession:
                 "desc": t(self.engine.locale, "seer_check"),
                 "candidates": [{"pos": p, "name": e.seat_at(p).name} for p in cands]})
             return {"target": resp.get("target")}
-        return self.agents[seer.name].night_action("seer", cands)
+        return await self._npc_call(self.agents[seer.name].night_action, "seer", cands)
 
     async def _wolves_action(self):
         e = self.engine
@@ -646,7 +667,7 @@ class GameSession:
             return {"target": resp.get("target")}
         proposals = []
         for wolf in wolves:
-            action = self.agents[wolf.name].night_action("wolves", all_alive)
+            action = await self._npc_call(self.agents[wolf.name].night_action, "wolves", all_alive)
             if action.get("target") is not None:
                 proposals.append((wolf, action["target"]))
         if not proposals:
@@ -681,7 +702,7 @@ class GameSession:
                 "dual_potions": e.witch_dual, "unlimited_potions": e.witch_unlimited})
             return {"save": resp.get("save"), "poison": resp.get("poison")}
         agent = self.agents[witch.name]
-        return agent.night_action(
+        return await self._npc_call(agent.night_action,
             "witch", self._alive_others(witch.name), knife=knife,
             antidote=e.witch_antidote, poison=e.witch_poison,
         )
@@ -694,7 +715,7 @@ class GameSession:
             resp = await self.ask_player("night", {"role_key": "guard", "role": guard.role_cn, "desc": t(e.locale, "guard_desc"),
                 "candidates": [{"pos": p, "name": e.seat_at(p).name} for p in cands]})
             return {"target": resp.get("target")}
-        return self.agents[guard.name].night_action("guard", cands)
+        return await self._npc_call(self.agents[guard.name].night_action, "guard", cands)
 
     async def _beauty_action(self):
         e = self.engine
@@ -705,7 +726,7 @@ class GameSession:
                 "desc": t(e.locale, "beauty_desc"),
                 "candidates": [{"pos": p, "name": e.seat_at(p).name} for p in cands]})
             return {"target": resp.get("target")}
-        return self.agents[b.name].night_action("wolf_beauty", cands)
+        return await self._npc_call(self.agents[b.name].night_action, "wolf_beauty", cands)
 
     async def _sg_action(self):
         e = self.engine
@@ -716,7 +737,7 @@ class GameSession:
                 "desc": t(e.locale, "sg_desc"),
                 "candidates": [{"pos": p, "name": e.seat_at(p).name} for p in cands]})
             return {"target": resp.get("target")}
-        return self.agents[sg.name].night_action("stone_ghost", cands)
+        return await self._npc_call(self.agents[sg.name].night_action, "stone_ghost", cands)
 
     async def _sg_kill_action(self):
         e = self.engine
@@ -728,7 +749,7 @@ class GameSession:
                 "desc": t(e.locale, "sg_kill_desc"),
                 "candidates": [{"pos": p, "name": e.seat_at(p).name} for p in cands]})
             return {"target": resp.get("target")}
-        return self.agents[sg.name].night_action("wolves", cands)
+        return await self._npc_call(self.agents[sg.name].night_action, "wolves", cands)
 
     def _deliver_grave_result(self):
         e = self.engine
@@ -756,7 +777,7 @@ class GameSession:
             target = response.get("target")
         else:
             agent = self.agents[seat.name]
-            target = (agent.night_action(seat.role, candidates).get("target") if self.planner is not None else
+            target = ((await self._npc_call(agent.night_action, seat.role, candidates)).get("target") if self.planner is not None else
                       agent.brain.day_skill([c["pos"] for c in candidates]).target)
         for event in e.resolve_day_skill(seat.pos, target):
             await self._emit_event(event)
@@ -775,7 +796,7 @@ class GameSession:
                     up_players.append(s)
             else:
                 agent = self.agents[s.name]
-                up = agent.election_choice() if self.planner is not None else (s.role == "seer" or
+                up = await self._npc_call(agent.election_choice) if self.planner is not None else (s.role == "seer" or
                       (s.is_wolf and agent.brain.wolf_strategy == "bluff") or
                       agent.style.aggression > 0.82)
                 if up:
@@ -791,7 +812,7 @@ class GameSession:
                 text = resp.get("text", "")
                 speech = self._player_speech(text)
             else:
-                speech = self.agents[s.name].speak(election_speeches)
+                speech = await self._npc_call(self.agents[s.name].speak, election_speeches)
                 text = speech.text
             election_speeches.append((s.name, speech))
             self._broadcast_speech(s, speech)
@@ -812,7 +833,7 @@ class GameSession:
                     withdraw = response["withdraw"]
                 else:
                     own_claim = next(sp.claim for name, sp in election_speeches if name == s.name)
-                    withdraw = (self.agents[s.name].election_choice(withdraw=True) if self.planner is not None else
+                    withdraw = (await self._npc_call(self.agents[s.name].election_choice, withdraw=True) if self.planner is not None else
                                 own_claim != "seer" and any(sp.claim == "seer" for name, sp in election_speeches if name != s.name) and self.agents[s.name].style.aggression < 0.9)
                 if withdraw:
                     self.emit({"type": "narration", "text": f"#{s.pos} {s.name} " + ("withdraws." if e.locale == "en" else "退警。")})
@@ -829,7 +850,7 @@ class GameSession:
                     {"candidates": [{"pos": u.pos, "name": u.name} for u in up_players], "sheriff": True})
                 votes[s.pos] = resp.get("target")
             else:
-                votes[s.pos] = self.agents[s.name].vote(
+                votes[s.pos] = await self._npc_call(self.agents[s.name].vote,
                     [{"pos": u.pos, "name": u.name} for u in up_players], sheriff=True)
         self._broadcast_votes(votes)
         tally = {}
@@ -870,7 +891,7 @@ class GameSession:
                 votes[s.pos] = resp.get("target")
             else:
                 cands = [{"pos": x.pos, "name": x.name} for x in alive] + [{"pos": 0, "name": target_label(0, e.locale)}]
-                votes[s.pos] = self.agents[s.name].vote(cands)
+                votes[s.pos] = await self._npc_call(self.agents[s.name].vote, cands)
         self._broadcast_votes(votes)
         tally = e.vote_tally(votes)
         self.emit(ballot_event(e, votes, tally))
@@ -926,8 +947,8 @@ class GameSession:
             return resp.get("target")
         candidates = [{"pos": pos, "name": e.seat_at(pos).name} for pos in cands]
         if self.planner is not None and candidates:
-            return self.agents[shooter.name].night_action("death-trigger shot", candidates).get("target")
-        return self.agents[shooter.name].vote(candidates) if candidates else None
+            return (await self._npc_call(self.agents[shooter.name].night_action, "death-trigger shot", candidates)).get("target")
+        return await self._npc_call(self.agents[shooter.name].vote, candidates) if candidates else None
 
     # ---------------- 事件广播 ----------------
     async def _emit_event(self, ev):
@@ -1011,11 +1032,24 @@ async def start(req: Request):
                              personalities=body.get("personalities"),
                              conjecture=body.get("conjecture", False),
                              player_role=body.get("player_role"), onboarding=True)
+        # Only explicit offline selection bypasses a real-model preflight.
+        # Runtime commands come from trusted local configuration, never HTTP.
+        offline = isinstance(body.get("llm"), dict) and body["llm"].get("enabled") is False
+        if not offline:
+            if runner.conjecture:
+                raise ValueError("Model-player conjecture tables are not yet integrated; choose normal mode.")
+            planner = create_runtime(backend="api" if body.get("llm") else None, options=body.get("llm"))
+            await asyncio.to_thread(planner.preflight)
+            runner.planner = planner
+            runner.llm = LLMClient(LLMRuntimeConfig.from_request({"enabled": False}))
+            runner.host = HostAgent(runner.llm, locale=runner.engine.locale)
+    except ModelTurnError:
+        raise HTTPException(status_code=503, detail="LLM connection check failed. No game started and no offline fallback. / 模型预检失败，未开局、未降级。") from None
     except (ValueError, KeyError, TypeError) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     GAMES[game_id] = runner
     return {"ok": True, "game_id": game_id,
-            "llm_status": runner.llm.public_status()}
+            "llm_status": runner._model_status()}
 
 
 @app.get("/api/cast")

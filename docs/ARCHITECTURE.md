@@ -8,28 +8,33 @@ Browser (`static/`) and terminal (`chat_game.py`) consume **the same
 action dictionaries via `submit()`. It has one consumer and cannot be resumed.
 The browser converts these events to views; it never decides legal actions.
 
-Agent chat now injects `CodexNPCAgent` through a verified local-only planner;
-HTTP request bodies cannot enable account-backed Codex subprocesses. Codex owns
-speech, candidacy/withdrawal, votes and skill choices; the engine still validates
-and resolves rules. The adapter supplies only the actor's `InformationSet`,
-public event history and their own previous model decisions. Fresh tool-disabled
-ephemeral calls run outside the repository. A failed/invalid response stops the
-game; it must not fall through to the local Brain. The public event history is
-full match memory, not proof the model understood every event. Local Brain still
-provides personality and interruption-interest scoring, not Codex turn targets.
+All normal entry points inject `ModelNPCAgent` through a preflight-verified
+`DecisionRuntime`. API/local model servers, trusted Agent wrappers and optional
+Codex all implement `complete(request, schema) -> dict`. See [the connection
+protocol](MODEL_CONNECTIONS.md). HTTP bodies cannot supply executable commands;
+server owners select non-API adapters only through local environment configuration.
 
-Browser and explicit legacy/offline paths retain the local planner described
-below. Conjecture tables remain legacy-only for now; Codex rejects that setting.
-The runtime follows [Codex non-interactive execution](https://learn.chatgpt.com/docs/non-interactive-mode),
-with structured output and explicit tool disabling; local CLI support is also
-checked by actual preflight rather than assumed from a configured model name.
+The LLM owns speech, candidacy/withdrawal, votes and skills; the engine validates
+and resolves rules. Requests contain the actor's lawful `InformationSet`, full
+public history and only that seat's prior decisions. Model calls run off the
+event loop so HTTP/SSE and retry controls remain responsive. Failure pauses at
+the exact failed call for explicit retry/stop; completed actions are not replayed.
+Public history is memory, not proof the model understood it. The local Brain
+still supplies personality and interruption-interest scoring, not model targets.
+
+Only explicit legacy/offline tests retain the rule planner. Conjecture tables
+remain legacy-only and are rejected in model mode rather than silently replaced.
+The optional Codex adapter follows [non-interactive execution](https://learn.chatgpt.com/docs/non-interactive-mode).
+Other Agent wrappers must enforce their own tool isolation and role boundaries.
 
 | Component | Owns | Must not own |
 | --- | --- | --- |
 | `game/engine.py`, `models.py` | Authoritative roles, legal resolution, deaths, victory, event ledger | Model wording or UI state |
 | `ai/brain.py`, `strategy.py` | One NPC's lawful observations, beliefs and local decisions | Another NPC's private belief or unrevealed good role |
 | `ai/strategic_agent.py` | Playable adapter, observations, optional expression, scoped memory | Replacement rule adjudication |
-| `ai/codex_player.py` | Local Codex decision runtime, legal prompt context, structured action validation | Rules, hidden opponent knowledge, silent fallback or global Codex settings |
+| `ai/model_player.py` | Provider-independent lawful prompt context, private decision memory, validated actions | Hidden opponent knowledge or rule adjudication |
+| `ai/decision_runtime.py` | API and Agent-wrapper protocol, preflight, timeouts and call budgets | Rule decisions, public secrets or silent fallback |
+| `ai/codex_player.py` | Optional Codex protocol adapter (backward-compatible class alias) | Global Agent settings or product-wide vendor dependency |
 | `ai/host.py` | Public rules help, narration, bounded interruptions; separate postgame review | Live private-identity tutoring or inventing unimplemented rules |
 | `game/conjecture.py` | Playable private/public drafts and public revision history | Host-certified claims or automatic proof of rationality |
 | `ai/llm.py` | Optional OpenAI-compatible expression, budgets and fallback | Playable votes/night decisions |

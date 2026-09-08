@@ -26,6 +26,12 @@ def _number(text: str, candidates: list[dict]) -> int | None:
 def parse_action(kind: str, data: dict, text: str) -> dict | None:
     """Convert a deliberately small, unambiguous chat vocabulary to actions."""
     text = text.strip()
+    if kind == "model_retry":
+        if text.casefold() in ("retry", "重试"):
+            return {"retry": True}
+        if text.casefold() in ("stop", "结束", "停止"):
+            return {"retry": False}
+        return None
     if kind == "ready":
         return {"ready": True} if text.casefold() in ("ready", "start", "开始", "准备好了", "准备好") else None
     if kind == "election_withdraw":
@@ -121,6 +127,8 @@ def _render(event: dict, locale: str = "zh-CN"):
 
 def _request_prompt(kind: str, data: dict, locale: str = "zh-CN") -> str:
     en = locale == "en"
+    if kind == "model_retry":
+        return "\nModel paused. retry / stop: " if en else "\n模型暂停。输入 重试 / 结束："
     if kind == "conjecture":
         lines = ["\n" + data["hint"]]
         for i, name in enumerate(data["players"], 1):
@@ -180,20 +188,20 @@ def _ordinary_request_prompt(kind: str, data: dict, locale: str = "zh-CN") -> st
 
 
 async def play(board_id: str, seed: int | None, offline: bool, locale: str, names=None,
-               personalities=None, conjecture=False, player_role=None, backend="codex",
-               model="gpt-5.6-terra", effort="medium", max_calls=240):
-    from .ai.codex_player import CodexPlayerRuntime, ModelTurnError
+               personalities=None, conjecture=False, player_role=None, backend=None,
+               model=None, effort=None, max_calls=None, agent_command=None):
+    from .ai.decision_runtime import create_runtime, ModelTurnError
     planner = None
-    if not offline and backend == "codex":
+    if not offline and backend != "legacy":
         if conjecture:
-            print("Codex conjecture tables are not integrated yet / Codex 猜想表尚未接入；请选择普通模式。")
+            print("Model-player conjecture tables are not integrated yet / 模型玩家猜想表尚未接入；请选择普通模式。")
             return 1
-        print(f"Codex NPC decisions: {model} / {effort}; max {max_calls} calls. Checking connection before dealing roles…" if locale == "en" else
-              f"Codex 驱动 NPC 决策：{model} / {effort}；本局最多 {max_calls} 次调用。发身份前检查连接……", flush=True)
-        planner = CodexPlayerRuntime(model=model, effort=effort, max_calls=max_calls)
         try:
+            planner = create_runtime(backend, model=model, effort=effort, max_calls=max_calls, command=agent_command)
+            print(json.dumps(planner.public_status(), ensure_ascii=False), flush=True)
+            print("Checking LLM before dealing roles… / 发身份前验证 LLM 连接……", flush=True)
             await asyncio.to_thread(planner.preflight)
-        except ModelTurnError as error:
+        except (ModelTurnError, ValueError) as error:
             print(str(error))
             return 1
         print("Model connection verified. No silent offline fallback." if locale == "en" else
@@ -239,11 +247,12 @@ def main():
     parser.add_argument("--list-roles", action="store_true", help="List roles available on the selected board")
     parser.add_argument("--seed", type=int, help="可复现随机种子")
     parser.add_argument("--offline", action="store_true", help="只使用本地表达")
-    parser.add_argument("--backend", choices=("codex", "legacy"), default="codex",
-                        help="codex: model decisions (default); legacy: rule decisions with optional rephrasing")
-    parser.add_argument("--model", default="gpt-5.6-terra")
-    parser.add_argument("--effort", choices=("low", "medium", "high"), default="medium")
-    parser.add_argument("--max-model-calls", type=int, default=240)
+    parser.add_argument("--backend", choices=("api", "codex", "command", "legacy"),
+                        help="api (default or local config), codex, command; legacy is a rule test")
+    parser.add_argument("--agent-command", help="Trusted local wrapper as JSON argument array; stdin/stdout protocol")
+    parser.add_argument("--model")
+    parser.add_argument("--effort")
+    parser.add_argument("--max-model-calls", type=int)
     parser.add_argument("--lang", default="zh-CN", choices=("zh-CN", "en"), help="game language")
     parser.add_argument("--name", help="Your display name; omitted means random")
     parser.add_argument("--rename", action="append", default=[], metavar="PLAYER_ID=NAME",
@@ -256,7 +265,7 @@ def main():
     args = parser.parse_args()
     from .game.engine import BOARD_MAP, ROLE_META
     from .i18n import board_role_name
-    if args.max_model_calls < 1 or args.max_model_calls > 1000:
+    if args.max_model_calls is not None and not 1 <= args.max_model_calls <= 1000:
         parser.error("--max-model-calls must be between 1 and 1000")
     if args.board is None:
         if args.list_roles or args.list_cast or args.list_personalities:
@@ -308,7 +317,8 @@ def main():
     except ValueError as error:
         parser.error(str(error))
     result = asyncio.run(play(args.board, args.seed, args.offline, args.lang, names, personalities,
-                              args.conjecture, args.role, args.backend, args.model, args.effort, args.max_model_calls))
+                              args.conjecture, args.role, args.backend, args.model, args.effort, args.max_model_calls,
+                              args.agent_command))
     if result == 1:
         raise SystemExit(1)
 

@@ -40,10 +40,9 @@ class Config:
     LLM_MODEL = _get("LLM_MODEL", "deepseek-chat")
     LLM_TEMPERATURE = float(_get("LLM_TEMPERATURE", "0.85"))
     LLM_ENABLED = _get("LLM_ENABLED", "true").lower() in ("1", "true", "yes", "on")
-    # These are availability controls, not game-balance knobs.  The local
-    # strategy engine remains authoritative regardless of their values.
-    LLM_TIMEOUT_SECONDS = float(_get("LLM_TIMEOUT_SECONDS", "8"))
-    LLM_GAME_MAX_CALLS = int(_get("LLM_GAME_MAX_CALLS", "36"))
+    # The LLM chooses actions; the local engine remains authoritative for rules.
+    LLM_TIMEOUT_SECONDS = float(_get("LLM_TIMEOUT_SECONDS", "30"))
+    LLM_GAME_MAX_CALLS = int(_get("LLM_GAME_MAX_CALLS", "240"))
     # Leave the request key empty for generic OpenAI-compatible services.
     # Providers with a reasoning switch can opt in, e.g.
     # LLM_REASONING_PARAM=reasoning_effort.

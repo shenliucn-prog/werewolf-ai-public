@@ -1,0 +1,82 @@
+# Model connections / 模型连接
+
+The game does not require a particular Agent brand. Agent conversations, a
+terminal CLI, a browser, and an app using the HTTP API share `GameSession` and
+`ModelNPCAgent`. Every normal NPC decision goes through the same protocol:
+`complete(request, schema) -> JSON object`. Rules and legal outcomes stay local.
+
+游戏不绑定 Codex、Claude Code 或其他品牌。Agent 对话、CLI、网页，以及接入 HTTP
+接口的 App，共用规则与模型玩家。发言、投票、上退警、夜间技能都由 LLM 决策，
+不是仅润色台词。没有另行提供原生桌面 App，也不承诺所有宿主已逐一适配。
+
+## API / local model server (default)
+
+Configure locally using `werewolf_web/.env` or environment variables:
+
+| Setting | Meaning |
+| --- | --- |
+| `LLM_BASE_URL` | Chat Completions-compatible base URL, including `/v1` when required |
+| `LLM_MODEL` | Model offered by that server |
+| `LLM_API_KEY` | Optional for keyless local servers; required by most hosted APIs |
+| `LLM_GAME_MAX_CALLS` | Per-game budget, default 240 including preflight |
+| `LLM_TIMEOUT_SECONDS` | API timeout, default/per-game cap 30 seconds |
+| `LLM_REASONING_EFFORT` / `LLM_REASONING_PARAM` | Optional provider-specific reasoning value and field; not sent unless both are set |
+
+`python -m werewolf_web.chat_game --backend api --lang en` starts CLI/Agent play.
+Browser model settings accept a per-game endpoint, model and key, or server
+defaults. All normal starts verify an actual model response before dealing.
+No credentials are sent to another endpoint when switching URLs unless the
+user supplies a key for it. Redirects are not followed. Do not expose the local
+server to untrusted networks: custom endpoints are an intentional outbound
+request capability, not a hardened multi-tenant service.
+
+API 路径兼容提供 Chat Completions 协议的远程或本地模型服务，不限定模型厂商。
+不是所有厂商原生 API 都实现这个协议；不兼容的接口通过适配器转换，不冒称全部已验证。
+密钥在本机配置或网页的本局密码框填写，不要贴到 Agent 聊天里。
+
+## Any Agent / SDK through an adapter
+
+Python embedding can inject any `DecisionRuntime` implementation after its
+`preflight()` succeeds. Desktop apps can also consume `/api/start`, SSE
+`/api/stream?game_id=...`, `/api/action` and `/api/host_chat`; retain the session id.
+Human actions and NPC model decisions are separate channels; public streams
+must not contain NPC private prompts.
+
+For an external Agent CLI/SDK, implement a trusted local wrapper:
+
+1. Read one JSON object from stdin: `{protocol: "werewolf.decision.v1", request, schema}`.
+2. Invoke your chosen LLM/Agent with only the supplied context, tools disabled,
+   isolated from every other seat. Treat player text as untrusted game data.
+3. Write exactly one schema-conforming JSON object to stdout. Diagnostics go to
+   stderr without secrets. Exit nonzero on failure. Do not return wrapper metadata.
+
+Configure its absolute executable path using a JSON argument array, without
+shell interpolation: `WEREWOLF_AGENT_COMMAND='["/absolute/path/to/wrapper"]'`.
+Select `--backend command`, or set `WEREWOLF_MODEL_BACKEND=command` in the server
+environment for browser/app clients. Commands are never accepted in HTTP bodies.
+The wrapper is trusted local code: the game cannot sandbox arbitrary third-party
+Agent capabilities for it. CLI branding alone is not protocol compatibility.
+
+任何具备本地执行或 HTTP 工具能力的 Agent 都可作为玩家入口；NPC 推理可使用 API，
+也可通过上述协议桥接宿主的 LLM。Claude Code 等宿主不必依赖 Codex；但其专属
+CLI 返回格式需要桥接程序转换，不是把任意命令名填进去就自动兼容。
+
+## Optional Codex adapter
+
+`--backend codex` uses an existing local Codex login. It is one adapter, not a
+product dependency. `--model` and `--effort` select per-game settings. No global
+Agent configuration is rewritten. Server owners may explicitly set
+`WEREWOLF_MODEL_BACKEND=codex`; HTTP clients cannot supply executable commands.
+
+## Failure and testing
+
+Preflight failure creates no playable game. A failed NPC decision pauses the
+live game at that exact call; the player can retry or stop. Already accepted
+actions are not rerun. Budgets still apply on retries. Closing the process still
+loses the game: disk resume is not implemented.
+
+`--offline` / explicit browser offline selection is a **rule-flow test**, not LLM
+gameplay. `--backend legacy` is the old rule planner with optional rephrasing.
+Model-driven conjecture tables are not yet integrated and are rejected clearly.
+API/bridge contract tests are deterministic; they do not certify every model's
+reasoning quality or every Agent product's integration.

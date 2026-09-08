@@ -8,14 +8,13 @@ complete rule coverage or balance. See the explicit [rule variant](RULE_VARIANT.
 
 ### Model-player boundary
 
-Agent chat defaults to local Codex decision players (normal mode only), with a
-real preflight before dealing and no silent fallback. Browser and `--backend
-legacy` remain rule-driven decisions with optional API rephrasing; `--offline`
-is explicitly a rule-flow test. These modes are not equivalent playability
-evidence. Codex conjecture tables and cross-game model learning are not yet
-integrated. Full public history is included every turn without truncation;
-long games can be slow or exceed context/account budgets. Failure stops the
-process's game; resume and in-place retry are not implemented. Structural
+All normal interfaces share provider-neutral model decisions (normal mode
+only), with real preflight and no silent fallback. API, local model servers and
+trusted Agent protocol adapters are supported; Codex is optional. Only explicit
+legacy/offline selections use local rule decisions. Model conjecture tables and
+cross-game learning are not yet integrated. Full public history is included every turn without truncation;
+long games can be slow or exceed context/account budgets. Failure pauses at the same decision for explicit retry/stop. Disk resume is
+not implemented; process loss still loses the game. Structural
 validation does not prove semantic consistency, truthfulness or balance.
 
 The common flow includes night actions, dawn/death announcements, first-day sheriff voting, statements, bounded table interruptions, exile voting, and victory checks. Seer checks, Witch potions, guarding, ordinary wolf kills, Hunter/Wolf King shots, Wolf Beauty charm, Bomber exile explosions, Hidden Wolf checks, and Evil Knight reflection have implementation paths, with remaining edge cases below.
