@@ -2,40 +2,36 @@
 
 English | [简体中文](README.zh-CN.md)
 
-A 12-player social deduction game with 11 independent AI opponents and an automated host. **The recommended experience is playing inside your own AI Agent's conversation**, in English or Chinese. The browser is optional. Currently, a capable local Agent can relay the terminal interface; a universal Agent plugin/MCP integration is not yet provided. See [Agent play](docs/AGENT_PLAY.md).
+A local single-player Werewolf game: you play one seat against 11 AI opponents.
+**Normal play requires a model API or a supported connection to your own Agent.**
+Models decide NPC speech and actions; Python enforces rules and saves progress.
+The browser is optional—not a browser-only game.
 
-The core experience is the conversation: players form suspicions, make claims, interrupt one another, and respond before the host brings the table back to the game. Browser and chat share rules and public records. **Agent chat, CLI, browser and app integrations share provider-neutral LLM decision players.** Connect an API/local model service or a configured Agent adapter; Codex is optional. See [model connections](docs/MODEL_CONNECTIONS.md).
+Playing in your Agent's conversation is recommended. The Agent needs local
+command execution and a persistent interactive process. Relaying the game does
+**not** automatically connect that Agent's model to the NPCs. There is no
+universal Agent plugin or separate native app yet.
 
-**Status:** an experimental, local-first prototype. Start with the Classic board. Eight original boards plus two Divine Witch experimental variants have playable ability paths under this project's [rule variant](docs/RULE_VARIANT.md); edge cases and balance still need testing. See [known limitations](docs/KNOWN_LIMITATIONS.md).
+## Choose a mode
 
-## What you can do
+| Entry | What it does |
+| --- | --- |
+| Campaign | Start as a Civilian and win to unlock the next role across 16 fixed-board levels. A faction win counts even if you died. |
+| Free game | Choose a board, your role or random, NPC names and fixed/random personalities. |
+| Continue | Resume an interrupted saved game instead of starting over. |
 
-- Choose normal conversation (default). **Conjecture mode (beta)** remains available in the legacy test backend; Model-player dual tables are not integrated yet and are explicitly rejected instead of silently substituted.
-- Try **Divine Witch**: unlimited potions, either one type or both types per night. Choose the experimental board and select the Witch as your role. [Rules and stress tests](docs/DIVINE_WITCH.md).
-- Assign each NPC a **fixed preset** or **random each game**, independently of names and hidden roles.
-- Play with text only. **Voice and visual gameplay have no design or implementation yet**; portraits are decorative, not behavioral evidence.
+Losses can be retried. Draws count as attempts but do not unlock a level;
+abandoning a started attempt counts as a non-win. Model failures pause play,
+never silently substitute program-controlled NPCs. Role teaching and short
+loss reviews use the model and can be retried.
 
-See [game setup and conjecture play](docs/GAME_MODES.md). The separate
-[extreme-personality research protocol](docs/EXTREME_EXPERIMENT.md) runs complete
-seven-seat experimental games, not the twelve-seat playable board.
-
-- Play against NPCs with distinct personalities, beliefs, cognitive profiles, and bounded match-to-match learning.
-- Ask the host private rules questions without consuming your action.
-- Take part in brief public exchanges that other players can react to; the host limits repeated two-person debates.
-- Switch between English and Chinese before starting a game, including NPC names, catchphrases, prompts, and reviews.
-- Model players independently choose speech, votes, candidacy and abilities using public history and their own lawful private information. Configure your model provider or Agent adapter; usage costs depend on that connection.
-- Model play pauses for explicit retry/stop on failure, timeout, invalid decisions or budget exhaustion. It never silently switches to local templates. Offline rule-flow tests remain explicitly available with `--offline`.
+**Offline simulation must be explicitly selected.** It is a rule-flow test,
+makes no model calls and does not count toward campaign progress.
 
 ## Quick start
 
-Fork this repository on GitHub, then clone your fork locally (or clone the
-upstream below to try it). Both Agent and browser games run on your machine.
-After installing dependencies, run `python -m werewolf_web.setup --lang en`.
-Onboarding checks your environment, explains costs and entry points, guides
-game settings, and leads into the host's rules/question phase. Night one waits
-for Ready. Check without starting: `python -m werewolf_web.setup --check --lang en`.
-
-Use Python 3.10 or newer. Run commands from the repository root.
+Python 3.10+ is required. Fork and clone your fork to customize the game, or
+try the upstream below. Run commands from the repository root.
 
 ```bash
 git clone https://github.com/shenliucn-prog/werewolf-ai-public.git
@@ -45,156 +41,149 @@ source .venv/bin/activate
 python -m pip install -r werewolf_web/requirements.txt
 ```
 
-On Windows PowerShell, activate with `.venv\Scripts\Activate.ps1` instead.
+On Windows PowerShell, activate with `.venv\Scripts\Activate.ps1`.
 
-### Play inside your Agent — recommended experience
+### 1. Connect a model
 
-Ask your Agent to read this repository and [the Agent play instructions](docs/AGENT_PLAY.md), run the game and relay it in your conversation. You speak, ask rules questions and choose actions in the Agent, not in a terminal yourself. The Agent needs local command execution and a persistent interactive process. This is a capability-dependent bridge, not verified native support for every Agent product.
+Choose one:
 
-### Terminal bridge — for the Agent, or direct testing
+- **API/local model server:** copy `werewolf_web/.env.example` to
+  `werewolf_web/.env`; configure `LLM_BASE_URL`, `LLM_MODEL` and
+  `LLM_API_KEY` if required. The endpoint must support OpenAI-compatible
+  Chat Completions. Keyless local servers are supported.
+- **Your own Agent:** configure a trusted local wrapper implementing the
+  [decision protocol](docs/MODEL_CONNECTIONS.md), then select
+  `--backend command`. An arbitrary Agent executable is not automatically compatible.
+- **Optional Codex adapter:** use `--backend codex` with an existing local
+  Codex login. Codex is not required.
 
-The Agent can use the following command after installation and model connection setup. It first asks for the board, then verifies a real model response before dealing roles. Manual terminal play is also available. No browser server is needed.
+A real connection check runs before dealing roles. The default call budget is
+240; API users can set `LLM_GAME_MAX_CALLS`. Retries, teaching and short reviews
+consume calls when they request the model; cached teaching does not.
+A call cap is not a monetary cap. Only set reasoning options supported by your
+provider. See [connection settings](docs/MODEL_CONNECTIONS.md).
+
+Setup guidance: `python -m werewolf_web.setup --lang en`.
+Add `--check` to check the environment without starting a game.
+
+### 2. Start or continue
+
+Ask your Agent to read [Agent play](docs/AGENT_PLAY.md), run the game and relay
+your choices without autoplaying. Direct terminal play uses the same commands:
 
 ```bash
+# Campaign: current unlocked role
+python -u -m werewolf_web.chat_game --campaign --lang en
+
+# Free game: choose a board interactively
 python -u -m werewolf_web.chat_game --lang en
+
+# Free game: selected board and role
+python -u -m werewolf_web.chat_game --board classic --role seer --lang en
+
+# Resume: replace GAME_ID with the saved game's identifier
+python -u -m werewolf_web.chat_game --resume GAME_ID --lang en
 ```
 
-Choose your identity before play with `--role seer`, or leave it random.
-Use `--backend api` (default), `command` for a trusted Agent wrapper, or optional
-`codex`. `--model`, `--effort` and `--max-model-calls` configure the selected
-adapter. Default cap is 240 calls including preflight. Model availability and
-latency depend on the connection. See [connection protocol](docs/MODEL_CONNECTIONS.md).
-`--board classic --list-roles --lang en` lists legal choices. The browser has
-the same **Your role** selector. Other identities remain hidden and board
-role counts stay unchanged. See [game setup](docs/GAME_MODES.md) and the
-research-only [mechanics lab](docs/MECHANICS_LAB.md).
+Campaign profiles default to `default`; `--profile NAME` selects another local
+profile. Start the campaign entry again after finishing a level. Campaign starts
+can reuse non-secret saved model settings; keep credentials in trusted local
+configuration for recovery.
 
-| Situation | Input |
-| --- | --- |
-| Speak | Type your statement |
-| Claim a role / accuse a player | `I am the Seer. I suspect #3.` |
-| Run for sheriff | `yes` or `no` |
-| Vote | `vote 3` |
-| Support no exile | `peaceful day` |
-| Withdraw after candidacy speeches | `withdraw` or `stay` |
-| Review public ballots / statements | `latest votes`, `day 2 speeches`, `/history` |
-| See current seats | `/seats` |
-| Choose a night target | `choose 3` |
-| Use one Witch potion | `save 3` **or** `poison 4` |
-| Skip an optional night action | `pass` |
-| Duel / self-destruct / slander when prompted | `choose 3` or `pass` |
-| Ask the host about rules | `?How does the Witch work?` |
-
-On original boards, the Witch cannot use both potions in one night. The experimental
-`divine_witch_dual` board allows `save 3 poison 4` in one action. Valid targets and
-available potions are shown in the prompt. Rules questions do not consume your turn.
-
-Use `--lang zh-CN` for Chinese or `--seed 42` for a repeatable initial setup. The chat action parser accepts a small explicit vocabulary; it is not a general natural-language command interpreter.
-
-### Browser game — optional
+For the optional browser interface:
 
 ```bash
 python -m uvicorn werewolf_web.run:app --host 127.0.0.1 --port 8000
 ```
 
-Open [localhost:8000](http://127.0.0.1:8000), choose **English** or **中文**, and start a game. Configure the model connection in Model settings. Offline rule tests are explicitly labeled.
+Open [localhost:8000](http://127.0.0.1:8000), select a language and model
+connection, then Campaign, Free game or Continue. A key entered in the browser
+goes to the local Python backend for that connection, not into the settings file.
 
-The conversation and current action occupy the main area; your role and compact player roster are on the left, alongside expandable private rules help. On narrow screens the conversation comes first and supporting details follow. Setup collapses after a successful start. Changing interfaces starts a new game, not a transfer of the current session.
+### 3. Play
 
-New to Werewolf? Read the [two-minute player guide](docs/PLAYER_GUIDE.md).
+The host introduces the rules and seating map. Ask questions, then confirm Ready
+to begin night one.
 
-### AI-only observer mode — developer tool, not the recommended player entry
-
-```bash
-python -m werewolf_web.cli_game --board classic --seed 42 --no-think
-```
-
-This developer-oriented mode is in Chinese and may expose every role and private reasoning. It is separate from the human-playable chat interface.
-
-## Model API connection
-
-API connections now drive decisions in all normal interfaces. Keyless local
-servers are supported. Only explicit `--backend legacy` retains the old rule
-planner/rephrasing path; `--offline` is a rule-flow test. Normal gameplay never
-silently substitutes local NPCs. See [adapters and protocol](docs/MODEL_CONNECTIONS.md).
-
-Copy the template and configure your own provider:
-
-```bash
-cp werewolf_web/.env.example werewolf_web/.env
-```
-
-| Setting | Purpose |
+| At a terminal action prompt | Input |
 | --- | --- |
-| `LLM_ENABLED` | Enable or disable model use (disabled means a rule test) |
-| `LLM_BASE_URL` | OpenAI-compatible Chat Completions endpoint |
-| `LLM_API_KEY` | Provider credential |
-| `LLM_MODEL` | Model ID offered by that endpoint |
-| `LLM_TIMEOUT_SECONDS` | Per-call timeout |
-| `LLM_GAME_MAX_CALLS` | Model-call budget per game |
-| `LLM_REASONING_EFFORT` / `LLM_REASONING_PARAM` | Optional provider-specific reasoning field |
+| Speak | Your statement |
+| Seats / public history | `/seats` / `/history` |
+| Ask rules without taking an action | `?How does the Witch work?` |
+| Vote / select a target | `vote 3` / `choose 3` |
+| Skip an optional action | `pass` |
+| Retry campaign teaching | `/teaching` |
+| Retry short review at the post-game prompt | `/review` |
 
-Leave reasoning settings empty unless your endpoint explicitly supports them. Native provider APIs that do not implement OpenAI-compatible Chat Completions are not supported directly.
+Follow the prompt for legal choices. The parser uses explicit commands, not
+general natural language. An Agent may translate your choices but must not
+invent events or inspect hidden NPC state. See the [player guide](docs/PLAYER_GUIDE.md).
 
-Browser users can supply a key for one game. That key is sent to this game's Python backend, then used for requests to the configured provider; it is not a browser-only integration. The application omits keys from its game events, memory, and review files. Provider policies and server logs are outside that guarantee.
+## Modes and current limits
 
-When a model connection is enabled, the provider receives the speaking NPC's context, including its legal private role information and prior player statements. Do not include sensitive real-world information in game chat.
+- Text only, in English or Chinese. Voice and visual gameplay have no design
+  or implementation; portraits are decorative.
+- Normal debate is the default. Model-driven conjecture tables are not yet
+  integrated; conjecture is restricted to explicit legacy/offline research play.
+- Ten boards; start with Classic. Divine Witch and extreme-personality
+  experiments are not certified balanced.
+- Local prototype, not a fair leaderboard or anti-cheat system. Automated tests
+  do not certify every provider or Agent. Complete real-API/Agent campaign runs
+  remain a final release-verification item.
 
-## Architecture
+See [game modes](docs/GAME_MODES.md), [Divine Witch](docs/DIVINE_WITCH.md),
+[project rules](docs/RULE_VARIANT.md) and [known limitations](docs/KNOWN_LIMITATIONS.md).
 
-```text
-Browser / terminal chat
-          |
-     GameSession
-      /   |    \
- Rules  NPC adapter  Host
-          |
- Shared ModelNPCAgent -> API / local model server / Agent adapter
-```
+## Saves and privacy
 
-- `werewolf_web/run.py`: shared playable session and FastAPI/SSE adapter.
-- `werewolf_web/game/`: seats, phases, actions, outcomes, and events.
-- `werewolf_web/ai/brain.py`: local beliefs and decisions for each NPC.
-- `werewolf_web/ai/model_player.py`, `decision_runtime.py`: provider-neutral model players, lawful context, per-seat memory, validated actions and API/Agent adapters. Full public records are supplied each turn; no context truncation or cross-game model learning is implemented yet.
-- `werewolf_web/ai/strategy.py`, `growth.py`, `affect.py`: decision traces, cognitive profiles, and bounded state changes.
-- `werewolf_web/ai/host.py`: narration, public-rule help, table moderation, and post-game review.
-- `werewolf_web/i18n.py`: localized NPC identities and game text.
-- `werewolf_web/static/`: browser presentation.
-- `werewolf_web/data/personas/`: canonical Chinese persona definitions.
+Checkpoints, campaign archives, settings, teaching cache and runtime memories
+stay under `werewolf_web/data/`, ignored by Git and excluded from release exports.
+**Checkpoints contain hidden roles and NPC private state: do not share them or
+read them for a gameplay advantage.** Keys are excluded from settings and
+checkpoints; restoring model play requires a trusted live connection again.
+Missing or corrupt saves are not guaranteed recoverable.
 
-NPCs keep stable IDs across languages. Canonical personas determine behavior; localization supplies display names and phrasing. If you edit a persona, update its English presentation in `i18n.py` as well. The Chinese persona headings are parser inputs, not documentation that can be translated independently.
+Browser reconnect and terminal `--resume GAME_ID` use saved sessions. Do not
+control the same live game from two interfaces at once. New playable sessions
+do not automatically inherit previous games' NPC memories.
 
-## Local data and deployment
+The provider receives each acting NPC's permitted context, including your
+statements and that NPC's private information. Avoid sensitive real-world chat.
+There is no account system or hardened public multi-user deployment; run locally.
+See [security](SECURITY.md).
 
-Runtime files are written under `werewolf_web/data/`: NPC memories, host style, and game reviews. These files and `.env` are ignored by Git. They can include game statements and private role information.
+## For contributors
 
-Browser and terminal matches each use a fresh session memory directory. The learning
-machinery exists, but new playable sessions do not automatically inherit earlier
-games' NPC memories. Active games live in memory and do not survive a process restart.
+| Location | Responsibility |
+| --- | --- |
+| `werewolf_web/session.py` | Shared session, events and recovery |
+| `werewolf_web/run.py`, `chat_game.py` | Web and terminal adapters |
+| `werewolf_web/game/` | Deterministic rules and outcomes |
+| `werewolf_web/ai/model_player.py`, `ai/decision_runtime.py` | Model decisions and API/Agent adapters |
+| `werewolf_web/ai/model_context.py` | Bounded requests; full records remain in saves |
+| `werewolf_web/campaign*.py` | Levels, progress, teaching and short reviews |
+| `werewolf_web/static/`, `i18n.py` | Browser UI and localization |
 
-The backend is intended for your machine or a trusted development environment. It has no user authentication, durable sessions, or production-grade request/resource limits. Do not expose it as a public multi-user service without additional work. See [security guidance](SECURITY.md).
-
-## Development and tests
+Legacy Brain/research tools are separate from normal model decision play.
+`cli_game.py` is an omniscient developer observer, **not a player entry**.
+Persona source headings are parser inputs; do not translate them blindly.
 
 ```bash
 python -m unittest discover -s tests -q
-node --check werewolf_web/static/js/app.js
-node --check werewolf_web/static/js/i18n.js
 npm ci
 npm test
+node --check werewolf_web/static/js/app.js
+node --check werewolf_web/static/js/i18n.js
 python scripts/check_release.py
 ```
 
-Use Node.js 24.15+ (24.x) for development checks and DOM tests. Node and npm are
-not needed to play; the browser app has no build step. `npm ci` installs
-development-only dependencies from the committed lockfile.
+Node.js 24.15+ (24.x) is for development tests only; playing needs no npm build.
+Read [contribution guidance](CONTRIBUTING.md) and
+[architecture / extension recipes](docs/ARCHITECTURE.md). Research/design docs
+are not promises that every proposed feature is implemented.
 
-The suite includes a 40-match matrix across ten boards, two languages and two modes, plus targeted selected-role and Divine Witch games. Completion tests verify termination and review; they do not certify competitive balance or every provider's behavior. A separate frozen-extreme Divine Witch screen uses local AI decisions, not model API calls.
+## License
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing rules or NPC information boundaries.
-See [architecture and extension recipes](docs/ARCHITECTURE.md) for where to add
-boards, roles, personalities, languages or transports.
-
-## License and assets
-
-Source code is licensed under the [MIT License](LICENSE). The maintainer generated the portraits locally with AI and authorized their use in this project and publication with the repository. Portraits are not covered by MIT; other uses require separate permission. See [asset provenance](docs/ASSETS.md) and [publication readiness](docs/PUBLIC_RELEASE.md).
+Code: [MIT](LICENSE). AI-generated portraits are authorized for this project and
+repository distribution, but are **not** covered by MIT; other uses require
+separate permission. See [asset provenance](docs/ASSETS.md).
