@@ -27,10 +27,15 @@ from __future__ import annotations
 import math
 import random
 import re
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Optional
 
 from ..game.models import GameEvent, WOLF_ROLES
+from ..recovery import (
+    SCHEMA_VERSION, check_version, decode_rng, encode_rng,
+    require_str, require_dict, require_list,
+)
 from .affect import MatchState
 from .growth import CognitiveProfile
 from .strategy import BeliefState, DecisionTrace, StrategicVotePlanner
@@ -144,6 +149,29 @@ class Style:
         s.verbosity = clamp(s.verbosity)
         return s
 
+    def to_dict(self) -> dict:
+        return {
+            "aggression": self.aggression,
+            "logic": self.logic,
+            "bluff": self.bluff,
+            "loyalty": self.loyalty,
+            "caution": self.caution,
+            "verbosity": self.verbosity,
+            "argument": self.argument,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Style":
+        return cls(
+            aggression=data["aggression"],
+            logic=data["logic"],
+            bluff=data["bluff"],
+            loyalty=data["loyalty"],
+            caution=data["caution"],
+            verbosity=data["verbosity"],
+            argument=data["argument"],
+        )
+
 
 # ---------------------------------------------------------------- 话语
 @dataclass
@@ -170,7 +198,7 @@ class Decision:
 class Brain:
     def __init__(self, seat, engine, persona: dict, rng: random.Random,
                  llm=None, cognitive_state: dict | None = None,
-                 match_carry: dict | None = None):
+                 match_carry: dict | None = None, emit_start: bool = True):
         self.me = seat                 # 自己的座位（Seat）
         self.name = seat.name
         self.engine = engine
@@ -206,7 +234,8 @@ class Brain:
         # 这是"各自思考"的直接来源——同样的公开信息，不同人读出不同结论。
         self.gut: dict[str, float] = {}
         self.decision_traces: list[DecisionTrace] = []
-        self._state_event("match_start")
+        if emit_start:
+            self._state_event("match_start")
 
     def effective_ability(self, dimension: str) -> float:
         """Current ability for a decision, without mutating long-term cognition."""
@@ -1155,3 +1184,137 @@ class Brain:
             self.wolf_strategy = "quiet"          # 低调划水
         else:
             self.wolf_strategy = "undercover"     # 深水/倒钩
+
+    # ================================================== 快照 / 恢复
+    def snapshot(self) -> dict:
+        """Whitelisted private-state snapshot; no engine/persona/llm references."""
+        return deepcopy({
+            "schema_version": SCHEMA_VERSION,
+            "name": self.name,
+            "style": self.style.to_dict(),
+            "cognition": self.cognition.snapshot(),
+            "match_state": self.match_state.snapshot(),
+            "starting_state": self.starting_state,
+            "sus": self.sus,
+            "claims": self.claims,
+            "claim_order": self.claim_order,
+            "accuse_log": self.accuse_log,
+            "defend_log": self.defend_log,
+            "vote_log": self.vote_log,
+            "flips": self.flips,
+            "resolved_exiles": sorted(self.resolved_exiles),
+            "speeches": self.speeches,
+            "silent": sorted(self.silent),
+            "my_claims": self.my_claims,
+            "wolf_strategy": self.wolf_strategy,
+            "notes": self.notes,
+            "gut": self.gut,
+            "decision_traces": [trace.to_dict() for trace in self.decision_traces],
+            "bluff_checks": {str(night): check for night, check in
+                             getattr(self, "_bluff_checks", {}).items()},
+            "rng": encode_rng(self.rng),
+        })
+
+    def restore(self, data: dict) -> None:
+        """Restore private state in place; seat/engine/persona/llm stay wired.
+
+        Validate-then-apply: every field is type/range checked and converted
+        *before* any attribute is replaced, so a corrupt snapshot cannot leave
+        a half-restored brain.
+        """
+        where = "Brain.snapshot"
+        check_version(data, where)
+        data = deepcopy(data)
+
+        # ---- validate (no mutation) ----
+        name = require_str(data, "name", where, allow_empty=False)
+        style = Style.from_dict(require_dict(data, "style", where))
+        cognition = CognitiveProfile.restore(require_dict(data, "cognition", where))
+        match_state = MatchState.restore(require_dict(data, "match_state", where))
+        starting_state = require_dict(data, "starting_state", where)
+        sus = require_dict(data, "sus", where)
+        claims = require_dict(data, "claims", where)
+        gut = require_dict(data, "gut", where)
+        if any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in sus.values()):
+            raise ValueError(f"{where}: sus values must be numbers")
+        if any(not isinstance(v, str) for v in claims.values()):
+            raise ValueError(f"{where}: claims values must be strings")
+        if any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in gut.values()):
+            raise ValueError(f"{where}: gut values must be numbers")
+
+        def tuples(items, label):
+            out = []
+            for item in items:
+                if not isinstance(item, (list, tuple)):
+                    raise ValueError(f"{where}: {label} entries must be arrays")
+                out.append(tuple(item))
+            return out
+
+        claim_order = tuples(require_list(data, "claim_order", where), "claim_order")
+        accuse_log = tuples(require_list(data, "accuse_log", where), "accuse_log")
+        defend_log = tuples(require_list(data, "defend_log", where), "defend_log")
+        vote_log = tuples(require_list(data, "vote_log", where), "vote_log")
+        flips = tuples(require_list(data, "flips", where), "flips")
+        resolved_exiles = set()
+        for item in require_list(data, "resolved_exiles", where):
+            if not isinstance(item, (list, tuple)) or len(item) != 2:
+                raise ValueError(
+                    f"{where}: resolved_exiles entries must be [int, str] pairs")
+            seat, role = item
+            if type(seat) is not int or isinstance(seat, bool):
+                raise ValueError(f"{where}: resolved_exiles seat must be an integer")
+            if not isinstance(role, str):
+                raise ValueError(f"{where}: resolved_exiles role must be a string")
+            resolved_exiles.add((seat, role))
+        speeches = tuples(require_list(data, "speeches", where), "speeches")
+
+        silent = require_list(data, "silent", where)
+        my_claims = require_list(data, "my_claims", where)
+        notes = require_list(data, "notes", where)
+        for label, values in (("silent", silent), ("my_claims", my_claims),
+                              ("notes", notes)):
+            if any(not isinstance(x, str) for x in values):
+                raise ValueError(f"{where}: {label} must be an array of strings")
+        silent = set(silent)
+
+        traces = [DecisionTrace.from_dict(trace)
+                  for trace in require_list(data, "decision_traces", where)]
+        wolf_strategy = data.get("wolf_strategy")
+        if wolf_strategy is not None and not isinstance(wolf_strategy, str):
+            raise ValueError(f"{where}: wolf_strategy must be a string or null")
+
+        bluff_raw = data.get("bluff_checks", {})
+        if not isinstance(bluff_raw, dict):
+            raise ValueError(f"{where}: bluff_checks must be an object")
+        bluff_checks = {}
+        for night, check in bluff_raw.items():
+            if not isinstance(night, str) or not night.lstrip("-").isdigit():
+                raise ValueError(f"{where}: bluff_checks keys must be night numbers")
+            if not isinstance(check, dict):
+                raise ValueError(f"{where}: bluff_checks values must be objects")
+            bluff_checks[int(night)] = check
+        rng = decode_rng(data.get("rng"))
+
+        # ---- apply ----
+        self.name = name
+        self.style = style
+        self.cognition = cognition
+        self.match_state = match_state
+        self.starting_state = starting_state
+        self.sus = sus
+        self.claims = claims
+        self.claim_order = claim_order
+        self.accuse_log = accuse_log
+        self.defend_log = defend_log
+        self.vote_log = vote_log
+        self.flips = flips
+        self.resolved_exiles = resolved_exiles
+        self.speeches = speeches
+        self.silent = silent
+        self.my_claims = my_claims
+        self.wolf_strategy = wolf_strategy
+        self.notes = notes
+        self.gut = gut
+        self.decision_traces = traces
+        self._bluff_checks = bluff_checks
+        self.rng = rng

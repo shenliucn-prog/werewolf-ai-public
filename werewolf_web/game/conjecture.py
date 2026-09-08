@@ -7,6 +7,7 @@ from copy import deepcopy
 
 from ..ai.brain import Speech
 from ..i18n import role_name, board_role_name
+from ..recovery import SCHEMA_VERSION, check_version
 from .engine import ROLE_META
 
 
@@ -142,3 +143,63 @@ class GameConjectures:
 
     def public_history(self):
         return deepcopy(self.history)
+
+    def snapshot(self) -> dict:
+        """Whitelisted conjecture ledger; ``engine`` is re-derived on restore."""
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "history": deepcopy(self.history),
+            "private": deepcopy(self.private),
+            "roster": list(self.roster),
+            "options": list(self.options),
+            "labels": dict(self.labels),
+        }
+
+    def restore(self, data: dict) -> None:
+        """Restore the conjecture ledger in place; ``engine`` stays wired.
+
+        Validate-then-apply: every field is read, checked, and converted before
+        any attribute is replaced, so a corrupt snapshot cannot leave a
+        half-restored table.
+        """
+        where = "GameConjectures.snapshot"
+        check_version(data, where)
+        data = deepcopy(data)
+
+        # ---- validate (no mutation) ----
+        history = data.get("history")
+        if not isinstance(history, list):
+            raise ValueError(f"{where}: history must be an array")
+        private = data.get("private")
+        if not isinstance(private, dict):
+            raise ValueError(f"{where}: private must be an object")
+        for name, drafts in private.items():
+            if not isinstance(name, str):
+                raise ValueError(f"{where}: private keys must be player names")
+            if not isinstance(drafts, list):
+                raise ValueError(f"{where}: private values must be arrays")
+
+        roster = data.get("roster")
+        if not isinstance(roster, list) or any(
+                not isinstance(n, str) for n in roster):
+            raise ValueError(f"{where}: roster must be an array of names")
+        roster = tuple(roster)
+        if roster != tuple(s.name for s in self.engine.seats.values()):
+            raise ValueError(f"{where}: roster does not match engine seats")
+
+        options = data.get("options")
+        if not isinstance(options, list) or any(
+                not isinstance(o, str) for o in options):
+            raise ValueError(f"{where}: options must be an array of strings")
+        options = tuple(options)
+
+        labels = data.get("labels")
+        if not isinstance(labels, dict):
+            raise ValueError(f"{where}: labels must be an object")
+
+        # ---- apply ----
+        self.history = deepcopy(history)
+        self.private = deepcopy(private)
+        self.roster = roster
+        self.options = options
+        self.labels = dict(labels)

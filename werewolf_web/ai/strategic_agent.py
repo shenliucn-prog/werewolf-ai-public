@@ -10,8 +10,12 @@ import json
 import os
 import random
 import re
+from copy import deepcopy
 
 from .. import config
+from ..recovery import (
+    SCHEMA_VERSION, check_version, require_str, require_bool, require_list,
+)
 from . import prompts
 from .brain import Brain, Speech
 from .llm import LLMClient
@@ -26,7 +30,9 @@ class StrategicNPCAgent:
     """Presentation and persistence adapter for the shared Brain."""
 
     def __init__(self, name: str, engine, llm: LLMClient,
-                 memory_dir: str | None = None):
+                 memory_dir: str | None = None,
+                 private_rng: random.Random | None = None,
+                 emit_start: bool = True):
         self.name = name
         self.engine = engine
         self.llm = llm
@@ -37,11 +43,15 @@ class StrategicNPCAgent:
         self.role_cn = self.seat.role_cn
         self.is_wolf = self.seat.is_wolf
         self.memory = self._load_memory()
-        private_rng = random.Random(engine.rng.randrange(1, 2 ** 31))
+        # A restore rebuild must not consume the shared engine RNG, so an
+        # explicit seed lets that path inject a throwaway generator instead.
+        if private_rng is None:
+            private_rng = random.Random(engine.rng.randrange(1, 2 ** 31))
         self.brain = Brain(
             self.seat, engine, self.persona, private_rng,
             cognitive_state=self.memory.get("cognition"),
             match_carry=self.memory.get("match_carry"),
+            emit_start=emit_start,
         )
         self.reasoning: list[str] = []
 
@@ -198,3 +208,51 @@ class StrategicNPCAgent:
         if kind == "witch":
             return {"save": decision.save, "poison": decision.poison}
         return {"target": decision.target}
+
+    # ================================================== 快照 / 恢复
+    def snapshot(self) -> dict:
+        """Whitelisted per-agent private state (seat/persona/llm are re-derived)."""
+        return deepcopy({
+            "schema_version": SCHEMA_VERSION,
+            "name": self.name,
+            "role_cn": self.role_cn,
+            "is_wolf": self.is_wolf,
+            "brain": self.brain.snapshot(),
+            "reasoning": self.reasoning,
+        })
+
+    def restore(self, data: dict) -> None:
+        where = "StrategicNPCAgent.snapshot"
+        check_version(data, where)
+        data = deepcopy(data)
+        name = require_str(data, "name", where, allow_empty=False)
+        role_cn = require_str(data, "role_cn", where)
+        is_wolf = require_bool(data, "is_wolf", where)
+        reasoning = require_list(data, "reasoning", where)
+        if any(not isinstance(line, str) for line in reasoning):
+            raise ValueError(f"{where}: reasoning must be an array of strings")
+        # Validate the brain before touching any field.
+        self.brain.restore(data["brain"])
+        self.name = name
+        self.role_cn = role_cn
+        self.is_wolf = is_wolf
+        self.reasoning = reasoning
+
+    @classmethod
+    def restore_agent(cls, snapshot: dict, engine, llm: LLMClient,
+                      memory_dir: str | None = None) -> "StrategicNPCAgent":
+        """Rebuild an agent from a snapshot without disturbing the engine.
+
+        Normal construction seeds each brain's private RNG from ``engine.rng``
+        and emits a ``match_start`` ledger event.  Recovery must do neither:
+        the engine has already been restored, and both values come from the
+        snapshot.  This entry constructs with a throwaway RNG and no start
+        event, so the engine's RNG and history are left byte-identical.
+        """
+        check_version(snapshot, "StrategicNPCAgent.snapshot")
+        name = require_str(snapshot, "name", "StrategicNPCAgent.snapshot",
+                           allow_empty=False)
+        agent = cls(name, engine, llm, memory_dir=memory_dir,
+                    private_rng=random.Random(0), emit_start=False)
+        agent.restore(snapshot)
+        return agent

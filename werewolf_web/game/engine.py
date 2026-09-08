@@ -8,11 +8,16 @@ from __future__ import annotations
 import json
 import os
 import random
+from copy import deepcopy
 from typing import Optional
 
 from .models import Seat, GameEvent, WOLF_ROLES
 from ..i18n import cast, normalize_locale, role_name, role_desc, t, list_sep, board_display, board_role_name, witch_rule_text
 from ..casting import random_names, assign_personas
+from ..recovery import (
+    SCHEMA_VERSION, check_version, decode_rng, encode_rng,
+    require_str, require_int, require_bool, require_dict, require_list,
+)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BOARDS_PATH = os.path.join(BASE_DIR, "data", "boards.json")
@@ -23,6 +28,10 @@ with open(BOARDS_PATH, "r", encoding="utf-8") as f:
     _BOARDS = json.load(f)
 BOARD_MAP = {b["id"]: b for b in _BOARDS["boards"]}
 ROLE_META = _BOARDS["roles"]
+
+# 引擎阶段白名单：引擎本体 (prep/night/dawn/day) + 会话层注入的阶段
+# (onboarding/election/vote)。restore 只接受这些真实存在的阶段。
+PHASES = ("prep", "onboarding", "night", "dawn", "day", "election", "vote")
 
 
 def role_info(key: str) -> dict:
@@ -524,3 +533,214 @@ class GameEngine:
             "seer_results": self.seer_results if ps.role == "seer" else [],
             "grave_results": self.grave_results if ps.role == "gravekeeper" else [],
         }
+
+    # ---------- 快照 / 恢复 ----------
+    def snapshot(self) -> dict:
+        """Whitelisted engine checkpoint (identity + skill state + ledger + RNG).
+
+        ``board`` / witch rules are re-derived from ``board_id``; nothing here is
+        a live reference, credential, or transient queue.
+        """
+        return deepcopy({
+            "schema_version": SCHEMA_VERSION,
+            "board_id": self.board_id,
+            "locale": self.locale,
+            "player_role": self.player_role,
+            "cast_names": self.cast_names,
+            "cast_personas": self.cast_personas,
+            "seats": [seat.to_dict() for seat in self.seats.values()],
+            "phase": self.phase,
+            "day_count": self.day_count,
+            "night_count": self.night_count,
+            "sheriff": self.sheriff,
+            "winner": self.winner,
+            "end_reason": self.end_reason,
+            "witch_antidote": self.witch_antidote,
+            "witch_poison": self.witch_poison,
+            "guard_last": self.guard_last,
+            "knight_used": self.knight_used,
+            "crow_used_day": self.crow_used_day,
+            "charmed": self.charmed,
+            "last_exiled": self.last_exiled,
+            "last_exiled_wolf": self.last_exiled_wolf,
+            "crow_target": self.crow_target,
+            "evil_knight_reflection_used": self.evil_knight_reflection_used,
+            "seer_results": self.seer_results,
+            "sg_results": self.sg_results,
+            "grave_results": self.grave_results,
+            "history": [event.to_dict() for event in self.history],
+            "rng": encode_rng(self.rng),
+        })
+
+    def restore(self, data: dict) -> None:
+        """Restore engine state in place from a whitelisted snapshot.
+
+        Validate-then-apply: the board, role set, RNG, seats, and ledger are
+        all checked and re-derived before any attribute is replaced, so a
+        corrupt snapshot cannot leave a half-restored engine.
+        """
+        where = "GameEngine.snapshot"
+        check_version(data, where)
+        data = deepcopy(data)
+
+        # ---- validate (no mutation) ----
+        board_id = require_str(data, "board_id", where, allow_empty=False)
+        if board_id not in BOARD_MAP:
+            raise ValueError(f"{where}: unknown board {board_id!r}")
+        board = BOARD_MAP[board_id]
+        locale = require_str(data, "locale", where)
+        player_role = data.get("player_role")
+        if player_role is not None and not isinstance(player_role, str):
+            raise ValueError(f"{where}: player_role must be a string or null")
+        if player_role is not None and player_role not in board["roles"]:
+            raise ValueError(f"{where}: unknown player_role {player_role!r}")
+        cast_names = require_dict(data, "cast_names", where)
+        cast_personas = require_dict(data, "cast_personas", where)
+        phase = require_str(data, "phase", where)
+        if phase not in PHASES:
+            raise ValueError(f"{where}: unknown phase {phase!r}")
+        day_count = require_int(data, "day_count", where, minimum=0)
+        night_count = require_int(data, "night_count", where, minimum=0)
+
+        def opt_int(key):
+            value = data.get(key)
+            if value is not None and (type(value) is not int or isinstance(value, bool)):
+                raise ValueError(f"{where}: {key!r} must be an integer or null")
+            return value
+
+        def opt_str(key):
+            value = data.get(key)
+            if value is not None and not isinstance(value, str):
+                raise ValueError(f"{where}: {key!r} must be a string or null")
+            return value
+
+        def opt_bool(key):
+            value = data.get(key)
+            if value is not None and type(value) is not bool:
+                raise ValueError(f"{where}: {key!r} must be a boolean or null")
+            return value
+
+        sheriff = opt_int("sheriff")
+        guard_last = opt_int("guard_last")
+        crow_used_day = opt_int("crow_used_day")
+        crow_target = opt_int("crow_target")
+        winner = opt_str("winner")
+        if winner is not None and winner not in ("god", "wolf", "draw"):
+            raise ValueError(f"{where}: unknown winner {winner!r}")
+        end_reason = require_str(data, "end_reason", where)
+        charmed = opt_str("charmed")
+        last_exiled = opt_str("last_exiled")
+        last_exiled_wolf = opt_bool("last_exiled_wolf")
+        witch_antidote = require_bool(data, "witch_antidote", where)
+        witch_poison = require_bool(data, "witch_poison", where)
+        knight_used = require_bool(data, "knight_used", where)
+        evil_knight_reflection_used = require_bool(data, "evil_knight_reflection_used", where)
+
+        seats_data = require_list(data, "seats", where)
+        seats = {}
+        player_positions = []
+        for entry in seats_data:
+            if not isinstance(entry, dict):
+                raise ValueError(f"{where}: seats entries must be objects")
+            seat = Seat.from_dict(entry)
+            if type(seat.pos) is not int or isinstance(seat.pos, bool):
+                raise ValueError(f"{where}: seat pos must be an integer")
+            if seat.pos < 1 or seat.pos > 12:
+                raise ValueError(f"{where}: seat pos out of range 1..12: {seat.pos!r}")
+            if seat.pos in seats:
+                raise ValueError(f"{where}: duplicate seat position {seat.pos}")
+            if seat.role not in ROLE_META:
+                raise ValueError(f"{where}: unknown role {seat.role!r}")
+            # 阵营/狼属标记必须与角色一致，否则会被静默改成错误阵营。
+            if type(seat.is_wolf) is not bool:
+                raise ValueError(f"{where}: seat {seat.pos} is_wolf must be a boolean")
+            if seat.is_wolf != (seat.role in WOLF_ROLES):
+                raise ValueError(
+                    f"{where}: seat {seat.pos} is_wolf {seat.is_wolf!r} "
+                    f"contradicts role {seat.role!r}")
+            if seat.faction != role_info(seat.role)["faction"]:
+                raise ValueError(
+                    f"{where}: seat {seat.pos} faction {seat.faction!r} "
+                    f"contradicts role {seat.role!r}")
+            # 真人标记必须跟随稳定的 player_id，且全局恰好一名真人。
+            if type(seat.is_player) is not bool:
+                raise ValueError(f"{where}: seat {seat.pos} is_player must be a boolean")
+            if seat.is_player != (seat.player_id == PLAYER_ID):
+                raise ValueError(
+                    f"{where}: seat {seat.pos} is_player {seat.is_player!r} "
+                    f"contradicts player_id {seat.player_id!r}")
+            if seat.is_player:
+                player_positions.append(seat.pos)
+            seat.emoji = role_info(seat.role)["emoji"]
+            seats[seat.pos] = seat
+        if not seats:
+            # 未发牌的 prep 阶段：合法空阵容（尚未 setup() 发牌）。
+            if phase != "prep":
+                raise ValueError(
+                    f"{where}: empty seats are only legal in the undealt "
+                    f"prep phase, got phase {phase!r}")
+        else:
+            if phase == "prep":
+                raise ValueError(
+                    f"{where}: prep phase must have an empty (undealt) roster")
+            if sorted(seats) != list(range(1, 13)):
+                raise ValueError(
+                    f"{where}: seats must cover positions 1..12 exactly once")
+            if len(player_positions) != 1:
+                raise ValueError(
+                    f"{where}: exactly one human seat required, "
+                    f"got {len(player_positions)}")
+            if sorted(seat.role for seat in seats.values()) != sorted(board["roles"]):
+                raise ValueError(f"{where}: seat roles do not match the board roster")
+
+        def result_list(key):
+            items = require_list(data, key, where)
+            for entry in items:
+                if not isinstance(entry, dict):
+                    raise ValueError(f"{where}: {key} entries must be objects")
+            return [dict(entry) for entry in items]
+
+        seer_results = result_list("seer_results")
+        sg_results = result_list("sg_results")
+        grave_results = result_list("grave_results")
+
+        history_data = require_list(data, "history", where)
+        history = []
+        for entry in history_data:
+            if not isinstance(entry, dict):
+                raise ValueError(f"{where}: history entries must be objects")
+            history.append(GameEvent.from_dict(entry))
+
+        rng = decode_rng(data.get("rng"))
+
+        # ---- apply ----
+        self.board_id = board_id
+        self.board = board
+        self.witch_unlimited = board.get("witch_rules", {}).get("unlimited", False)
+        self.witch_dual = board.get("witch_rules", {}).get("dual", False)
+        self.player_role = player_role
+        self.locale = locale
+        self.cast_names = cast_names
+        self.cast_personas = cast_personas
+        self.seats = seats
+        self.history = history
+        self.phase = phase
+        self.day_count = day_count
+        self.night_count = night_count
+        self.sheriff = sheriff
+        self.winner = winner
+        self.end_reason = end_reason
+        self.witch_antidote = witch_antidote
+        self.witch_poison = witch_poison
+        self.guard_last = guard_last
+        self.knight_used = knight_used
+        self.crow_used_day = crow_used_day
+        self.charmed = charmed
+        self.last_exiled = last_exiled
+        self.last_exiled_wolf = last_exiled_wolf
+        self.crow_target = crow_target
+        self.evil_knight_reflection_used = evil_knight_reflection_used
+        self.seer_results = seer_results
+        self.sg_results = sg_results
+        self.grave_results = grave_results
+        self.rng = rng

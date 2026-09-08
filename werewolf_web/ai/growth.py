@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from ..recovery import SCHEMA_VERSION, check_version, require_number, require_int
+
 
 def _clamp(value: float, low: float = 0.05, high: float = 0.95) -> float:
     return max(low, min(high, value))
@@ -103,3 +105,20 @@ class CognitiveProfile:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+    def snapshot(self) -> dict:
+        """Versioned recovery snapshot; ``to_dict`` stays a plain field map."""
+        return {"schema_version": SCHEMA_VERSION, **self.to_dict()}
+
+    @classmethod
+    def restore(cls, data: dict) -> "CognitiveProfile":
+        where = "CognitiveProfile.snapshot"
+        check_version(data, where)
+        kwargs = {}
+        for key in ("evidence_processing", "recursive_reasoning", "social_reading",
+                    "deception", "calibration", "decisiveness", "learning_rate"):
+            kwargs[key] = require_number(data, key, where, 0.0, 1.0)
+        kwargs["preferred_depth"] = require_int(data, "preferred_depth", where, 1, 5)
+        kwargs["max_depth"] = require_int(data, "max_depth", where, 1, 5)
+        kwargs["experience"] = require_int(data, "experience", where, minimum=0)
+        return cls(**kwargs)

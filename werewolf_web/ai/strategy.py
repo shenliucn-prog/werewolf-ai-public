@@ -7,6 +7,7 @@ without coupling strategy to either the CLI or web presentation layer.
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, Optional
 from ..i18n import witch_rule_text
@@ -124,6 +125,15 @@ class DecisionAlternative:
     utility: float
     components: dict[str, float] = field(default_factory=dict)
 
+    def to_dict(self) -> dict:
+        return {"target": self.target, "utility": self.utility,
+                "components": deepcopy(self.components)}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "DecisionAlternative":
+        return cls(data["target"], data["utility"],
+                   deepcopy(data.get("components") or {}))
+
 
 @dataclass
 class DecisionTrace:
@@ -140,6 +150,42 @@ class DecisionTrace:
     confidence: float = 0.0
     overthought: bool = False
     state_snapshot: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        return {
+            "actor": self.actor,
+            "phase": self.phase,
+            "day": self.day,
+            "night": self.night,
+            "action": self.action,
+            "target": self.target,
+            "reasoning_depth": self.reasoning_depth,
+            "rationale": self.rationale,
+            "beliefs": deepcopy(self.beliefs),
+            "alternatives": [alt.to_dict() for alt in self.alternatives],
+            "confidence": self.confidence,
+            "overthought": self.overthought,
+            "state_snapshot": deepcopy(self.state_snapshot),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "DecisionTrace":
+        return cls(
+            actor=data["actor"],
+            phase=data["phase"],
+            day=data["day"],
+            night=data["night"],
+            action=data["action"],
+            target=data["target"],
+            reasoning_depth=data["reasoning_depth"],
+            rationale=data["rationale"],
+            beliefs=deepcopy(data.get("beliefs") or {}),
+            alternatives=[DecisionAlternative.from_dict(alt)
+                          for alt in data.get("alternatives", [])],
+            confidence=data.get("confidence", 0.0),
+            overthought=data.get("overthought", False),
+            state_snapshot=deepcopy(data.get("state_snapshot") or {}),
+        )
 
 
 @dataclass
