@@ -151,7 +151,9 @@ class CodexPlayerTest(unittest.IsolatedAsyncioTestCase):
         event = session.event_q.get_nowait()
         self.assertEqual(event["type"], "error")
         self.assertNotIn("PRIVATE_CANARY", json.dumps(event))
-        self.assertTrue(session.finished)
+        # A model fault is recoverable, not a finished game (CAMPAIGN_DESIGN §3.3).
+        self.assertTrue(session.faulted)
+        self.assertFalse(session.finished)
         self.assertIsNone(session.pending)
 
     def test_board_selection_precedes_launch(self):

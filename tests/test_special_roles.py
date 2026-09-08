@@ -268,7 +268,10 @@ class SpecialSessionTest(unittest.IsolatedAsyncioTestCase):
                             self.assertTrue(session.submit(action))
                     self.assertTrue(seen_skill, (key, locale))
                     self.assertEqual(seen_first_day_vote, key == "crow")
-                    self.assertEqual(events[-1]["type"], "gameover")
+                    # The endgame commit (gameover) lands first; the review is a
+                    # separate, retryable step emitted after it.
+                    self.assertEqual(events[-1]["type"], "review")
+                    self.assertTrue(any(e["type"] == "gameover" for e in events))
 
     def session(self, board, locale="en"):
         session = GameSession(board, {"enabled": False}, seed=7, locale=locale)

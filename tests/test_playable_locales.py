@@ -65,8 +65,9 @@ class PlayableLocalesTest(unittest.IsolatedAsyncioTestCase):
                             finally:
                                 await stream.aclose()
                             self.assertEqual(events[0]["type"], "init")
-                            self.assertEqual(events[-1]["type"], "gameover")
-                            self.assertTrue(any(e["type"] == "review" for e in events))
+                            # Endgame commits (gameover) first; the review follows.
+                            self.assertEqual(events[-1]["type"], "review")
+                            self.assertTrue(any(e["type"] == "gameover" for e in events))
                             self.assertIn(session.engine.winner, ("god", "wolf"))
                             self.assertTrue(session.finished)
 
@@ -81,7 +82,9 @@ class PlayableLocalesTest(unittest.IsolatedAsyncioTestCase):
                 self.assertLogs("werewolf_web.session", level="ERROR"):
             events = [event async for event in session.events()]
         self.assertEqual(events[0]["type"], "error")
-        self.assertTrue(session.finished)
+        # An initialization failure is a recoverable fault, not a finished game.
+        self.assertTrue(session.faulted)
+        self.assertFalse(session.finished)
 
     async def test_invalid_or_duplicate_input_does_not_advance_the_game(self):
         session = GameSession("classic", {"enabled": False}, locale="en")

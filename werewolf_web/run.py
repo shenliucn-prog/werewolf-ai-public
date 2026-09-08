@@ -20,6 +20,9 @@ from fastapi.staticfiles import StaticFiles
 
 from . import config
 from . import checkpoint
+from . import campaign_flow
+from . import settings as user_settings
+from .campaign import LEVELS
 from .ai.llm import LLMClient, LLMRuntimeConfig
 from .ai.decision_runtime import ModelTurnError, create_runtime
 from .ai.host import HostAgent
@@ -37,6 +40,14 @@ GAMES: dict[str, "GameSession"] = {}
 # each register their own live instance.  ``restore_game`` double-checks inside
 # the lock, so the already-live fast path stays lock-free.
 _RESTORE_LOCKS: dict[str, asyncio.Lock] = {}
+
+
+def _resolve_llm(body: dict):
+    """Use the request's llm options, or fall back to the saved local settings."""
+    llm = body.get("llm")
+    if llm:
+        return llm
+    return user_settings.load_settings()
 
 
 async def restore_game(game_id: str):
@@ -83,6 +94,10 @@ async def restore_game(game_id: str):
                                  session_id=game_id, planner=planner,
                                  checkpoint_path=path, _defer_preflight=True)
             runner.restore(payload)
+            if runner.campaign_profile and not campaign_flow.resume(
+                    runner.campaign_profile, game_id, runner):
+                # abandoned (or reconciled-and-refused): never revive it.
+                return None
             if planner is not None:
                 planner.reserve()
                 runner._checkpoint()
@@ -126,8 +141,9 @@ async def start(req: Request):
     body = await _json_object(req)
     board_id = body.get("board_id", "classic")
     game_id = secrets.token_urlsafe(18)
+    llm = _resolve_llm(body)
     try:
-        runner = GameSession(board_id, body.get("llm"), session_id=game_id,
+        runner = GameSession(board_id, llm, session_id=game_id,
                              locale=body.get("locale", "zh-CN"), names=body.get("names"),
                              personalities=body.get("personalities"),
                              conjecture=body.get("conjecture", False),
@@ -135,12 +151,14 @@ async def start(req: Request):
                              checkpoint_path=checkpoint.checkpoint_path(game_id))
         # Only explicit offline selection bypasses a real-model preflight.
         # Runtime commands come from trusted local configuration, never HTTP.
-        offline = isinstance(body.get("llm"), dict) and body["llm"].get("enabled") is False
+        offline = isinstance(llm, dict) and llm.get("enabled") is False
         if not offline:
             if runner.conjecture:
                 raise ValueError("Model-player conjecture tables are not yet integrated; choose normal mode.")
-            planner = create_runtime(backend="api" if body.get("llm") else None, options=body.get("llm"))
+            planner = create_runtime(**user_settings.runtime_kwargs(llm if isinstance(llm, dict) else None))
             await asyncio.to_thread(planner.preflight)
+            if llm:
+                user_settings.save_settings(llm)
             runner.planner = planner
             runner.llm = LLMClient(LLMRuntimeConfig.from_request({"enabled": False}))
             runner.host = HostAgent(runner.llm, locale=runner.engine.locale)
@@ -151,6 +169,124 @@ async def start(req: Request):
     GAMES[game_id] = runner
     return {"ok": True, "game_id": game_id,
             "llm_status": runner._model_status()}
+
+
+# ---------------- 闯关入口 ----------------
+
+
+@app.post("/api/campaign/start")
+async def campaign_start(req: Request):
+    """Start a campaign attempt for a level role: register ``preparing``, deal a
+    fixed-board game, then count/settle via the progress hook."""
+    body = await _json_object(req)
+    profile_id = body.get("profile_id", "default")
+    role = body.get("role")
+    level = next((l for l in LEVELS if l["role"] == role), None)
+    if level is None:
+        raise HTTPException(status_code=422, detail="Unknown campaign role.")
+    board_id = level["board"]
+    game_id = secrets.token_urlsafe(18)
+    llm = _resolve_llm(body)
+    offline = isinstance(llm, dict) and llm.get("enabled") is False
+    try:
+        # Offline simulation is an explicit choice and never counts toward
+        # campaign progress: no archive registration, no progress hook.
+        if not offline:
+            campaign_flow.begin_attempt(profile_id, game_id, role, board_id, config=llm)
+        runner = GameSession(board_id, llm, session_id=game_id,
+                             locale=body.get("locale", "zh-CN"),
+                             player_role=role, onboarding=True,
+                             checkpoint_path=checkpoint.checkpoint_path(game_id))
+        runner.campaign_counted = not offline
+        if not offline:
+            planner = create_runtime(**user_settings.runtime_kwargs(llm if isinstance(llm, dict) else None))
+            await asyncio.to_thread(planner.preflight)
+            if llm:
+                user_settings.save_settings(llm)
+            runner.planner = planner
+            runner.llm = LLMClient(LLMRuntimeConfig.from_request({"enabled": False}))
+            runner.host = HostAgent(runner.llm, locale=runner.engine.locale)
+            runner.campaign_profile = profile_id
+            runner._checkpoint()                      # initial (uninitialized) save
+            runner.progress_hook = campaign_flow.progress_hook(profile_id, game_id)
+    except ModelTurnError:
+        raise HTTPException(status_code=503, detail="LLM connection check failed.") from None
+    except (ValueError, KeyError, TypeError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    GAMES[game_id] = runner
+    return {"ok": True, "game_id": game_id, "role": role, "board_id": board_id,
+            "counted": not offline}
+
+
+@app.get("/api/campaign/status")
+async def campaign_status(profile_id: str = "default"):
+    """The current campaign level (role/board/goal) and unlocked index."""
+    profile = campaign_flow.load_profile(profile_id)
+    idx = min(profile["unlocked"], len(LEVELS) - 1)
+    level = LEVELS[idx]
+    return {"ok": True, "profile_id": profile_id, "unlocked": profile["unlocked"],
+            "role": level["role"], "board_id": level["board"],
+            "goal_cn": level["goal_cn"], "goal_en": level["goal_en"]}
+
+
+@app.get("/api/campaign/teaching")
+async def campaign_teaching(profile_id: str = "default", game_id: str = ""):
+    """The first-entry role teaching for the current campaign level.  Retryable:
+    a cache hit returns instantly; a miss generates once (charging budget) and
+    persists the reservation before the request.  Never re-registers the attempt."""
+    if not game_id:
+        raise HTTPException(status_code=422, detail="game_id is required.")
+    runner = await restore_game(game_id)
+    if not runner:
+        raise HTTPException(status_code=404, detail="No such game.")
+    role = runner.engine.player_role
+    if role not in {level["role"] for level in LEVELS}:
+        raise HTTPException(status_code=422, detail="Not a campaign level role.")
+    model = getattr(runner.planner, "model", None) or "campaign"
+    try:
+        event = campaign_flow.generate_teaching(runner, role, model)
+    except (ValueError, TypeError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return {"ok": True, "game_id": game_id, "role": role, **event}
+
+
+@app.post("/api/campaign/review")
+async def campaign_review_retry(req: Request):
+    """Regenerate a failed post-loss short review (charges budget; never re-settles)."""
+    body = await _json_object(req)
+    game_id = body.get("game_id", "")
+    if not game_id:
+        raise HTTPException(status_code=422, detail="game_id is required.")
+    runner = await restore_game(game_id)
+    if not runner:
+        raise HTTPException(status_code=404, detail="No such game.")
+    if not runner.campaign_profile:
+        raise HTTPException(status_code=404, detail="Not a campaign game.")
+    if not runner.finished:
+        raise HTTPException(status_code=409, detail="Game is not finished.")
+    try:
+        event = campaign_flow.generate_campaign_review(runner)
+    except (ValueError, TypeError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    if event is None:
+        return {"ok": True, "game_id": game_id, "review": None}
+    return {"ok": True, "game_id": game_id, **event}
+
+
+@app.get("/api/campaign/resume")
+async def campaign_resume(profile_id: str = "default", game_id: str = ""):
+    """Resume a campaign attempt: reconcile the archive against the save, then
+    reattach the progress hook so a finished game still settles."""
+    status, _archive = campaign_flow.resume_game(profile_id, game_id)
+    if status == "corrupt":
+        raise HTTPException(status_code=409, detail="Save is corrupt; cannot resume.")
+    if status == "missing":
+        raise HTTPException(status_code=404, detail="No such game.")
+    runner = await restore_game(game_id)
+    if not runner:
+        raise HTTPException(status_code=404, detail="No such game.")
+    runner.progress_hook = campaign_flow.progress_hook(profile_id, game_id)
+    return {"ok": True, "status": status, "view": runner.recovery_view(0)}
 
 
 @app.get("/api/cast")
@@ -205,6 +341,10 @@ async def leave(req: Request):
     runner = GAMES.get(game_id)
     if not runner:
         return {"ok": False, "error": "no game"}
+    # Settle an explicit abandon *before* deleting the game, so the attempt is
+    # recorded (abandoned, or dropped if never started) and can be reconciled.
+    if runner.campaign_profile:
+        campaign_flow.abandon_game(runner.campaign_profile, game_id)
     runner.abandon()
     GAMES.pop(game_id, None)
     _RESTORE_LOCKS.pop(game_id, None)
