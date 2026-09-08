@@ -77,7 +77,8 @@ object, which would drag in references, transient queues, and credentials.
 Durable:
 
 - `conjecture`, `onboarding`, `memory_dir`, `finished`
-- `public_record.entries` (rebuildable from `history`, cheap to store directly)
+- `public_record.entries` (stored directly — do not assume rebuildable from
+  `history`; the two capture different scopes)
 - `conjecture_ledger` — `history`, `private`, `roster`, `options`, `labels`
   (when conjecture mode is on)
 - table-talk state — `_table_extra_turns`, `_table_extra_by_name`, `_table_pairs`,
@@ -131,7 +132,9 @@ restore (section 7).
   `WEREWOLF_AGENT_COMMAND` and validated on restore.
 - **codex** (`CodexPlayerRuntime`): persist `model`, `effort`, `max_calls`,
   `timeout`, `calls`. No credential is stored (it uses the existing local Codex
-  login); only the `codex` binary's presence on PATH is re-checked.
+  login). On restore, the `codex` binary's presence on PATH is re-checked and the
+  Codex connection is re-verified — liveness is never trusted from the save
+  (section 7).
 - **legacy expression** (`LLMClient`, host narration and NPC rephrasing on the
   `planner is None` path): persist `calls`, `failures`, `unavailable_reason`,
   and its `runtime` config (`base_url`, `model`, `temperature`,
