@@ -106,3 +106,29 @@ def load_checkpoint(path: str) -> dict:
         raise ValueError(
             "checkpoint: checksum mismatch — refusing to resume a corrupt save")
     return payload
+
+
+def probe_checkpoint(game_id: str):
+    """Distinguish the three save states a resume must treat differently.
+
+    Returns ``("missing", None)`` (no file — genuinely never started),
+    ``("corrupt", None)`` (file exists but fails to parse/verify, or its
+    ``session_id`` does not match), ``("uninitialized", payload)`` (valid save
+    whose engine was never dealt), or ``("ok", payload)``.
+    """
+    try:
+        path = checkpoint_path(game_id)
+    except ValueError:
+        return "missing", None
+    if not os.path.exists(path):
+        return "missing", None
+    try:
+        payload = load_checkpoint(path)
+    except ValueError:
+        return "corrupt", None
+    if payload.get("session_id") != game_id:
+        return "corrupt", None
+    engine = payload.get("engine")
+    if isinstance(engine, dict) and not engine.get("seats"):
+        return "uninitialized", payload
+    return "ok", payload

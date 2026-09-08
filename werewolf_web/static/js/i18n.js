@@ -60,7 +60,11 @@ const EN = {
   "投票选警长": "Vote for sheriff", "确认投票": "Confirm vote", "确认": "Confirm",
   "救人": "Antidote", "不救": "Do not save", "毒人": "Poison", "不毒": "Do not poison",
   "连接断开": "Connection closed", "对局结束": "Game finished",
+  "复盘暂不可用，可稍后重试。": "The review is unavailable; retry later.",
+  "开始闯关": "Start campaign", "继续游戏": "Continue game",
   "操作发送失败，请重试。": "Could not send your action. Please retry.",
+  "重新生成短复盘": "Regenerate short review",
+  "重新生成角色教学": "Regenerate teaching",
   "不能同夜使用两瓶药。": "Use at most one potion per night."
 };
 function tr(text) { return uiLocale === "en" ? (EN[text] || text) : text; }

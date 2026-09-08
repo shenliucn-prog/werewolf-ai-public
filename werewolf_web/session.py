@@ -50,6 +50,17 @@ class GameSession:
             raise ValueError("Model-player conjecture tables are not yet integrated; choose normal mode.")
         self.planner = planner
         self.session_id = session_id
+        # Campaign association (durable): the profile this game settles into, or
+        # None for a free-play game.  Lets a restored game re-attach its hook.
+        self.campaign_profile = None
+        # Whether this campaign game counts toward progression (False for an
+        # explicit offline simulation).  Durable, so reconnect keeps the label.
+        self.campaign_counted = None
+        # Durable post-loss short-review state for a campaign game: None (not yet
+        # generated), "done", or "unavailable".  Snapshotted so a restore knows a
+        # finished review already ran and never re-triggers (or re-charges) it —
+        # only an explicit retry re-requests.
+        self.campaign_review_state = None
         # Optional recovery sink: when set, the game writes checkpoints at turn
         # boundaries and around every external call; None disables persistence.
         self.checkpoint_path = checkpoint_path
@@ -122,6 +133,12 @@ class GameSession:
         # Abandon (§7) removes the on-disk save; the game-task finalizer must not
         # re-write a checkpoint after that removal.  Transient, never snapshotted.
         self._abandoned = False
+        # Recoverable fault (§3.3): a model/internal error paused the game.  The
+        # game is NOT finished and stays resumable; transient, never snapshotted.
+        self.faulted = False
+        # Optional lifecycle hook called after every durable checkpoint with
+        # ``self`` (campaign wiring uses it to count/settle).  Transient.
+        self.progress_hook = None
 
     @property
     def q(self):
@@ -269,6 +286,9 @@ class GameSession:
             return
         from . import checkpoint as cp
         cp.save_checkpoint(self.checkpoint_path, self.snapshot())
+        hook = self.progress_hook
+        if hook is not None:
+            hook(self)
 
     def _commit_batch(self) -> None:
         """Atomically commit a recorded settlement batch, then publish it once.
@@ -325,6 +345,9 @@ class GameSession:
             "board_id": self.engine.board_id,
             "locale": self.engine.locale,
             "session_id": self.session_id,
+            "campaign_profile": self.campaign_profile,
+            "campaign_counted": self.campaign_counted,
+            "campaign_review_state": self.campaign_review_state,
             "conjecture": self.conjecture,
             "onboarding": self.onboarding,
             "engine": self.engine.snapshot(),
@@ -383,6 +406,10 @@ class GameSession:
         session_id = snapshot.get("session_id")
         if not isinstance(session_id, str) or not session_id:
             raise ValueError("GameSession.snapshot: session_id must be a non-empty string")
+        review_state = snapshot.get("campaign_review_state")
+        if review_state not in (None, "done", "unavailable"):
+            raise ValueError(
+                "GameSession.snapshot: campaign_review_state must be null, 'done' or 'unavailable'")
 
         planner_snap = snapshot.get("planner")
         if planner_snap is not None:
@@ -494,6 +521,15 @@ class GameSession:
 
         # Session loop state (durable fields only).
         self.session_id = session_id
+        profile = snapshot.get("campaign_profile")
+        if profile is not None and not isinstance(profile, str):
+            raise ValueError("GameSession.snapshot: campaign_profile must be a string or null")
+        self.campaign_profile = profile
+        counted = snapshot.get("campaign_counted")
+        if counted is not None and not isinstance(counted, bool):
+            raise ValueError("GameSession.snapshot: campaign_counted must be a boolean or null")
+        self.campaign_counted = counted
+        self.campaign_review_state = review_state
         self.memory_dir = memory_dir
         self.conjecture = bool(snapshot.get("conjecture"))
         self.onboarding = bool(snapshot.get("onboarding"))
@@ -527,6 +563,8 @@ class GameSession:
         self._event_q = None
         self.stream_active = False
         self._game_task_ref = None
+        self.faulted = False
+        self.progress_hook = None
         # The restored ledger is already durable and re-presented by the
         # ``events(after)`` catch-up path, not the live queue.  Align the
         # publish cursor to the ledger end so a subsequent ``_flush_publish``
@@ -681,9 +719,22 @@ class GameSession:
         private = None
         if self.engine.seats:
             private = self.engine.player_view()
+        # Review status (§1/§7): "finished" alone means the winner is decided, not
+        # that the result stream is fully received.  A reattaching client must be
+        # able to distinguish "review pending" (crash before review ran) from
+        # "review done/unavailable" instead of treating finished as all-received.
+        review_status = None
+        if self.finished:
+            reviews = [e for e in self._events if e.get("type") == "review"]
+            if reviews:
+                review_status = "unavailable" if reviews[-1].get("unavailable") else "done"
+            else:
+                review_status = "pending"
         return {
             "game_id": self.session_id,
             "finished": self.finished,
+            "review_status": review_status,
+            "counted": self.campaign_counted,
             "init": self._init_event,
             "private": private,
             "public_events": public_events,
@@ -694,27 +745,60 @@ class GameSession:
         }
 
     async def _game_task(self):
+        # Re-entering the loop is the fault -> in_progress transition: a retry in
+        # the *same* process (no restore()) must not stay stuck in the "faulted"
+        # terminal view after it eventually ends.
+        self.faulted = False
         try:
             await self._play()
-        except ModelTurnError:
-            self.emit({"type": "error", "text": (
-                "Model decision failed, timed out or exceeded budget. Game stopped; no offline substitution. Resume is not supported."
-                if self.engine.locale == "en" else "模型决策失败、超时或调用额度耗尽。对局已停止，未切换离线玩家；目前不支持断线续局。")})
-        except Exception:
-            logging.getLogger(__name__).exception("Game session failed")
-            self.emit({"type": "error", "text": (
-                "The game stopped unexpectedly. Please start a new game."
-                if self.engine.locale == "en" else "对局意外中断，请重新开局。")})
-        finally:
+            # Normal endgame: _step_endgame already set finished=True.  Clear the
+            # now-stale prompt so a finished game shows no pending action.
             self.pending = None
             self._pending_event_no = None
-            self.finished = True
+        except ModelTurnError:
+            self._fault(
+                "Model decision failed, timed out or exceeded budget. The game is paused — fix the connection and rejoin to continue; no offline substitution."
+                if self.engine.locale == "en" else
+                "模型决策失败、超时或调用额度耗尽。对局已暂停，请检查连接后重连继续；未切换离线玩家。")
+        except Exception:
+            logging.getLogger(__name__).exception("Game session failed")
+            self._fault(
+                "The game paused due to an unexpected error; rejoin to continue or abandon this game."
+                if self.engine.locale == "en" else
+                "对局因意外错误暂停；可重连继续，或放弃本局。")
+        finally:
             self.event_q.put_nowait(_SENTINEL)
-            # Persist the finished flag (and any error event) so a restart does
-            # not re-present the game as still running.  Skipped on abandon: the
-            # caller removes the save, and a finalizer must not resurrect it.
+            # Persist the paused/faulted state (or the finished flag) so a restart
+            # resumes the exact position.  Skipped on abandon: the caller removes
+            # the save, and a finalizer must not resurrect it.
             if not self._abandoned:
                 self._checkpoint()
+
+    def _fault(self, text: str) -> None:
+        """Mark a recoverable fault (§3.3): pause, keep the resume position and
+        pending action, and do NOT finish — a fault is neither a loss nor a
+        settlement trigger."""
+        self.faulted = True
+        self.emit({"type": "error", "text": text})
+
+    @property
+    def terminal_state(self) -> str:
+        """Session-level attempt state (CAMPAIGN_DESIGN §3.3).
+
+        Only ``ended`` (normal endgame) and ``abandoned`` end the attempt.
+        ``faulted`` and ``paused`` are resumable and must not settle.  The
+        archive-level ``preparing`` / ``in_progress`` live in the campaign
+        archive, not here.
+        """
+        if self._abandoned:
+            return "abandoned"
+        if self.faulted:
+            return "faulted"
+        if self.finished:
+            return "ended"
+        if self.pending is not None:
+            return "paused"
+        return "in_progress"
 
     async def _npc_call(self, call, *args, action=None, **kwargs):
         if self.planner is None:
@@ -1061,20 +1145,50 @@ class GameSession:
 
     async def _step_endgame(self):
         e = self.engine
-        perf = self._npc_performances()
-        review = self.host.review(e, perf)
-        self.host.evolve(e, review)
-        for a in self.agents.values():
-            a.save_memory()
         reveal = "\n".join(f"#{s.pos} {s.name}: {s.role_cn}" for s in sorted(e.seats.values(), key=lambda s: s.pos))
-        review += "\n\n" + ("Final roles\n" if e.locale == "en" else "最终身份\n") + reveal
-        review += "\n\n" + self.public_record.query("/history")
-        self.emit({"type": "review", "text": review, "winner": e.winner})
+        # 1) Commit the normal endgame atomically, *before* any review runs: the
+        #    winner/reason, the final-role reveal and finished=True are durable
+        #    first.  A review failure (or a crash mid-review) must never leave a
+        #    finished game looking unfinished (CAMPAIGN_DESIGN §1 / §7).
         self.emit({"type": "gameover", "winner": e.winner, "reason": e.end_reason})
+        self.emit({"type": "narration",
+                   "text": ("Final roles\n" if e.locale == "en" else "最终身份\n") + reveal})
         self.finished = True
         self._step = None
-        # Final commit (§8.3): the terminal review/gameover events, the finished
-        # flag and the drained step cursor are durable before the game task exits.
+        self._checkpoint()
+        # 2) Campaign post-loss short review (§7): generated exactly once here,
+        #    after the game settled and *before* the host review, so a Web SSE
+        #    client receives it in order.  Guarded by the durable
+        #    ``campaign_review_state`` — a restore never re-triggers it, only an
+        #    explicit retry does.
+        if self.campaign_profile:
+            from . import campaign_flow
+            campaign_flow.generate_review_once(self)
+        # 3) The model review is a separate, retryable step after the commit.
+        await self._write_review(reveal)
+
+    async def _write_review(self, reveal: str):
+        """Generate and publish the post-game review, retryably.
+
+        Runs *after* the endgame commit: a failure here leaves the game finished
+        and settled, emits a fallback marker, and can be retried later — it never
+        re-faults or un-finishes the game.
+        """
+        e = self.engine
+        try:
+            perf = self._npc_performances()
+            review = self.host.review(e, perf)
+            self.host.evolve(e, review)
+            for a in self.agents.values():
+                a.save_memory()
+            review += "\n\n" + self.public_record.query("/history")
+            self.emit({"type": "review", "text": review, "winner": e.winner})
+        except Exception:
+            logging.getLogger(__name__).exception("Endgame review failed")
+            self.emit({"type": "review",
+                       "text": ("The review is temporarily unavailable; retry later."
+                                if e.locale == "en" else "复盘暂不可用，可稍后重试。"),
+                       "winner": e.winner, "unavailable": True})
         self._checkpoint()
 
     async def _conjecture_round(self):

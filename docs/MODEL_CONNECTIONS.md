@@ -72,8 +72,9 @@ Agent configuration is rewritten. Server owners may explicitly set
 
 Preflight failure creates no playable game. A failed NPC decision pauses the
 live game at that exact call; the player can retry or stop. Already accepted
-actions are not rerun. Budgets still apply on retries. Closing the process still
-loses the game: disk resume is not implemented.
+actions are not rerun. Budgets still apply on retries. Interrupted games can be restored with `chat_game --resume GAME_ID` or browser
+reconnect. Keep trusted model credentials available; corrupted or missing saves
+may not be recoverable. Offline campaign simulations never count toward progress.
 
 `--offline` / explicit browser offline selection is a **rule-flow test**, not LLM
 gameplay. `--backend legacy` is the old rule planner with optional rephrasing.

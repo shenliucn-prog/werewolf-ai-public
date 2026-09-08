@@ -12,9 +12,10 @@ All normal interfaces share provider-neutral model decisions (normal mode
 only), with real preflight and no silent fallback. API, local model servers and
 trusted Agent protocol adapters are supported; Codex is optional. Only explicit
 legacy/offline selections use local rule decisions. Model conjecture tables and
-cross-game learning are not yet integrated. Full public history is included every turn without truncation;
-long games can be slow or exceed context/account budgets. Failure pauses at the same decision for explicit retry/stop. Disk resume is
-not implemented; process loss still loses the game. Structural
+cross-game learning are not yet integrated. Model requests use bounded context rather than full verbatim history;
+older details may be omitted, while full records remain in local saves. Long
+games can still be slow or exhaust call budgets. Failure pauses for explicit
+retry/stop. Checkpoint recovery and browser reconnect are implemented. Structural
 validation does not prove semantic consistency, truthfulness or balance.
 
 The common flow includes night actions, dawn/death announcements, first-day sheriff voting, statements, bounded table interruptions, exile voting, and victory checks. Seer checks, Witch potions, guarding, ordinary wolf kills, Hunter/Wolf King shots, Wolf Beauty charm, Bomber exile explosions, Hidden Wolf checks, and Evil Knight reflection have implementation paths, with remaining edge cases below.
@@ -52,7 +53,11 @@ day-ability flow and must not be used as evidence of browser/chat rule parity.
 
 ## Hosting and persistence
 
-Games are in-memory, single-process sessions. A restart or closed event stream ends the session; reconnect/resume is not implemented. There is no account system, production deployment configuration, durable database, or automatic memory retention/cleanup policy. Use the server locally; see [SECURITY.md](../SECURITY.md).
+Live sessions run in one process, with local checkpoints for restart recovery
+and browser reconnect. Campaign progress is stored separately and reconciled by
+game id. Missing or corrupt saves may prevent recovery. There is no account
+system, production deployment configuration, database service, or automatic
+memory retention/cleanup policy. Use the server locally; see [SECURITY.md](../SECURITY.md).
 
 ## What the tests establish
 

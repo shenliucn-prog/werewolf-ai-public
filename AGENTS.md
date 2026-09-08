@@ -22,8 +22,9 @@ Do not invent human statements or submit a decision when the user only asks
 about rules. The engine alone resolves actions. Do not inspect hidden roles or
 NPC private memory to answer player questions.
 
-If a process is lost, report it; recovery/transfer is not implemented. Ask before
-restarting and re-randomizing. When the player dies, explain that the current
+If a process is lost, use the recorded game id with `chat_game --resume GAME_ID`.
+Do not inspect private checkpoint contents or re-randomize the game. If recovery
+fails, report the error and ask before starting over. When the player dies, explain that the current
 engine automatically continues the NPC game; retain all public output.
 
 For code changes, preserve existing user work. Keep human onboarding enabled

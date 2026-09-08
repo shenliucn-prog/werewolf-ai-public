@@ -12,6 +12,9 @@ let es = null;
 let gameId = null;
 let lastEventNo = 0;
 let rejoinAttempts = 0;
+let faulted = false;    // 可恢复故障：保留对局与本地续玩记录，不自动重连
+let campaignReviewGameId = null;   // 短复盘失败后保留的 game_id，供重试按钮使用
+let campaignTeachingGameId = null; // 角色教学失败后保留的 game_id，供重试按钮使用
 const SAVE_KEY = "werewolf.game";
 let seats = {};        // pos -> seat DOM
 let mySeat = null;
@@ -42,7 +45,7 @@ function applyLocale(value) {
   $("#brand").textContent = t.brand; $("#newGame").textContent = t.start;
   $("#identityTitle").textContent = t.identity; $("#hostChatTitle").textContent = t.host;
   $("#hostChatLog").textContent = t.hint;
-  const command = `python -u -m werewolf_web.chat_game --board classic --lang ${uiLocale} --offline`;
+  const command = `python -u -m werewolf_web.chat_game --board classic --lang ${uiLocale}`;
   $("#textCommand").textContent = uiLocale === "en"
     ? `Help me play Werewolf here in our conversation. Repository: https://github.com/shenliucn-prog/werewolf-ai-public\nRead README.md and docs/AGENT_PLAY.md, prepare the local environment, then keep this interactive process alive:\n${command}\nRelay the game's statements and my private prompts. Wait for my decisions; do not autoplay, invent game events or inspect hidden roles. If you cannot maintain an interactive process, tell me rather than simulating a game.`
     : `请让我在当前 Agent 对话里玩狼人杀。仓库：https://github.com/shenliucn-prog/werewolf-ai-public\n阅读 README.md 和 docs/AGENT_PLAY.md，准备本地环境，并持续保留以下交互进程：\n${command}\n转述游戏发言和属于我的私密提示，等待我的决定，不代打、不编造事件、不读取其他人的隐藏身份。如果无法保持交互进程，请说明限制，不要模拟一局冒充真实游戏。`;
@@ -233,11 +236,30 @@ function handleEvent(d) {
       });
       break;
     case "request": showAction(d); break;
-    case "review": showReview(d.text); break;
+    case "teaching":
+      log(d.unavailable ? `⚠️ ${escapeHtml(d.text)}` : `📖 ${escapeHtml(d.text)}`, "narr");
+      if (d.unavailable) {
+        if (gameId) campaignTeachingGameId = gameId;   // keep an id for the retry
+        showCampaignTeachingRetry();
+      } else {
+        hideCampaignTeachingRetry();
+      }
+      break;
+    case "campaign_review":
+      log(`📋 ${escapeHtml(d.text).replace(/\n/g, "<br>")}`, "narr");
+      if (d.unavailable) {
+        if (gameId) campaignReviewGameId = gameId;   // keep an id for the retry
+        showCampaignReviewRetry();
+      } else {
+        hideCampaignReviewRetry();
+      }
+      break;
+    case "review": showReview(d.text); finishStream(tr("对局结束")); break;
     case "gameover":
-      log(`🏆 ${escapeHtml(d.reason)}`, "win"); panelEl.style.display = "none";
-      finishStream(tr("对局结束")); break;
-    case "error": log(escapeHtml(d.text), "err"); finishStream(d.text); break;
+      // 只标记胜负已定、禁用行动，不在此断流：身份揭晓(narration)与复盘(review)
+      // 紧跟其后，关闭流会让它们丢失。结果流以 review（成功或兜底）为收尾信号。
+      log(`🏆 ${escapeHtml(d.reason)}`, "win"); panelEl.style.display = "none"; break;
+    case "error": log(escapeHtml(d.text), "err"); pauseStream(d.text); break;
   }
 }
 
@@ -462,7 +484,49 @@ function finishStream(status) {
   gameId = null;
   document.body.classList.remove("playing");
   lockNames(false);
+  setModeBadge(null);
   persistState();
+}
+
+// Persistent mode label (independent of the running-status line): offline
+// simulation "not counted" survives status updates and reconnect.
+function setModeBadge(text) {
+  const el = $("#modeBadge");
+  if (text) { el.textContent = text; el.hidden = false; }
+  else { el.hidden = true; el.textContent = ""; }
+}
+
+// Explicitly abandon the current game (settle + delete its save) before a new
+// start.  Returns true on success; false means the old game is still valid.
+async function endCurrentGame() {
+  if (!gameId) return true;
+  const current = gameId;
+  try {
+    const response = await fetch("/api/leave", { method: "POST", headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({ game_id: current }) });
+    const data = await response.json();
+    return response.ok && data.ok;
+  } catch (_) {
+    return false;   // network error: keep the old game + its resume record
+  }
+}
+
+// 可恢复故障（§3.3）：断流但不清理对局——保留 gameId 与本地续玩记录，后续可重连续玩。
+// 完整重试入口留到教学/复盘里程碑；这里只保证「故障可恢复」在网页上有闭环。
+function pauseStream(status) {
+  faulted = true;
+  if (es) es.close();
+  $("#status").textContent = status;
+  panelEl.style.display = "none";
+  document.body.classList.remove("playing");
+  persistState();   // gameId 仍在，保留同一局的恢复信息
+}
+
+// 胜负已定但复盘尚未生成（崩溃发生在复盘前）：展示待完成状态，不误判为全部完成，
+// 且不清除续接信息。
+function showReviewPending() {
+  $("#reviewText").textContent = tr("复盘暂不可用，可稍后重试。");
+  $("#reviewMask").style.display = "flex";
 }
 
 // ---------- 断线重连 / 恢复（§6）----------
@@ -496,7 +560,7 @@ function openStream(after) {
   };
   es.onerror = () => {
     es.close();
-    if (!gameId) return;
+    if (!gameId || faulted) return;   // 故障已暂停：不自动重连，等玩家手动续玩
     // 服务端可能尚未清掉旧流的 active 标记；用退避重试，绝不因瞬时断线结束对局。
     rejoinAttempts += 1;
     if (rejoinAttempts > 12) { finishStream(tr("连接断开")); return; }
@@ -557,7 +621,17 @@ function applyRecoveryView(view) {
   // 终局信号（gameover/review/error）最后回放，避免提前关流。
   for (const ev of view.terminal || []) dispatch(ev);
 
+  // Restore the persistent "offline · not counted" label after a reconnect.
+  setModeBadge(view.counted === false
+    ? (uiLocale === "en" ? "Offline · not counted" : "离线模拟 · 不计闯关成绩") : null);
+
   if (view.finished) {
+    // 区分「对局结束」与「复盘完成/不可用」：胜负已定但复盘尚未生成（崩溃在
+    // 复盘前）时，展示待完成状态并保留续接信息，不能把 finished 当作全部接收完毕。
+    if (view.review_status === "pending") {
+      showReviewPending();
+      return;
+    }
     finishStream(tr("对局结束"));
     return;
   }
@@ -572,6 +646,7 @@ function restoreSavedGame() {
   if (!saved || !saved.game_id) return;
   gameId = saved.game_id;
   lastEventNo = 0;   // 完整重建（init + 事件回放）
+  faulted = false;   // 明确恢复当前局：解除上一次故障暂停
   rejoin();
 }
 
@@ -581,6 +656,77 @@ function showReview(text) {
   $("#reviewMask").style.display = "flex";
 }
 $("#closeReview").onclick = () => { $("#reviewMask").style.display = "none"; };
+
+// ---------- 闯关短复盘重试 ----------
+function showCampaignReviewRetry() {
+  const btn = $("#retryCampaignReview");
+  if (btn) btn.hidden = false;
+}
+function hideCampaignReviewRetry() {
+  const btn = $("#retryCampaignReview");
+  if (btn) btn.hidden = true;
+}
+async function retryCampaignReview() {
+  const id = campaignReviewGameId || gameId;
+  if (!id) return;
+  const btn = $("#retryCampaignReview");
+  if (btn) btn.disabled = true;
+  try {
+    const response = await fetch("/api/campaign/review", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_id: id })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error("review failed");
+    if (data.unavailable) {
+      // Failed again: keep the retry control visible and show the fallback note.
+      log(`⚠️ ${escapeHtml(data.text)}`, "narr");
+    } else if (data.text) {
+      log(`📋 ${escapeHtml(data.text).replace(/\n/g, "<br>")}`, "narr");
+      hideCampaignReviewRetry();   // success only hides the retry
+    } else if (data.review === null) {
+      hideCampaignReviewRetry();   // not a loss — nothing to review
+    }
+  } catch (_) {
+    // keep the retry control visible so the player can try again
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+$("#retryCampaignReview").onclick = retryCampaignReview;
+
+// ---------- 闯关角色教学重试 ----------
+function showCampaignTeachingRetry() {
+  const btn = $("#retryCampaignTeaching");
+  if (btn) btn.hidden = false;
+}
+function hideCampaignTeachingRetry() {
+  const btn = $("#retryCampaignTeaching");
+  if (btn) btn.hidden = true;
+}
+async function retryCampaignTeaching() {
+  const id = campaignTeachingGameId || gameId;
+  if (!id) return;
+  const btn = $("#retryCampaignTeaching");
+  if (btn) btn.disabled = true;
+  try {
+    const response = await fetch(`/api/campaign/teaching?game_id=${encodeURIComponent(id)}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error("teaching failed");
+    if (data.unavailable) {
+      // Failed again: keep the retry control visible and show the fallback note.
+      log(`⚠️ ${escapeHtml(data.text)}`, "narr");
+    } else if (data.text) {
+      log(`📖 ${escapeHtml(data.text)}`, "narr");
+      hideCampaignTeachingRetry();   // success only hides the retry
+    }
+  } catch (_) {
+    // keep the retry control visible so the player can try again
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+$("#retryCampaignTeaching").onclick = retryCampaignTeaching;
 
 // ---------- 新游戏 ----------
 async function newGame() {
@@ -593,6 +739,10 @@ async function newGame() {
     $("#castError").textContent = tr("名字必须不同，且为1至24字的文字、数字、空格或连字符。");
     return;
   }
+  if (!(await endCurrentGame())) {
+    $("#status").textContent = uiLocale === "en" ? "Could not end the current game; please retry." : "未能结束当前对局，请重试。";
+    return;   // keep the old game + its resume record
+  }
   const board = $("#board").value;
   const locale = $("#locale").value;
   applyLocale(locale);
@@ -604,6 +754,10 @@ async function newGame() {
   $("#status").textContent = UI[uiLocale].starting;
   panelEl.style.display = "none";
   logEl.innerHTML = "";
+  hideCampaignReviewRetry();
+  campaignReviewGameId = null;
+  hideCampaignTeachingRetry();
+  campaignTeachingGameId = null;
   if (es) es.close();
   $("#locale").disabled = true;
   $("#newGame").disabled = true;
@@ -628,6 +782,7 @@ async function newGame() {
   $("#textGuide").open = false;
   lastEventNo = 0;
   rejoinAttempts = 0;
+  faulted = false;   // 新局重置故障暂停，前一局的故障不得影响后续对局
   persistState();
   openStream(0);
   // The init event replaces this with a safe model/local-runtime status.
@@ -640,6 +795,62 @@ async function newGame() {
 }
 
 $("#newGame").onclick = newGame;
+$("#continueGame").onclick = () => restoreSavedGame();
+
+async function campaignGame() {
+  if (gameId && !window.confirm(uiLocale === "en" ? "End this game and start a new one?" : "结束当前对局并重新开局？")) return;
+  const llm = configuredLlmOptions();
+  const offline = llm && llm.enabled === false;
+  // Every confirmation runs BEFORE the abandon request, so a cancel never ends
+  // the old game.
+  if (offline && !window.confirm(uiLocale === "en"
+      ? "Offline simulation does not count toward campaign progress (no unlock, no score). Continue?"
+      : "离线模拟不计闯关成绩（不解锁、不计分）。确定继续？")) return;
+  if (!(await endCurrentGame())) {
+    $("#status").textContent = uiLocale === "en" ? "Could not end the current game; please retry." : "未能结束当前对局，请重试。";
+    return;   // keep the old game + its resume record
+  }
+  try {
+    const status = await (await fetch("/api/campaign/status")).json();
+    const locale = $("#locale").value;
+    applyLocale(locale);
+    $("#status").textContent = UI[uiLocale].starting;
+    panelEl.style.display = "none";
+    logEl.innerHTML = "";
+    hideCampaignReviewRetry();
+    campaignReviewGameId = null;
+    hideCampaignTeachingRetry();
+    campaignTeachingGameId = null;
+    if (es) es.close();
+    $("#locale").disabled = true;
+    lockNames(true);
+    $("#reviewMask").style.display = "none";
+    const start = await fetch("/api/campaign/start", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profile_id: "default", role: status.role, locale, llm })
+    });
+    $("#llmApiKey").value = "";
+    const started = await start.json();
+    gameId = started.game_id || null;
+    if (!gameId) { finishStream(UI[uiLocale].failed); return; }
+    document.body.classList.add("playing");
+    $("#gameSetup").open = false;
+    lastEventNo = 0; rejoinAttempts = 0; faulted = false;
+    persistState();
+    await loadCampaignTeaching(gameId);   // generate + emit the first-entry teaching before the stream
+    openStream(0);
+    setModeBadge(started.counted === false
+      ? (uiLocale === "en" ? "Offline · not counted" : "离线模拟 · 不计闯关成绩") : null);
+  } catch (_) { finishStream(UI[uiLocale].failed); }
+}
+async function loadCampaignTeaching(id) {
+  // Best-effort: the teaching event arrives via the stream; this request only
+  // triggers generation (and its "unavailable" marker on model failure).
+  try {
+    await fetch(`/api/campaign/teaching?game_id=${encodeURIComponent(id)}`);
+  } catch (_) { /* the game proceeds regardless */ }
+}
+$("#campaignGame").onclick = campaignGame;
 $("#copyTextCommand").onclick = async () => {
   try {
     await navigator.clipboard.writeText($("#textCommand").textContent);

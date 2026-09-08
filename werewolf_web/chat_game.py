@@ -121,6 +121,13 @@ def _render(event: dict, locale: str = "zh-CN"):
         print("🗳️ " + ", ".join(f"{target_label(pos, locale)}: {votes} {'votes' if en else '票'}" for pos, votes in event["tally"].items()))
     elif kind == "review":
         print(("\n📋 Post-game review\n" if en else "\n📋 赛后复盘\n") + event["text"])
+    elif kind == "teaching":
+        if event.get("unavailable"):
+            print("⚠️ " + event["text"])
+        else:
+            print(("\n📖 Role teaching\n" if en else "\n📖 角色教学\n") + event["text"])
+    elif kind == "campaign_review":
+        print(("\n📋 Campaign review\n" if en else "\n📋 闯关短复盘\n") + event["text"])
     elif kind == "error":
         print("⚠️ " + event["text"])
 
@@ -187,6 +194,65 @@ def _ordinary_request_prompt(kind: str, data: dict, locale: str = "zh-CN") -> st
     return f"\n{data.get('role', 'Action')}: {data.get('desc', '')}\nCandidates: {candidates}. Use choose N or pass:\n> " if en else f"\n{data.get('role', '角色')}：{data.get('desc', '')}\n行动目标（{candidates}）。例如：选 3 号，或 跳过：\n> "
 
 
+async def _campaign_review_repl(session: GameSession) -> None:
+    """Post-game campaign short-review handling (terminal entry).
+
+    The review is generated once during the endgame step and rendered as a normal
+    event; here a ``generate_review_once`` covers the narrow crash-between-settle-
+    and-review case without re-charging a persisted result, then the player can
+    explicitly retry a failed (or regenerate a stale) review with ``/review``
+    (or ``复盘``) — charging budget — without leaving the REPL.
+    """
+    from . import campaign_flow
+    locale = session.engine.locale
+    if not campaign_flow.review_applies(session):
+        return
+    event = campaign_flow.generate_review_once(session)
+    if event is not None:
+        _render(event, locale)
+    if session.campaign_review_state == "unavailable":
+        print("⚠️ " + ("The short review failed. Type /review to retry, or press Enter to quit."
+                       if locale == "en" else "短复盘生成失败。输入 /review 重试，或直接回车结束。"))
+    while True:
+        raw = (await asyncio.to_thread(
+            input,
+            ("\n/review to regenerate the short review, Enter to quit:\n> "
+             if locale == "en" else "\n输入 /review 重新生成短复盘，回车结束：\n> "))).strip()
+        if raw.casefold() in ("", "q", "quit", "exit", "退出", "结束"):
+            return
+        if raw in ("/review", "复盘"):
+            event = campaign_flow.generate_campaign_review(session)
+            if event is None:
+                print("🎙️ " + ("No short review for this result." if locale == "en" else "本局结果无需短复盘。"))
+            else:
+                _render(event, locale)
+            continue
+        print("🎙️ " + ("Type /review to retry, or press Enter to quit." if locale == "en"
+                        else "输入 /review 重试，或回车结束。"))
+
+
+def _teaching_command(session: GameSession) -> bool:
+    """Regenerate + print the role teaching (terminal ``/teaching`` command).
+
+    Only a campaign game has a teaching role; a free-play or offline session
+    returns False so the caller can show a fallback note.  A cache hit is free;
+    a miss charges one budget unit (``cached_role_teaching`` already makes a hit
+    free).  Rendered inline (``publish=False``) so the live REPL loop does not
+    re-render the same event a second time when it drains the queue.
+    """
+    from . import campaign_flow
+    from .campaign import LEVELS
+    if not session.campaign_profile:
+        return False
+    role = session.engine.player_role
+    if role not in {level["role"] for level in LEVELS}:
+        return False
+    model = getattr(session.planner, "model", "campaign")
+    event = campaign_flow.generate_teaching(session, role, model, publish=False)
+    _render(event, session.engine.locale)
+    return True
+
+
 async def _repl(session: GameSession) -> int:
     """Drive one live session through the terminal; returns a process exit code."""
     locale = session.engine.locale
@@ -203,6 +269,12 @@ async def _repl(session: GameSession) -> int:
             if raw.startswith("?") or raw.strip().casefold() in ("/seats", "seats", "座次", "座次表") or record_command:
                 print("🎙️ " + session.answer_question(raw[1:] if raw.startswith("?") else raw))
                 continue
+            if raw.strip().casefold() in ("/teaching", "教学"):
+                if _teaching_command(session):
+                    continue
+                print("🎙️ " + ("Teaching is only available in a campaign game." if locale == "en"
+                                else "教学仅在闯关对局可用。"))
+                continue
             if kind == "conjecture" and edit_conjecture(data, raw):
                 continue
             action = parse_action(kind, data, raw)
@@ -210,6 +282,8 @@ async def _repl(session: GameSession) -> int:
                 break
             print("🎙️ I did not understand that action. Use a clear seat number or ? for rules." if locale == "en"
                   else "🎙️ 我没听懂这个行动。可以换成明确的座位号，或输入 ? 加规则问题。")
+    if session.campaign_profile and session.finished and not session.faulted:
+        await _campaign_review_repl(session)
     return 0
 
 
@@ -218,7 +292,7 @@ async def play(board_id: str, seed: int | None, offline: bool, locale: str, name
                model=None, effort=None, max_calls=None, agent_command=None,
                resume_game_id=None):
     from .ai.decision_runtime import create_runtime, ModelTurnError
-    from . import checkpoint
+    from . import checkpoint, campaign_flow
     if resume_game_id is not None:
         # Rehydrate an interrupted chat game from its checkpoint (§7).  Board,
         # roles and locale come from the save; only the trusted local model
@@ -252,6 +326,11 @@ async def play(board_id: str, seed: int | None, offline: bool, locale: str, name
             # reservation and the check still restores the consumed call, and
             # success leaves the runtime verified (not clobbered by restore).
             session.restore(payload)
+            if session.campaign_profile and not campaign_flow.resume(
+                    session.campaign_profile, resume_game_id, session):
+                print("This game was abandoned and cannot be resumed." if locale == "en"
+                      else "本局已放弃，无法续玩。")
+                return 1
             if planner is not None:
                 planner.reserve()
                 session._checkpoint()
@@ -294,6 +373,72 @@ async def play(board_id: str, seed: int | None, offline: bool, locale: str, name
     return await _repl(session)
 
 
+async def campaign_play(profile_id: str, offline: bool, locale: str, seed: int | None,
+                        backend=None, model=None, effort=None, max_calls=None,
+                        agent_command=None):
+    """Terminal campaign entry: play the current unlocked level, count and settle.
+
+    Offline / legacy rule tests are an explicit choice and never count toward
+    campaign progress (no archive registration, no hook).
+    """
+    from .ai.decision_runtime import create_runtime, ModelTurnError
+    from . import campaign_flow, checkpoint, settings as user_settings
+    from .campaign import LEVELS
+
+    profile = campaign_flow.load_profile(profile_id)
+    level = LEVELS[min(profile["unlocked"], len(LEVELS) - 1)]
+    role, board_id = level["role"], level["board"]
+    game_id = "campaign-" + secrets.token_urlsafe(12)
+
+    if offline or backend == "legacy":
+        print("Offline rule test — not counted toward campaign progress." if locale == "en"
+              else "离线规则测试——不计入闯关成绩。")
+        session = GameSession(board_id, {"enabled": False}, session_id=game_id,
+                              seed=seed, locale=locale, player_role=role, onboarding=True)
+        return await _repl(session)
+
+    try:
+        campaign_flow.begin_attempt(profile_id, game_id, role, board_id,
+                                    config={"backend": backend, "model": model})
+    except ValueError as error:
+        print(str(error))
+        return 1
+
+    planner = None
+    saved = user_settings.load_settings() or {}
+    eff = dict(saved)                       # keep base_url/timeout/etc.
+    if backend: eff["backend"] = backend
+    if model: eff["model"] = model
+    if effort: eff["effort"] = effort
+    if max_calls: eff["max_calls"] = max_calls
+    try:
+        kwargs = user_settings.runtime_kwargs(eff)
+        if agent_command is not None:
+            kwargs["command"] = agent_command   # local CLI only; never from HTTP
+        planner = create_runtime(**kwargs)
+        print(json.dumps(planner.public_status(), ensure_ascii=False), flush=True)
+        print("Checking LLM before dealing roles… / 发身份前验证 LLM 连接……", flush=True)
+        await asyncio.to_thread(planner.preflight)
+        user_settings.save_settings(eff)    # merge, never drop saved fields
+    except (ModelTurnError, ValueError) as error:
+        print(str(error))
+        return 1
+
+    session = GameSession(board_id, {"enabled": False}, session_id=game_id,
+                          seed=seed, locale=locale, player_role=role, onboarding=True,
+                          planner=planner,
+                          checkpoint_path=checkpoint.checkpoint_path(game_id))
+    session.campaign_profile = profile_id
+    session._checkpoint()
+    session.progress_hook = campaign_flow.progress_hook(profile_id, game_id)
+    print((f"闯关关卡：{role}（{board_id}）—— 通关后解锁下一关。" if locale == "zh-CN" else
+           f"Campaign level: {role} ({board_id}) — win to unlock the next."))
+    # First-entry teaching: generated (and charged) once, retried on failure, and
+    # rendered by the REPL as a normal event (no separate print here).
+    campaign_flow.generate_teaching(session, role, getattr(planner, "model", "campaign"))
+    return await _repl(session)
+
+
 def main():
     parser = argparse.ArgumentParser(description="对话式狼人杀")
     parser.add_argument("--board", help="板子 ID；省略时先选择 / select before dealing")
@@ -318,6 +463,10 @@ def main():
     parser.add_argument("--list-personalities", action="store_true")
     parser.add_argument("--resume", metavar="GAME_ID",
                         help="Resume an interrupted game from its checkpoint (board/role come from the save)")
+    parser.add_argument("--campaign", action="store_true",
+                        help="Play the campaign (闯关): the current unlocked level, counted and settled")
+    parser.add_argument("--profile", default="default",
+                        help="Campaign profile id (default: 'default')")
     args = parser.parse_args()
     from .game.engine import BOARD_MAP, ROLE_META
     from .i18n import board_role_name
@@ -331,6 +480,15 @@ def main():
                                   model=args.model, effort=args.effort,
                                   max_calls=args.max_model_calls,
                                   agent_command=args.agent_command))
+        if result == 1:
+            raise SystemExit(1)
+        return
+    if args.campaign:
+        result = asyncio.run(campaign_play(args.profile, args.offline, args.lang,
+                                           args.seed, backend=args.backend,
+                                           model=args.model, effort=args.effort,
+                                           max_calls=args.max_model_calls,
+                                           agent_command=args.agent_command))
         if result == 1:
             raise SystemExit(1)
         return

@@ -23,6 +23,12 @@ werewolf_web/data/host_style.*.json
 werewolf_web/data/npc_memory/
 # 恢复存档（§5.2 / §7）：含全部身份与 NPC 私有状态，绝不能进入公开仓库或发布候选包。
 werewolf_web/data/checkpoints/
+# 闯关档案（§5）：含本地闯关进度与成绩，仅本机、不进仓库/发布包。
+werewolf_web/data/campaign/
+# 本地设置（§4）：模型配置快照（不含密钥），仅本机。
+werewolf_web/data/settings.json
+# 角色教学缓存（§7）：模型生成的本地缓存，仅本机。
+werewolf_web/data/teaching.json
 
 # ---- 开发过程产物：不进仓库，仓库只放能跑起来的程序 ----
 # 对局记录、分析文档、人设档案副本、一次性工具脚本、开发期自测脚本
