@@ -11,6 +11,10 @@ from dataclasses import replace
 from typing import Protocol
 
 import httpx
+from ..recovery import (
+    SCHEMA_VERSION, check_version,
+    require_str, require_int, require_number, require_bool,
+)
 from .llm import LLMRuntimeConfig
 
 
@@ -23,6 +27,8 @@ class DecisionRuntime(Protocol):
     def complete(self, request: dict, schema: dict) -> dict: ...
     def preflight(self) -> None: ...
     def public_status(self) -> dict: ...
+    def snapshot(self) -> dict: ...
+    def restore(self, data: dict) -> None: ...
 
 
 class RuntimeBase:
@@ -49,6 +55,47 @@ class RuntimeBase:
         return {"mode": "model_decisions", "backend": self.backend,
                 "label": "LLM NPC decisions / LLM 玩家决策", "model": self.model,
                 "calls": self.calls, "max_calls": self.max_calls}
+
+    def snapshot(self) -> dict:
+        """Default adapter snapshot; never carries credentials or commands."""
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "backend": self.backend,
+            "model": self.model,
+            "max_calls": self.max_calls,
+            "timeout": self.timeout,
+            "calls": self.calls,
+        }
+
+    def _restore_fields(self, data: dict) -> tuple:
+        """Validate the shared adapter fields without mutating anything.
+
+        Returns ``(model, max_calls, timeout, calls)`` so a subclass can layer
+        its own fields on top and apply everything in one mutation pass.
+        """
+        where = f"{self.__class__.__name__}.snapshot"
+        check_version(data, where)
+        if data.get("backend") != self.backend:
+            raise ValueError(
+                f"{self.__class__.__name__}: backend mismatch "
+                f"({data.get('backend')!r} != {self.backend!r})")
+        model = require_str(data, "model", where)
+        max_calls = require_int(data, "max_calls", where, minimum=0)
+        timeout = require_number(data, "timeout", where, minimum=0.0)
+        calls = require_int(data, "calls", where, minimum=0)
+        if calls > max_calls:
+            raise ValueError(
+                f"{where}: calls ({calls}) exceeds max_calls ({max_calls})")
+        return model, max_calls, timeout, calls
+
+    def restore(self, data: dict) -> None:
+        model, max_calls, timeout, calls = self._restore_fields(data)
+        self.model = model
+        self.max_calls = max_calls
+        self.timeout = timeout
+        self.calls = calls
+        # Liveness is transient; a saved preflight is never trusted on restore.
+        self.verified = False
 
 
 class APIPlayerRuntime(RuntimeBase):
@@ -94,6 +141,52 @@ output support. The common player validates every decision before applying it.
                 return value
         except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError):
             raise ModelTurnError("Model API request failed or returned invalid JSON; no offline substitution.") from None
+
+    def snapshot(self) -> dict:
+        """Persist the API config allowlist; the ``api_key`` is never stored."""
+        data = super().snapshot()
+        cfg = self.config
+        data.update({
+            "base_url": cfg.base_url,
+            "temperature": cfg.temperature,
+            "reasoning_effort": cfg.reasoning_effort,
+            "reasoning_param": cfg.reasoning_param,
+            "enabled": cfg.enabled,
+        })
+        return data
+
+    def restore(self, data: dict) -> None:
+        where = f"{self.__class__.__name__}.snapshot"
+        check_version(data, where)
+        # Trusted-endpoint guard: the live credential was issued for the current
+        # base URL.  Never re-bind it to an address that came out of a snapshot.
+        base_url = require_str(data, "base_url", where)
+        if base_url.rstrip("/") != self.config.base_url.rstrip("/"):
+            raise ValueError(
+                f"{where}: endpoint mismatch — refusing to re-bind the "
+                f"configured credential to {base_url!r}")
+        # Validate everything (including the shared fields) before any mutation.
+        model, max_calls, timeout, calls = self._restore_fields(data)
+        temperature = require_number(data, "temperature", where, 0.0, 2.0)
+        reasoning_effort = require_str(data, "reasoning_effort", where)
+        reasoning_param = require_str(data, "reasoning_param", where)
+        enabled = require_bool(data, "enabled", where)
+
+        # Apply in a single pass; the key and endpoint stay the live config.
+        self.model = model
+        self.max_calls = max_calls
+        self.timeout = timeout
+        self.calls = calls
+        self.verified = False
+        self.config = replace(self.config,
+                              base_url=self.config.base_url,
+                              model=model,
+                              temperature=temperature,
+                              timeout_seconds=timeout,
+                              max_calls=max_calls,
+                              reasoning_effort=reasoning_effort,
+                              reasoning_param=reasoning_param,
+                              enabled=enabled)
 
 
 class CommandPlayerRuntime(RuntimeBase):

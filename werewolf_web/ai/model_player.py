@@ -1,5 +1,9 @@
 """Provider-independent NPC decisions and lawful per-seat model context."""
+import random
+from copy import deepcopy
 from dataclasses import asdict
+
+from ..recovery import check_version, require_str
 from .brain import Speech
 from .strategic_agent import StrategicNPCAgent
 from .decision_runtime import ModelTurnError
@@ -84,6 +88,37 @@ class ModelNPCAgent(StrategicNPCAgent):
         # Keep model decision memory within this match until evaluated growth
         # and privacy-safe persistence have a separate implementation.
         return None
+
+    def snapshot(self) -> dict:
+        """Per-agent snapshot adds the per-seat model decision memory."""
+        data = super().snapshot()
+        # Deep copy: a decision may hold nested dicts/lists, and the snapshot
+        # must stay independent of any later mutation of the live decisions.
+        data["model_decisions"] = deepcopy(self.model_decisions)
+        return data
+
+    def restore(self, data: dict) -> None:
+        where = "ModelNPCAgent.snapshot"
+        check_version(data, where)
+        decisions = data.get("model_decisions")
+        if not isinstance(decisions, list) or any(
+                not isinstance(entry, dict) for entry in decisions):
+            raise ValueError(f"{where}: model_decisions must be an array of objects")
+        super().restore(data)
+        self.model_decisions = deepcopy(decisions)
+
+    @classmethod
+    def restore_agent(cls, snapshot: dict, engine, llm, planner, public_record,
+                      memory_dir: str | None = None) -> "ModelNPCAgent":
+        """Side-effect-free rebuild for the model-driven agent (see base class)."""
+        check_version(snapshot, "ModelNPCAgent.snapshot")
+        name = require_str(snapshot, "name", "ModelNPCAgent.snapshot",
+                           allow_empty=False)
+        agent = cls(name, engine, llm, planner=planner,
+                    public_record=public_record, memory_dir=memory_dir,
+                    private_rng=random.Random(0), emit_start=False)
+        agent.restore(snapshot)
+        return agent
 
     def election_choice(self, withdraw=False):
         key = "withdraw" if withdraw else "up"

@@ -8,10 +8,14 @@ from __future__ import annotations
 import json
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from .. import config
+from ..recovery import (
+    SCHEMA_VERSION, check_version,
+    require_str, require_int, require_number, require_bool,
+)
 
 
 @dataclass(frozen=True)
@@ -134,6 +138,80 @@ class LLMClient:
                     "calls": self.calls, "max_calls": self.runtime.max_calls}
         return {"mode": "offline", "label": "本地策略与表达", "reason": self.unavailable_reason,
                 "calls": 0, "max_calls": self.runtime.max_calls}
+
+    def snapshot(self) -> dict:
+        """Legacy-expression runtime allowlist; the ``api_key`` is never stored."""
+        rt = self.runtime
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "calls": self.calls,
+            "failures": self.failures,
+            "unavailable_reason": self.unavailable_reason,
+            "config": {
+                "enabled": rt.enabled,
+                "base_url": rt.base_url,
+                "model": rt.model,
+                "temperature": rt.temperature,
+                "timeout_seconds": rt.timeout_seconds,
+                "max_calls": rt.max_calls,
+                "reasoning_effort": rt.reasoning_effort,
+                "reasoning_param": rt.reasoning_param,
+            },
+        }
+
+    def restore(self, data: dict) -> None:
+        where = "LLMClient.snapshot"
+        check_version(data, where)
+        calls = require_int(data, "calls", where, minimum=0)
+        failures = require_int(data, "failures", where, minimum=0)
+        unavailable_reason = require_str(data, "unavailable_reason", where)
+        cfg = data.get("config")
+        if not isinstance(cfg, dict):
+            raise ValueError(f"{where}: config must be an object")
+        # Trusted-endpoint guard: never re-bind the live key to a snapshot URL.
+        base_url = require_str(cfg, "base_url", where)
+        if base_url.rstrip("/") != self.runtime.base_url.rstrip("/"):
+            raise ValueError(
+                f"{where}: endpoint mismatch — refusing to re-bind the "
+                f"configured key to {base_url!r}")
+        enabled = require_bool(cfg, "enabled", where)
+        model = require_str(cfg, "model", where)
+        temperature = require_number(cfg, "temperature", where, 0.0, 2.0)
+        timeout_seconds = require_number(cfg, "timeout_seconds", where, minimum=0.0)
+        max_calls = require_int(cfg, "max_calls", where, minimum=0)
+        reasoning_effort = require_str(cfg, "reasoning_effort", where)
+        reasoning_param = require_str(cfg, "reasoning_param", where)
+        if calls > max_calls:
+            raise ValueError(
+                f"{where}: calls ({calls}) exceeds max_calls ({max_calls})")
+
+        # Apply; the key and endpoint stay the live config.
+        self.calls = calls
+        self.failures = failures
+        self.unavailable_reason = unavailable_reason
+        self.runtime = replace(self.runtime,
+                               enabled=enabled,
+                               base_url=self.runtime.base_url,
+                               model=model,
+                               temperature=temperature,
+                               timeout_seconds=timeout_seconds,
+                               max_calls=max_calls,
+                               reasoning_effort=reasoning_effort,
+                               reasoning_param=reasoning_param)
+        # Re-establish the provider handle without trusting saved liveness.
+        self._client = None
+        if self.runtime.enabled and self.runtime.api_key:
+            try:
+                from openai import OpenAI
+                self._client = OpenAI(
+                    base_url=self.runtime.base_url,
+                    api_key=self.runtime.api_key,
+                    timeout=self.runtime.timeout_seconds,
+                    max_retries=0,
+                )
+            except Exception:
+                self._client = None
+                self.unavailable_reason = "client_unavailable"
 
     def generate(self, system: str, prompt: str, temperature: float | None = None,
                  max_tokens: int = 600) -> str | None:

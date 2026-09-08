@@ -1,8 +1,11 @@
 """Bounded match form and in-game emotion for NPC decision variance."""
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from typing import Any
+
+from ..recovery import SCHEMA_VERSION, check_version, require_number, require_list
 
 
 def _clamp(value: float, low: float = -1.0, high: float = 1.0) -> float:
@@ -140,5 +143,24 @@ class MatchState:
         data = asdict(self)
         data.update({"condition": round(self.condition, 4),
                      "condition_label": self.condition_label,
-                     "mood": self.mood})
-        return data
+                     "mood": self.mood,
+                     "schema_version": SCHEMA_VERSION})
+        return deepcopy(data)
+
+    @classmethod
+    def restore(cls, data: dict) -> "MatchState":
+        """Rebuild from a whitelisted snapshot; computed fields are re-derived.
+
+        Strictly validates the dataclass fields and returns an object that
+        shares no nested references with ``data``.
+        """
+        where = "MatchState.snapshot"
+        check_version(data, where)
+        kwargs = {}
+        for key in ("form", "valence", "arousal", "confidence", "stress", "momentum"):
+            kwargs[key] = require_number(data, key, where, -2.0, 2.0)
+        events = require_list(data, "events", where)
+        if any(not isinstance(item, str) for item in events):
+            raise ValueError(f"{where}: events must be an array of strings")
+        kwargs["events"] = deepcopy(events)
+        return cls(**kwargs)

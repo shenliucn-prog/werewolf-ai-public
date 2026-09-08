@@ -10,6 +10,10 @@ import subprocess
 import tempfile
 
 from .decision_runtime import ModelTurnError
+from ..recovery import (
+    SCHEMA_VERSION, check_version,
+    require_str, require_int, require_number,
+)
 
 
 DISABLED = ("shell_tool", "unified_exec", "apps", "plugins", "hooks", "browser_use",
@@ -101,6 +105,41 @@ class CodexPlayerRuntime:
         return {"mode": "model_decisions", "backend": "codex", "label": "Codex NPC decisions / Codex 玩家决策",
                 "model": self.model, "reasoning_effort": self.effort,
                 "calls": self.calls, "max_calls": self.max_calls}
+
+    def snapshot(self) -> dict:
+        """Persist the Codex adapter allowlist; no credential or login state."""
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "backend": "codex",
+            "model": self.model,
+            "effort": self.effort,
+            "max_calls": self.max_calls,
+            "timeout": self.timeout,
+            "calls": self.calls,
+        }
+
+    def restore(self, data: dict) -> None:
+        where = "CodexPlayerRuntime.snapshot"
+        check_version(data, where)
+        if data.get("backend") != "codex":
+            raise ValueError("CodexPlayerRuntime: backend mismatch")
+        # Validate everything before mutating anything.
+        model = require_str(data, "model", where)
+        effort = require_str(data, "effort", where)
+        max_calls = require_int(data, "max_calls", where, minimum=0)
+        timeout = require_number(data, "timeout", where, minimum=0.0)
+        calls = require_int(data, "calls", where, minimum=0)
+        if calls > max_calls:
+            raise ValueError(
+                f"{where}: calls ({calls}) exceeds max_calls ({max_calls})")
+
+        self.model = model
+        self.effort = effort
+        self.max_calls = max_calls
+        self.timeout = timeout
+        self.calls = calls
+        # Liveness is re-established on restore; a saved preflight is not trusted.
+        self.verified = False
 
 # Backward-compatible import for existing experiments and third-party callers.
 from .model_player import ModelNPCAgent as CodexNPCAgent
