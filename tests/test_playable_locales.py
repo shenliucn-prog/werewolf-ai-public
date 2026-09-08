@@ -96,13 +96,18 @@ class PlayableLocalesTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(session.submit({"save": 1}))
         self.assertEqual(session.q.qsize(), 1)
 
-    async def test_stopping_event_consumer_cancels_the_game(self):
+    async def test_stopping_event_consumer_does_not_end_the_game(self):
         with tempfile.TemporaryDirectory() as tmp:
             session = GameSession("classic", {"enabled": False}, locale="en")
             session.memory_dir = tmp
             stream = session.events()
             self.assertEqual((await stream.__anext__())["type"], "init")
             await stream.aclose()
+            # Closing the SSE consumer no longer ends the game (the game task owns
+            # its lifetime); reattach resumes from the retained event ledger.
+            self.assertFalse(session.finished)
+            self.assertEqual(session.recovery_view(0)["init"]["type"], "init")
+            session.abandon()
             self.assertTrue(session.finished)
 
 

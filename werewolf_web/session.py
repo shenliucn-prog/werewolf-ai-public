@@ -12,6 +12,8 @@ import json
 import logging
 import os
 import re
+from copy import deepcopy
+from dataclasses import replace
 from typing import Optional
 
 from . import config
@@ -40,12 +42,17 @@ class GameSession:
                  locale: str = "zh-CN", names: dict | None = None,
                  personalities: dict | None = None, conjecture: bool = False,
                  player_role: str | None = None, onboarding: bool = False,
-                 planner=None):
-        if planner is not None and not planner.verified:
+                 planner=None, checkpoint_path: Optional[str] = None,
+                 _defer_preflight: bool = False):
+        if planner is not None and not planner.verified and not _defer_preflight:
             raise ValueError("Model preflight required before opening a game.")
         if planner is not None and conjecture:
             raise ValueError("Model-player conjecture tables are not yet integrated; choose normal mode.")
         self.planner = planner
+        self.session_id = session_id
+        # Optional recovery sink: when set, the game writes checkpoints at turn
+        # boundaries and around every external call; None disables persistence.
+        self.checkpoint_path = checkpoint_path
         if type(conjecture) is not bool:
             raise ValueError("Conjecture mode must be true or false.")
         self.conjecture = conjecture
@@ -78,6 +85,43 @@ class GameSession:
         self._pending_questions = {}
         self._questions_answered = 0
         self._table_cooldown = False
+        # 显式状态机游标：_play() 被分解为一系列小步骤，由 _step 驱动。
+        # _step_state 存放跨步骤的循环局部值（夜间行动、夜间事件等），
+        # 是后续检查点（预调用预留 + 本地原子提交）的挂载点。
+        self._step: Optional[str] = None
+        self._step_state: dict = {}
+        # 决策日志（§4.5）：decision_no 是单调的逻辑决策槽位，用于对已提交
+        # 动作去重；attempt_no 是同一槽位上的第几次物理调用，每次调用都消耗
+        # 预算（重试是新 attempt，不是旧 replay）。committed 在检查点提交边界
+        # 置真（块 3），此处先记录调用与结果。
+        self._decision_no = 0
+        self.decision_log: list[dict] = []
+        self._current_step: Optional[str] = None
+        # 事件账本（§5.4 / §6）：emit 给每个事件一个单调 event_no 并留存全量，
+        # 供断线重连时按编号追赶（无缺失、无重复）。对局生命周期由 _game_task
+        # 拥有：SSE 断开不再结束对局，它会在 ask_player 处继续等待输入。
+        self._event_no = 0
+        self._events: list[dict] = []
+        self._init_event: Optional[dict] = None
+        self._pending_event_no: Optional[int] = None
+        # How many ledger events have been handed to the live queue.  ``emit``
+        # records every event to the durable ledger and (by default) publishes
+        # it immediately; speech paths instead record first, checkpoint, and
+        # then flush, so an event is never visible before it is durable.
+        self._published_upto = 0
+        self.stream_active = False
+        self._game_task_ref: Optional[asyncio.Task] = None
+        # 中途续局（§5.1/§5.3）：崩溃发生在步骤内时 _step 已在派发时清空、
+        # _current_step 仍指向崩溃步骤。恢复时重新派发该步骤，并用决策日志
+        # 回放该步骤内已提交的决策（不再外呼、不耗预算）；未提交的在途调用
+        # 没有已提交条目，会被当作一次新 attempt 重新发出。这些字段是瞬态的，
+        # 每次 _play() 进入时从 decision_log 重新推导，不写入快照。
+        self._resume_step: Optional[str] = None
+        self._replay_committed: list[dict] = []
+        self._replay_cursor = 0
+        # Abandon (§7) removes the on-disk save; the game-task finalizer must not
+        # re-write a checkpoint after that removal.  Transient, never snapshotted.
+        self._abandoned = False
 
     @property
     def q(self):
@@ -91,9 +135,31 @@ class GameSession:
             self._event_q = asyncio.Queue()
         return self._event_q
 
-    def emit(self, obj: dict):
+    def emit(self, obj: dict, publish: bool = True):
+        self._record_event(obj)
+        if publish:
+            self._flush_publish()
+
+    def _record_event(self, obj: dict) -> dict:
+        """Append an event to the durable ledger + public record and assign its
+        ``event_no`` — without handing it to the live queue.  Speech paths call
+        this (via ``emit(..., publish=False)``), checkpoint, then flush, so a
+        published event is always already on disk."""
+        self._event_no += 1
+        obj["event_no"] = self._event_no
+        if obj.get("type") == "init":
+            self._init_event = obj
+        if obj.get("type") == "request":
+            self._pending_event_no = self._event_no
         self.public_record.observe(obj, self.engine.day_count)
-        self.event_q.put_nowait(obj)
+        self._events.append(obj)
+        return obj
+
+    def _flush_publish(self):
+        """Hand every recorded-but-unpublished ledger event to the live queue."""
+        while self._published_upto < len(self._events):
+            self.event_q.put_nowait(self._events[self._published_upto])
+            self._published_upto += 1
 
     def answer_question(self, question):
         if question.strip().casefold() in ("座次", "座次表", "/seats", "seats"):
@@ -111,10 +177,388 @@ class GameSession:
         record = self.public_record.query(question)
         return record if record is not None else self.host.answer_rule_question(question, self.engine)
 
+    def _open_decision(self, slot: str) -> dict:
+        """Open a logical decision slot and return its log entry.
+
+        ``decision_no`` is the monotonic dedup key for committed game actions;
+        each physical invocation of the external service for that slot is a new
+        ``attempt`` (recorded separately, each consuming budget).  ``committed``
+        is flipped at the checkpoint commit boundary (phase 3, later block).
+        """
+        self._decision_no += 1
+        entry = {
+            "decision_no": self._decision_no,
+            "slot": slot,
+            "attempts": [],
+            "result": None,
+            "committed": False,
+        }
+        self.decision_log.append(entry)
+        return entry
+
+    def _begin_attempt(self, entry: dict, calls_before: int) -> None:
+        entry["attempts"].append({
+            "attempt_no": len(entry["attempts"]) + 1,
+            "calls_before": calls_before,
+            "calls_after": calls_before,
+            "outcome": "pending",
+        })
+
+    def _end_attempt(self, entry: dict, calls_after: int, outcome: str) -> None:
+        attempt = entry["attempts"][-1]
+        attempt["calls_after"] = calls_after
+        attempt["outcome"] = outcome
+
+    def _slot_instance(self) -> str:
+        """Durable day/phase instance discriminator for decision slots (§4.5).
+
+        Step names repeat across the game ("vote" on day one and day two), so a
+        slot keyed only by step+agent would let a day-2 resume replay a stale
+        day-1 decision of the same name.  Night steps are keyed by
+        ``night_count``, everything else by ``day_count``; both counters are
+        durable (part of the engine snapshot), so the discriminator is stable
+        across a restore and unique per day/phase instance.
+        """
+        if self._current_step in ("night", "resolve_night"):
+            return f"n{self.engine.night_count}"
+        return f"d{self.engine.day_count}"
+
+    @staticmethod
+    def _slot_step(slot) -> Optional[str]:
+        """Recover the step name from a decision slot string.
+
+        NPC slots are ``"{step}:{instance}:{agent_name}:{action}"``; human slots
+        are ``"human:{step}:{instance}:{kind}"``.  Returns ``None`` for
+        malformed slots so a caller can treat them as un-replayable rather than
+        crashing.
+        """
+        if not isinstance(slot, str):
+            return None
+        if slot.startswith("human:"):
+            parts = slot.split(":", 2)
+            return parts[1] if len(parts) >= 2 else None
+        parts = slot.split(":", 1)
+        return parts[0] if parts else None
+
+    def _replay_decision(self, slot: str) -> Optional[dict]:
+        """Return the next committed decision for ``slot`` during a resume pass.
+
+        Replay is scoped to the step being resumed: only committed decisions
+        whose slot belongs to ``self._current_step`` are candidates, consumed in
+        ``decision_no`` order.  A committed decision is reused verbatim — no new
+        external call, no budget; an uncommitted in-flight decision has no entry
+        here, so the caller re-issues it as a fresh attempt.
+        """
+        if self._resume_step is None or self._resume_step != self._current_step:
+            return None
+        for index in range(self._replay_cursor, len(self._replay_committed)):
+            entry = self._replay_committed[index]
+            if entry.get("slot") == slot:
+                self._replay_cursor = index + 1
+                return entry
+        return None
+
+    # ---------------- 检查点 / 快照 ----------------
+    def _checkpoint(self) -> None:
+        """Persist the current logical state at a checkpoint boundary.
+
+        A no-op when ``checkpoint_path`` is not configured, so normal play and
+        the existing test suite are untouched until recovery is enabled.
+        """
+        if not self.checkpoint_path:
+            return
+        from . import checkpoint as cp
+        cp.save_checkpoint(self.checkpoint_path, self.snapshot())
+
+    def _commit_batch(self) -> None:
+        """Atomically commit a recorded settlement batch, then publish it once.
+
+        A settlement produces a list of events (deaths, flips, exiles) plus
+        engine mutations.  The caller records every event via ``_emit_event``
+        (``publish=False``) and then calls this: one checkpoint makes the *whole
+        batch* durable before the first event reaches the queue, then a single
+        flush publishes it.  A crash at any point leaves either none or all of
+        the batch in the ledger — never a torn batch.
+        """
+        self._checkpoint()
+        self._flush_publish()
+
+    @staticmethod
+    def _freeze(value):
+        """Recursively convert non-JSON game objects for the snapshot."""
+        if isinstance(value, Speech):
+            return {"__speech__": True, "text": value.text, "claim": value.claim,
+                    "accuse": value.accuse, "defend": value.defend,
+                    "question_to": value.question_to,
+                    "protected_facts": list(value.protected_facts)}
+        if isinstance(value, eng_mod.GameEvent):
+            return {"__event__": True, **value.to_dict()}
+        if isinstance(value, dict):
+            return {key: GameSession._freeze(val) for key, val in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [GameSession._freeze(val) for val in value]
+        return value
+
+    @staticmethod
+    def _thaw(value):
+        """Inverse of :meth:`_freeze`."""
+        if isinstance(value, dict):
+            if value.get("__speech__"):
+                return Speech(text=value.get("text", ""), claim=value.get("claim"),
+                              accuse=value.get("accuse"), defend=value.get("defend"),
+                              question_to=value.get("question_to"),
+                              protected_facts=tuple(value.get("protected_facts", [])))
+            if value.get("__event__"):
+                return eng_mod.GameEvent.from_dict(value)
+            return {key: GameSession._thaw(val) for key, val in value.items()}
+        if isinstance(value, list):
+            return [GameSession._thaw(val) for val in value]
+        return value
+
+    def snapshot(self) -> dict:
+        """Full logical-state snapshot (whitelisted; never emitted or stored
+        with credentials)."""
+        from .recovery import SCHEMA_VERSION
+        planner = self.planner
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "board_id": self.engine.board_id,
+            "locale": self.engine.locale,
+            "session_id": self.session_id,
+            "conjecture": self.conjecture,
+            "onboarding": self.onboarding,
+            "engine": self.engine.snapshot(),
+            "agents": {name: agent.snapshot() for name, agent in self.agents.items()},
+            "planner": planner.snapshot() if planner is not None and hasattr(planner, "snapshot") else None,
+            "llm": self.llm.snapshot(),
+            "conjecture_ledger": (self.conjecture_ledger.snapshot()
+                                  if self.conjecture_ledger is not None else None),
+            "public_record": deepcopy(self.public_record.entries),
+            "pending": deepcopy(self.pending),
+            "speech_events": [[name, self._freeze(sp)] for name, sp in self.speech_events],
+            "player_last_speech": self.player_last_speech,
+            "triggered": sorted(self._triggered),
+            "table_extra_turns": self._table_extra_turns,
+            "table_extra_by_name": dict(self._table_extra_by_name),
+            "table_pairs": [sorted(pair) for pair in self._table_pairs],
+            "pending_questions": dict(self._pending_questions),
+            "questions_answered": self._questions_answered,
+            "table_cooldown": self._table_cooldown,
+            "last_llm_status": (list(self._last_llm_status)
+                                if self._last_llm_status is not None else None),
+            "step": self._step,
+            "current_step": self._current_step,
+            "step_state": self._freeze(self._step_state),
+            "decision_no": self._decision_no,
+            "decision_log": self._freeze(self.decision_log),
+            "finished": self.finished,
+            # Event ledger (§5.4 / §6): durable so a process restart re-presents
+            # the same numbered transcript with no missing/duplicate events.
+            "event_no": self._event_no,
+            "events": deepcopy(self._events),
+            "pending_event_no": self._pending_event_no,
+        }
+
+    def restore(self, snapshot: dict) -> None:
+        """Restore full logical state in place (strict, validate-then-apply).
+
+        The session shell (board/seed/session_id/planner) must already exist;
+        this fills it from a whitelisted snapshot.  Transient run state — the
+        asyncio queues, ``stream_claimed``, ``_events_started`` — is reset, not
+        resurrected (see §4.2).
+
+        The restore is atomic: the *whole* snapshot is validated against
+        throwaway copies of the live components before any attribute on
+        ``self`` is touched, so a corrupt snapshot — however deep the defect —
+        raises with the session left unchanged, never half-restored.
+        """
+        from .recovery import check_version
+        check_version(snapshot, "GameSession.snapshot")
+        snapshot = deepcopy(snapshot)
+
+        # ================= Phase 1: validate (no mutation of ``self``) ======
+        board_id = snapshot.get("board_id")
+        if not isinstance(board_id, str) or not board_id:
+            raise ValueError("GameSession.snapshot: board_id must be a non-empty string")
+        session_id = snapshot.get("session_id")
+        if not isinstance(session_id, str) or not session_id:
+            raise ValueError("GameSession.snapshot: session_id must be a non-empty string")
+
+        planner_snap = snapshot.get("planner")
+        if planner_snap is not None:
+            if self.planner is None or not hasattr(self.planner, "restore"):
+                raise ValueError("GameSession.snapshot: planner snapshot without a live planner")
+        elif self.planner is not None:
+            raise ValueError("GameSession.snapshot: legacy snapshot but a live planner is attached")
+
+        entries = snapshot.get("public_record")
+        if not isinstance(entries, list):
+            raise ValueError("GameSession.snapshot: public_record must be an array")
+
+        ledger_snap = snapshot.get("conjecture_ledger")
+
+        agents = snapshot.get("agents")
+        if not isinstance(agents, dict):
+            raise ValueError("GameSession.snapshot: agents must be an object")
+        for name in agents:
+            if not isinstance(name, str) or not name:
+                raise ValueError("GameSession.snapshot: agent names must be non-empty strings")
+
+        # Event ledger (§5.4 / §6): restored verbatim so reattach after a
+        # process restart re-presents the exact numbered transcript.  The
+        # contiguous numbering invariant (1..event_no) is checked, not assumed.
+        event_no = snapshot.get("event_no", 0)
+        if type(event_no) is not int or event_no < 0:
+            raise ValueError("GameSession.snapshot: event_no must be a non-negative integer")
+        events = snapshot.get("events", [])
+        if not isinstance(events, list):
+            raise ValueError("GameSession.snapshot: events must be an array")
+        if len(events) != event_no:
+            raise ValueError("GameSession.snapshot: event ledger length does not match event_no")
+        for index, event in enumerate(events):
+            if not isinstance(event, dict):
+                raise ValueError("GameSession.snapshot: events must be objects")
+            if event.get("event_no") != index + 1:
+                raise ValueError("GameSession.snapshot: event ledger numbering is not contiguous")
+        pending_event_no = snapshot.get("pending_event_no")
+        if pending_event_no is not None and (type(pending_event_no) is not int or pending_event_no < 0):
+            raise ValueError("GameSession.snapshot: pending_event_no must be an integer or null")
+
+        # Validate every component snapshot by restoring it into a throwaway
+        # copy of the live object, so any component defect fires here too.
+        probe_engine = deepcopy(self.engine)
+        probe_engine.restore(snapshot["engine"])
+
+        # The live key is bound to the configured endpoint; a probe client
+        # mirrors that endpoint (disabled, so no network/client side effects)
+        # and re-runs llm.restore's endpoint-trust + budget checks untouched.
+        probe_llm = LLMClient(replace(self.llm.runtime, enabled=False, api_key=""))
+        probe_llm.restore(snapshot["llm"])
+
+        probe_planner = None
+        if planner_snap is not None:
+            probe_planner = deepcopy(self.planner)
+            probe_planner.restore(planner_snap)
+
+        probe_public = PublicRecord(probe_engine.locale)
+        probe_public.entries = deepcopy(entries)
+
+        probe_ledger = None
+        if ledger_snap is not None:
+            from .game.conjecture import GameConjectures
+            probe_ledger = GameConjectures(probe_engine)
+            probe_ledger.restore(ledger_snap)
+
+        memory_dir = os.path.join(config.DATA_DIR, "npc_memory", session_id)
+        probe_agents = {}
+        for name, agent_snap in agents.items():
+            if probe_planner is not None:
+                from .ai.model_player import ModelNPCAgent
+                probe_agents[name] = ModelNPCAgent.restore_agent(
+                    agent_snap, probe_engine, probe_llm, probe_planner,
+                    probe_public, memory_dir=memory_dir)
+            else:
+                probe_agents[name] = StrategicNPCAgent.restore_agent(
+                    agent_snap, probe_engine, probe_llm, memory_dir=memory_dir)
+
+        # ================= Phase 2: apply (cannot fail) ====================
+        # Everything above has validated, so each in-place restore below re-runs
+        # the same checks against the live object and succeeds.
+        self.engine.restore(snapshot["engine"])
+        self.llm.restore(snapshot["llm"])
+        if planner_snap is not None:
+            self.planner.restore(planner_snap)
+
+        self.public_record = PublicRecord(self.engine.locale)
+        self.public_record.entries = deepcopy(entries)
+
+        if ledger_snap is not None:
+            from .game.conjecture import GameConjectures
+            self.conjecture_ledger = GameConjectures(self.engine)
+            self.conjecture_ledger.restore(ledger_snap)
+        else:
+            self.conjecture_ledger = None
+
+        # Rebuild agents side-effect-free (no engine RNG, no match_start),
+        # against the restored engine/llm/planner and the restored memory_dir.
+        self.agents = {}
+        for name, agent_snap in agents.items():
+            if self.planner is not None:
+                from .ai.model_player import ModelNPCAgent
+                self.agents[name] = ModelNPCAgent.restore_agent(
+                    agent_snap, self.engine, self.llm, self.planner,
+                    self.public_record, memory_dir=memory_dir)
+            else:
+                self.agents[name] = StrategicNPCAgent.restore_agent(
+                    agent_snap, self.engine, self.llm, memory_dir=memory_dir)
+
+        # Session loop state (durable fields only).
+        self.session_id = session_id
+        self.memory_dir = memory_dir
+        self.conjecture = bool(snapshot.get("conjecture"))
+        self.onboarding = bool(snapshot.get("onboarding"))
+        self.finished = bool(snapshot.get("finished"))
+        self.pending = deepcopy(snapshot.get("pending"))
+        self.speech_events = [(name, self._thaw(sp))
+                              for name, sp in snapshot.get("speech_events", [])]
+        self.player_last_speech = snapshot.get("player_last_speech", "")
+        self._triggered = set(snapshot.get("triggered", []))
+        self._table_extra_turns = snapshot.get("table_extra_turns", 0)
+        self._table_extra_by_name = dict(snapshot.get("table_extra_by_name", {}))
+        self._table_pairs = {frozenset(pair) for pair in snapshot.get("table_pairs", [])}
+        self._pending_questions = dict(snapshot.get("pending_questions", {}))
+        self._questions_answered = snapshot.get("questions_answered", 0)
+        self._table_cooldown = bool(snapshot.get("table_cooldown"))
+        last = snapshot.get("last_llm_status")
+        self._last_llm_status = tuple(last) if isinstance(last, list) else None
+        self._step = snapshot.get("step")
+        self._current_step = snapshot.get("current_step")
+        self._step_state = self._thaw(snapshot.get("step_state", {}))
+        self._decision_no = snapshot.get("decision_no", 0)
+        self.decision_log = self._thaw(snapshot.get("decision_log", []))
+        self._event_no = event_no
+        self._events = deepcopy(events)
+        self._init_event = next((e for e in self._events if e.get("type") == "init"), None)
+        self._pending_event_no = pending_event_no
+        # Transient, deliberately not restored (see §4.2).
+        self.stream_claimed = False
+        self._events_started = False
+        self._q = None
+        self._event_q = None
+        self.stream_active = False
+        self._game_task_ref = None
+        # The restored ledger is already durable and re-presented by the
+        # ``events(after)`` catch-up path, not the live queue.  Align the
+        # publish cursor to the ledger end so a subsequent ``_flush_publish``
+        # hands only *newly* emitted events to the fresh queue — never re-publishes
+        # the pre-restart transcript from a stale cursor.
+        self._published_upto = len(self._events)
+
+
     async def ask_player(self, kind: str, data: dict) -> dict:
+        slot = f"human:{self._current_step}:{self._slot_instance()}:{kind}"
+        replayed = self._replay_decision(slot)
+        if replayed is not None:
+            # The action was already accepted and committed; return the accepted
+            # response without re-presenting the prompt or re-blocking on input.
+            return replayed["result"]
         self.pending = {"kind": kind, "data": data}
+        decision = self._open_decision(slot)
+        calls = getattr(self.planner, "calls", 0)
+        self._begin_attempt(decision, calls)
+        # Emit the request (which assigns ``_pending_event_no``) *before* the
+        # checkpoint, so the pending action, its event number and the request
+        # event commit atomically — a crash while the player is deciding restores
+        # a consistent prompt, never a pending action without its event number.
         self.emit({"type": "request", "kind": kind, "data": data})
-        return await self.q.get()
+        self._checkpoint()
+        resp = await self.q.get()
+        self._end_attempt(decision, calls, "accepted")
+        decision["result"] = resp
+        decision["committed"] = True
+        # Post-result commit: the accepted action is durable before it is applied.
+        self._checkpoint()
+        return resp
 
     def submit(self, resp: dict):
         if not self.pending or not isinstance(resp, dict):
@@ -155,35 +599,99 @@ class GameSession:
                 if kind == "vote" and target is None:
                     return False
         self.pending = None
+        self._pending_event_no = None
         self.q.put_nowait(resp)
         return True
 
-    # ---------------- 主循环 ----------------
-    async def events(self):
-        """Yield game events as dictionaries, independent of presentation."""
-        if self._events_started:
-            raise RuntimeError("A session has one event consumer; start a new game to play again.")
-        self._events_started = True
-        task = asyncio.create_task(self._game_task())
-        try:
-            while True:
-                item = await self.event_q.get()
-                if item is _SENTINEL:
-                    break
-                yield item
-            await task
-        finally:
-            if not task.done():
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
+    # ---------------- 主循环 / 断线重连 ----------------
+    def ensure_game_task(self):
+        """Start the game loop exactly once.  The game task owns the session's
+        lifetime: a closed SSE stream no longer ends the game — it keeps running
+        while blocked on ``ask_player`` until gameover or an explicit abandon."""
+        if self._game_task_ref is None or self._game_task_ref.done():
+            self._game_task_ref = asyncio.create_task(self._game_task())
+        return self._game_task_ref
 
-    async def run(self):
-        """Backward-compatible SSE view used by the existing Web adapter."""
-        async for item in self.events():
+    def abandon(self):
+        """Explicit leave/abandon: end the game without waiting for a stream."""
+        self._abandoned = True
+        self.finished = True
+        self.pending = None
+        self._pending_event_no = None
+        self.event_q.put_nowait(_SENTINEL)
+        if self._game_task_ref is not None and not self._game_task_ref.done():
+            self._game_task_ref.cancel()
+
+    async def events(self, after: int = 0):
+        """Yield events with ``event_no > after``, then live until the end.
+
+        Catch-up reads the retained event ledger (idempotent, so a reattaching
+        client neither misses nor duplicates an event); the live tail drains the
+        queue the game task fills.  Closing this consumer does *not* cancel the
+        game task — reattach is supported until the game ends or is abandoned.
+        """
+        self.ensure_game_task()
+        seen = after
+        for ev in list(self._events):
+            if ev["event_no"] > seen:
+                yield ev
+                seen = ev["event_no"]
+        while True:
+            item = await self.event_q.get()
+            if item is _SENTINEL:
+                break
+            if item["event_no"] > seen:
+                yield item
+                seen = item["event_no"]
+
+    async def run(self, after: int = 0):
+        """SSE view; ``after`` joins the stream at that event number (reattach)."""
+        async for item in self.events(after=after):
             yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
+
+    def recovery_view(self, last_event_no: int = 0) -> dict:
+        """Player-scoped recovery payload (§6): the init the player received,
+        their own private results, the numbered public events for catch-up, and
+        the current pending action — plus the event number where the live stream
+        rejoins (no missing, no duplicate).
+
+        ``public_events`` is the public transcript (numbered); ``private_events``
+        is only this seat's own ``private`` result lines, re-renderable as text.
+        Nothing here can leak another seat's private data — it is all read from
+        the single human seat's own view.
+        """
+        public_events = [
+            row["event"] for row in self.public_record.entries
+            if (row["event"].get("event_no") or 0) > last_event_no
+        ]
+        private_events = [
+            e for e in self._events
+            if e.get("event_no", 0) > last_event_no and e.get("type") == "private"
+        ]
+        pending = None
+        if self.pending is not None:
+            pending = {"type": "request", "kind": self.pending["kind"],
+                       "data": self.pending["data"],
+                       "event_no": self._pending_event_no}
+        # End-of-game signals (public only: winner/reason/review/error) so a
+        # reattaching client can render the final result after a finished game.
+        terminal = [e for e in self._events
+                    if e.get("event_no", 0) > last_event_no
+                    and e.get("type") in ("gameover", "review", "error")]
+        private = None
+        if self.engine.seats:
+            private = self.engine.player_view()
+        return {
+            "game_id": self.session_id,
+            "finished": self.finished,
+            "init": self._init_event,
+            "private": private,
+            "public_events": public_events,
+            "private_events": private_events,
+            "pending": pending,
+            "terminal": terminal,
+            "next_event_no": self._event_no + 1,
+        }
 
     async def _game_task(self):
         try:
@@ -199,28 +707,117 @@ class GameSession:
                 if self.engine.locale == "en" else "对局意外中断，请重新开局。")})
         finally:
             self.pending = None
+            self._pending_event_no = None
             self.finished = True
             self.event_q.put_nowait(_SENTINEL)
+            # Persist the finished flag (and any error event) so a restart does
+            # not re-present the game as still running.  Skipped on abandon: the
+            # caller removes the save, and a finalizer must not resurrect it.
+            if not self._abandoned:
+                self._checkpoint()
 
-    async def _npc_call(self, call, *args, **kwargs):
+    async def _npc_call(self, call, *args, action=None, **kwargs):
         if self.planner is None:
             return call(*args, **kwargs)
         agent = getattr(call, "__self__", None)
+        name = agent.name if agent is not None else "?"
+        # The decision identity must name the *concrete action*, not just the
+        # step + actor: within one election an agent 上警/发言/退警/投票, and the
+        # stone ghost acts twice a night.  A method-name default is unambiguous
+        # for speak/vote/table_*; callers that repeat one method per step pass an
+        # explicit ``action`` (election_up/election_withdraw/stone_ghost/…).
+        act = action if action is not None else getattr(call, "__name__", "call")
+        if not isinstance(act, str):
+            act = "call"
+        slot = f"{self._current_step}:{self._slot_instance()}:{name}:{act}"
+        replayed = self._replay_decision(slot)
+        if replayed is not None:
+            # Committed decision reused verbatim — no new call, no budget.
+            return replayed["result"]
+        decision = self._open_decision(slot)
         while True:
             memory = getattr(agent, "model_decisions", [])
             checkpoint = len(memory)
+            calls_before = getattr(self.planner, "calls", 0)
+            self._begin_attempt(decision, calls_before)
+            # Reserve the budget *before* the pre-call checkpoint: the external
+            # request may still fail or the process may crash, but the consumed
+            # attempt must survive a restore.  ``complete()`` no longer reserves.
+            reserve = getattr(self.planner, "reserve", None)
+            if reserve is not None:
+                reserve()
+            # Pre-call reservation: state-before-call + attempt are durable
+            # before the external request goes out.
+            self._checkpoint()
             try:
-                return await asyncio.to_thread(call, *args, **kwargs)
+                result = await asyncio.to_thread(call, *args, **kwargs)
             except ModelTurnError:
                 del memory[checkpoint:]
+                self._end_attempt(decision, getattr(self.planner, "calls", 0), "error")
+                self._checkpoint()
                 self.emit({"type": "narration", "text": (
                     "Model response failed. Game paused without substituting a local player. Retry after checking the connection, or stop. Budget limits still apply."
                     if self.engine.locale == "en" else "模型响应失败，对局已暂停，未替换为离线玩家。检查连接后可重试，或结束本局；调用上限仍有效。")})
                 response = await self.ask_player("model_retry", {})
                 if not response["retry"]:
                     raise ModelTurnError("Player stopped after model failure.") from None
+                continue
+            self._end_attempt(decision, getattr(self.planner, "calls", 0), "accepted")
+            decision["result"] = result
+            decision["committed"] = True
+            # Post-result commit: the accepted result is durable before the
+            # engine applies it in the calling step.
+            self._checkpoint()
+            return result
 
     async def _play(self):
+        """Run the game as an explicit state machine.
+
+        Each ``_step_*`` method is a small, resumable unit driven by the
+        ``_step`` cursor.  Loop-local values that must cross a step boundary
+        (night actions, the night's resolved events) travel through
+        ``_step_state``.  This is the seam where phase 3 hangs checkpoint
+        writes (pre-call reservation + local atomic commit).
+
+        A restored session enters with its ``_step`` cursor already set; a
+        fresh session (undealt engine, no cursor) starts at ``setup``.  A turn
+        boundary checkpoint is written before each step so the common refresh
+        case resumes from the last committed step.
+        """
+        if self._step is None and not self.finished:
+            if not self.engine.seats:
+                self._step = "setup"
+                self._step_state = {}
+            elif self._current_step and self._current_step != "endgame":
+                # Mid-step crash: dispatching the step cleared ``_step`` but the
+                # crashed step is still recorded.  Re-dispatch it and replay its
+                # committed decisions (see ``_replay_decision``) instead of
+                # halting or re-running the whole step from scratch.
+                self._resume_step = self._current_step
+                self._replay_committed = [
+                    d for d in self.decision_log
+                    if d.get("committed")
+                    and self._slot_step(d.get("slot")) == self._current_step
+                ]
+                self._replay_cursor = 0
+                self._step = self._current_step
+        while self._step is not None:
+            self._checkpoint()
+            step, self._step = self._step, None
+            self._current_step = step
+            if self._resume_step is not None and step != self._resume_step:
+                # The resumed step finished; stop replaying its committed
+                # decisions (a later normal occurrence of the same step name
+                # must not reuse a stale replay queue).
+                self._resume_step = None
+                self._replay_committed = []
+                self._replay_cursor = 0
+            handler = getattr(self, f"_step_{step}", None)
+            if handler is None:
+                raise RuntimeError(f"Unknown game step {step!r}")
+            await handler()
+
+    async def _step_setup(self):
         e = self.engine
         e.setup()
         if self.conjecture:
@@ -256,125 +853,214 @@ class GameSession:
                                 "visual_gameplay_available": False, "conjecture": self.conjecture,
                                 "npc_driver": self._model_status().get("backend", "model") if self.planner is not None else "legacy_rules"}})
         self._remember_llm_status()
+        self._step = "onboarding" if self.onboarding else "witch_rule"
 
-        if self.onboarding:
-            from .onboarding import introduction
-            e.phase = "onboarding"
-            self.emit({"type": "narration", "phase": "onboarding",
-                       "text": introduction(e, self.conjecture)})
-            await self.ask_player("ready", {})
+    async def _step_onboarding(self):
+        e = self.engine
+        from .onboarding import introduction
+        e.phase = "onboarding"
+        self.emit({"type": "narration", "phase": "onboarding",
+                   "text": introduction(e, self.conjecture)})
+        await self.ask_player("ready", {})
+        self._step = "witch_rule"
 
+    async def _step_witch_rule(self):
+        e = self.engine
         if e.witch_unlimited:
             self.emit({"type": "narration", "text": witch_rule_text(e.locale, e.board)})
+        self._step = "night"
 
-        game_over = False
-        while not game_over:
-            if e.check_round_limit():
-                self.emit({"type": "narration", "text": e.end_reason})
-                break
+    async def _step_night(self):
+        e = self.engine
+        if e.check_round_limit():
+            self.emit({"type": "narration", "text": e.end_reason})
+            self._step = "endgame"
+            return
+        # The night prologue (night_start narration + start_night) is guarded so
+        # a mid-step resume re-enters gather without re-incrementing night_count
+        # or re-announcing nightfall.
+        if not self._step_state.get("night_started"):
             self.emit({"type": "narration", "phase": "night", "text": self.host.narrate("night_start", "")})
             await asyncio.sleep(0.3)
             requests = e.start_night()
             self._deliver_grave_result()
-            actions = await self._gather_night(requests)
+            self._step_state["night_started"] = True
+            self._step_state["night_requests"] = requests
+            self._step_state["gather_actions"] = {}
+            self._step_state["gather_cursor"] = 0
+            self._checkpoint()
+        requests = self._step_state.get("night_requests", [])
+        actions = await self._gather_night(requests)
+        self._step_state["actions"] = actions
+        for key in ("night_started", "night_requests"):
+            self._step_state.pop(key, None)
+        self._step = "resolve_night"
+
+    async def _step_resolve_night(self):
+        e = self.engine
+        # Settlement is applied exactly once.  ``night_events`` in ``_step_state``
+        # is the execution-position marker: a mid-step resume (e.g. a crash while
+        # the hunter death-skill prompt is open, which checkpoints) re-enters here
+        # and must not re-pop ``actions`` nor re-apply ``resolve_night``.
+        night_events = self._step_state.get("night_events")
+        if night_events is None:
+            actions = self._step_state.pop("actions")
             night_events = e.resolve_night(actions)
+            self._step_state["night_events"] = night_events
             for ev in night_events:
                 await self._emit_event(ev)
-            await self._post_death_triggers()
-            if e.check_win():
-                self.emit({"type": "narration", "text": self.host.narrate("win", e.end_reason)})
-                break
-            if e.player_seat().role == "seer":
-                for r in e.seer_results:
-                    if r["night"] == e.night_count:
-                        self.emit({"type": "private",
-                                   "text": t(self.engine.locale, "seer_result",
-                                             n=r["night"], target=r["target"],
-                                             name=r["name"],
-                                             result=t(self.engine.locale, "result_wolf" if r["result"] == "wolf" else "result_good"))})
-            if e.player_seat().role == "stone_ghost":
-                for r in e.sg_results:
-                    if r["night"] == e.night_count:
-                        self.emit({"type": "private",
-                                   "text": t(self.engine.locale, "sg_result",
-                                             n=r["night"], target=r["target"],
-                                             name=r["name"], role=r["role_cn"])})
-            await asyncio.sleep(0.4)
+            # Commit the whole settlement batch (engine state + every event)
+            # atomically before publishing: a resume after a crash either replays
+            # the full batch or skips it wholesale — never a torn half-batch.
+            self._commit_batch()
+        await self._post_death_triggers()
+        if e.check_win():
+            self.emit({"type": "narration", "text": self.host.narrate("win", e.end_reason)})
+            self._step = "endgame"
+            return
+        if e.player_seat().role == "seer":
+            for r in e.seer_results:
+                if r["night"] == e.night_count:
+                    self.emit({"type": "private",
+                               "text": t(self.engine.locale, "seer_result",
+                                         n=r["night"], target=r["target"],
+                                         name=r["name"],
+                                         result=t(self.engine.locale, "result_wolf" if r["result"] == "wolf" else "result_good"))})
+        if e.player_seat().role == "stone_ghost":
+            for r in e.sg_results:
+                if r["night"] == e.night_count:
+                    self.emit({"type": "private",
+                               "text": t(self.engine.locale, "sg_result",
+                                         n=r["night"], target=r["target"],
+                                         name=r["name"], role=r["role_cn"])})
+        await asyncio.sleep(0.4)
+        self._step = "day_start"
 
-            e.start_day()
-            self._reset_table_talk()
-            self.emit({"type": "narration", "phase": "day", "text": self.host.narrate("day_start", t(self.engine.locale, "day_start", d=e.day_count))})
-            if not any(ev.type == "death" for ev in night_events):
-                self.emit({"type": "narration", "text": "Host Raven: No one died last night." if e.locale == "en" else "主持人夜鸦：昨夜平安，无人死亡。"})
-            await asyncio.sleep(0.3)
+    async def _step_day_start(self):
+        e = self.engine
+        night_events = self._step_state.pop("night_events", [])
+        e.start_day()
+        self._reset_table_talk()
+        self.emit({"type": "narration", "phase": "day", "text": self.host.narrate("day_start", t(self.engine.locale, "day_start", d=e.day_count))})
+        if not any(ev.type == "death" for ev in night_events):
+            self.emit({"type": "narration", "text": "Host Raven: No one died last night." if e.locale == "en" else "主持人夜鸦：昨夜平安，无人死亡。"})
+        await asyncio.sleep(0.3)
+        if e.day_count == 1:
+            self._step = "election"
+        elif self.conjecture:
+            self._step = "conjecture_pre"
+        else:
+            self._step = "speeches"
 
-            if e.day_count == 1:
-                await self._election()
-            e.phase = "day"
+    async def _step_election(self):
+        await self._election()
+        self.engine.phase = "day"
+        if self.conjecture:
+            self._step = "conjecture_pre"
+        else:
+            self._step = "speeches"
 
-            if self.conjecture:
-                await self._conjecture_round()
+    async def _step_conjecture_pre(self):
+        await self._conjecture_round()
+        self._step = "speeches"
 
-            order = e.speech_order()
+    async def _step_speeches(self):
+        e = self.engine
+        order = e.speech_order()
+        # ``speech_events``/``player_last_speech`` are instance fields restored
+        # from the snapshot; they are only reset on a *fresh* step (a mid-step
+        # resume re-enters mid-loop with the accumulated speeches intact).
+        if self._resume_step != "speeches":
             self.speech_events = []
             self.player_last_speech = ""
-            for pos in order:
-                seat = e.seat_at(pos)
-                if not seat.alive:
-                    continue
-                await self._day_skill(seat)
-                if e.check_win() or e.phase == "night":
-                    break
-                if not seat.alive:
-                    continue
-                if seat.is_player:
-                    resp = await self.ask_player("speech", {"phase": t(self.engine.locale, "phase_day", n=e.day_count)})
-                    text = resp.get("text", "").strip()
-                    self.player_last_speech = text
-                    speech = self._player_speech(text)
-                else:
-                    speech = await self._npc_call(self.agents[seat.name].speak,
-                        self.speech_events, self.player_last_speech)
-                    text = speech.text
-                    self._emit_llm_status_if_changed()
-                self.speech_events.append((seat.name, speech))
-                self._broadcast_speech(seat, speech)
-                e.record_speech(
-                    pos, text, claim=speech.claim,
-                    accuse=speech.accuse, defend=speech.defend,
-                )
-                self.emit({"type": "speech", "seat": pos, "name": seat.name, "text": text})
-                await asyncio.sleep(0.3)
-                await self._maybe_table_talk(seat, speech)
-
-            if e.check_win():
-                self.emit({"type": "narration", "text": self.host.narrate("win", e.end_reason)})
-                break
-            if e.phase == "night":
-                self.emit({"type": "narration", "text": t(e.locale, "skill_ends_day")})
+        start = self._step_state.get("speeches_cursor", 0) if self._resume_step == "speeches" else 0
+        for i in range(start, len(order)):
+            pos = order[i]
+            seat = e.seat_at(pos)
+            if not seat.alive:
                 continue
-
-            await self._answer_table_questions()
-            for seat in e.alive_seats():
-                if seat.role == "crow":
-                    await self._day_skill(seat, crow=True)
-
-            rule = self.host.maybe_invent_rule(e)
-            if rule:
-                self.emit({"type": "host_rule", "text": rule})
-
-            if self.conjecture:
-                # A second snapshot lets the human revise after discussion.
-                await self._conjecture_round()
-            await self._vote_phase()
-            await self._post_death_triggers()
-
-            win = e.check_win()
-            if win:
-                game_over = True
-                self.emit({"type": "narration", "text": self.host.narrate("win", e.end_reason)})
+            await self._day_skill(seat)
+            if e.check_win() or e.phase == "night":
                 break
+            if not seat.alive:
+                continue
+            if seat.is_player:
+                resp = await self.ask_player("speech", {"phase": t(self.engine.locale, "phase_day", n=e.day_count)})
+                text = resp.get("text", "").strip()
+                self.player_last_speech = text
+                speech = self._player_speech(text)
+            else:
+                speech = await self._npc_call(self.agents[seat.name].speak,
+                    self.speech_events, self.player_last_speech)
+                text = speech.text
+                self._emit_llm_status_if_changed()
+            self.speech_events.append((seat.name, speech))
+            self._broadcast_speech(seat, speech)
+            e.record_speech(
+                pos, text, claim=speech.claim,
+                accuse=speech.accuse, defend=speech.defend,
+            )
+            self._step_state["speeches_cursor"] = i + 1
+            # Durability before visibility: the speech event, the cursor and the
+            # agent/engine mutations commit atomically before the speech reaches
+            # the live queue — a crash here loses nothing the player already saw,
+            # and a resume re-enters at the next seat instead of re-emitting.
+            self.emit({"type": "speech", "seat": pos, "name": seat.name, "text": text},
+                      publish=False)
+            self._checkpoint()
+            self._flush_publish()
+            await asyncio.sleep(0.3)
+            await self._maybe_table_talk(seat, speech)
+            self._checkpoint()
 
+        self._step_state.pop("speeches_cursor", None)
+        if e.check_win():
+            self.emit({"type": "narration", "text": self.host.narrate("win", e.end_reason)})
+            self._step = "endgame"
+            return
+        if e.phase == "night":
+            self.emit({"type": "narration", "text": t(e.locale, "skill_ends_day")})
+            self._step = "night"
+            return
+        self._step = "day_wrap"
+
+    async def _step_day_wrap(self):
+        e = self.engine
+        await self._answer_table_questions()
+        for seat in e.alive_seats():
+            if seat.role == "crow":
+                await self._day_skill(seat, crow=True)
+
+        rule = self.host.maybe_invent_rule(e)
+        if rule:
+            self.emit({"type": "host_rule", "text": rule})
+
+        if self.conjecture:
+            # A second snapshot lets the human revise after discussion.
+            self._step = "conjecture_post"
+        else:
+            self._step = "vote"
+
+    async def _step_conjecture_post(self):
+        await self._conjecture_round()
+        self._step = "vote"
+
+    async def _step_vote(self):
+        e = self.engine
+        await self._vote_phase()
+        await self._post_death_triggers()
+        # The vote (and its death-trigger chain) is fully settled; drop the
+        # execution-position marker so the *next* day's vote runs fresh.
+        self._step_state.pop("vote_settled", None)
+
+        if e.check_win():
+            self.emit({"type": "narration", "text": self.host.narrate("win", e.end_reason)})
+            self._step = "endgame"
+            return
+        self._step = "night"
+
+    async def _step_endgame(self):
+        e = self.engine
         perf = self._npc_performances()
         review = self.host.review(e, perf)
         self.host.evolve(e, review)
@@ -385,6 +1071,11 @@ class GameSession:
         review += "\n\n" + self.public_record.query("/history")
         self.emit({"type": "review", "text": review, "winner": e.winner})
         self.emit({"type": "gameover", "winner": e.winner, "reason": e.end_reason})
+        self.finished = True
+        self._step = None
+        # Final commit (§8.3): the terminal review/gameover events, the finished
+        # flag and the drained step cursor are durable before the game task exits.
+        self._checkpoint()
 
     async def _conjecture_round(self):
         ledger = self.conjecture_ledger
@@ -462,17 +1153,42 @@ class GameSession:
             agent.observe_speech(self.engine.day_count, seat.name, speech)
 
     async def _answer_table_questions(self):
-        """A bounded public clarification window after ordered speeches."""
+        """A bounded public clarification window after ordered speeches.
+
+        A question is removed from the pending set — and the answer budget
+        spent — only *after* its reply is committed.  The in-flight question is
+        recorded in ``_step_state["answering_question"]`` before the model call,
+        so a crash before the commit re-asks it on resume instead of dropping it
+        permanently (Shawn's repro: empty questions, uncommitted decision, zero
+        retries after restore).
+        """
         for target, asker in list(self._pending_questions.items()):
-            del self._pending_questions[target]
             agent = self.agents.get(target)
             if not agent or not agent.seat.alive or self._questions_answered >= 2:
+                # Unanswerable or budget spent: drop it durably and move on.
+                self._pending_questions.pop(target, None)
+                self._step_state.pop("answering_question", None)
+                self._checkpoint()
                 continue
-            self._questions_answered += 1
-            self.emit({"type": "narration", "text":
-                       (f"Host: Before voting, {target}, answer {asker}'s question. This is a claim, not a host-verified result." if self.engine.locale == "en" else
-                        f"主持人：投票前请 {target} 回答 {asker} 的追问。这是玩家口径，不代表主持人认证。")})
+            # Announce on first entry only (a resume re-enters mid-question with
+            # the marker already set, skips the announcement, and re-asks through
+            # the decision replay path).
+            if self._step_state.get("answering_question") != [target, asker]:
+                self.emit({"type": "narration", "text":
+                           (f"Host: Before voting, {target}, answer {asker}'s question. This is a claim, not a host-verified result." if self.engine.locale == "en" else
+                            f"主持人：投票前请 {target} 回答 {asker} 的追问。这是玩家口径，不代表主持人认证。")},
+                          publish=False)
+            self._step_state["answering_question"] = [target, asker]
+            self._checkpoint()
+            self._flush_publish()
             response = await self._npc_call(agent.table_reply, asker) if self.planner is not None else agent.brain.answer_check_question()
+            # Commit the reply and the question bookkeeping atomically: apply the
+            # budget/question mutations *before* ``_publish_table_speech``, whose
+            # checkpoint persists the spent budget, the answered question and the
+            # reply together, then publishes once.
+            self._questions_answered += 1
+            self._pending_questions.pop(target, None)
+            self._step_state.pop("answering_question", None)
             await self._publish_table_speech(agent.seat, response, "clarification")
 
     def _reset_table_talk(self):
@@ -493,8 +1209,12 @@ class GameSession:
         )
         self._table_extra_turns += 1
         self._table_extra_by_name[seat.name] = self._table_extra_by_name.get(seat.name, 0) + 1
+        # Durability before visibility: the table speech and its counters persist
+        # before the event reaches the live queue.
         self.emit({"type": "speech", "seat": seat.pos, "name": seat.name,
-                   "text": speech.text, "table_talk": True})
+                   "text": speech.text, "table_talk": True}, publish=False)
+        self._checkpoint()
+        self._flush_publish()
         await asyncio.sleep(0.25)
 
     async def _maybe_table_talk(self, source, source_speech: Speech):
@@ -594,12 +1314,19 @@ class GameSession:
     # ---------------- 夜晚 ----------------
     async def _gather_night(self, requests) -> dict:
         e = self.engine
-        actions = {}
         prio = {"seer": 0, "wolves": 1, "witch": 2, "guard": 3,
                 "stone_ghost_kill": 1, "wolf_beauty": 4, "stone_ghost": 5}
         requests = sorted(requests, key=lambda r: prio.get(r[0], 9))
-        knife = None
-        for actor, pos in requests:
+        # Mid-step resume: the accumulated per-actor actions (and the knife the
+        # witch is told about) survive in ``_step_state`` so a re-run continues
+        # at the first actor not yet gathered instead of re-asking everyone.
+        resuming = self._resume_step == "night"
+        actions = self._step_state.get("gather_actions", {}) if resuming else {}
+        knife = actions.get("wolves", actions.get("stone_ghost_kill", {})).get("target") \
+            if resuming else None
+        start = self._step_state.get("gather_cursor", 0) if resuming else 0
+        for i in range(start, len(requests)):
+            actor, pos = requests[i]
             if actor == "seer":
                 actions["seer"] = await self._seer_action()
             elif actor == "wolves":
@@ -618,6 +1345,11 @@ class GameSession:
                 res = await self._sg_kill_action()
                 actions[actor] = res
                 knife = res.get("target")
+            self._step_state["gather_actions"] = actions
+            self._step_state["gather_cursor"] = i + 1
+            self._checkpoint()
+        self._step_state.pop("gather_actions", None)
+        self._step_state.pop("gather_cursor", None)
         return actions
 
     def _alive_others(self, exclude_name: str) -> list[int]:
@@ -729,7 +1461,7 @@ class GameSession:
                 "desc": t(e.locale, "sg_desc"),
                 "candidates": [{"pos": p, "name": e.seat_at(p).name} for p in cands]})
             return {"target": resp.get("target")}
-        return await self._npc_call(self.agents[sg.name].night_action, "stone_ghost", cands)
+        return await self._npc_call(self.agents[sg.name].night_action, "stone_ghost", cands, action="stone_ghost")
 
     async def _sg_kill_action(self):
         e = self.engine
@@ -741,7 +1473,7 @@ class GameSession:
                 "desc": t(e.locale, "sg_kill_desc"),
                 "candidates": [{"pos": p, "name": e.seat_at(p).name} for p in cands]})
             return {"target": resp.get("target")}
-        return await self._npc_call(self.agents[sg.name].night_action, "wolves", cands)
+        return await self._npc_call(self.agents[sg.name].night_action, "wolves", cands, action="stone_ghost_kill")
 
     def _deliver_grave_result(self):
         e = self.engine
@@ -773,96 +1505,177 @@ class GameSession:
                       agent.brain.day_skill([c["pos"] for c in candidates]).target)
         for event in e.resolve_day_skill(seat.pos, target):
             await self._emit_event(event)
+        self._commit_batch()
         await self._post_death_triggers()
 
     # ---------------- 警长选举（仅第一天） ----------------
     async def _election(self):
         e = self.engine
         e.phase = "election"
-        up_players = []
-        election_speeches: list[tuple[str, Speech]] = []
-        for s in e.alive_seats():
-            if s.is_player:
-                resp = await self.ask_player("election_up", {})
-                if resp.get("up"):
-                    up_players.append(s)
-            else:
-                agent = self.agents[s.name]
-                up = await self._npc_call(agent.election_choice) if self.planner is not None else (s.role == "seer" or
-                      (s.is_wolf and agent.brain.wolf_strategy == "bluff") or
-                      agent.style.aggression > 0.82)
-                if up:
-                    up_players.append(s)
-        if not up_players:
-            self.emit({"type": "narration", "text": t(e.locale, "sheriff_nobody")})
-            return
-        self.emit({"type": "narration", "text": ("Sheriff candidates: " if e.locale == "en" else "本轮上警名单：") +
-                   ", ".join(f"#{s.pos} {s.name}" for s in up_players)})
-        for s in sorted(up_players, key=lambda x: x.pos):
-            if s.is_player:
-                resp = await self.ask_player("speech", {"phase": t(e.locale, "election_phase")})
-                text = resp.get("text", "")
-                speech = self._player_speech(text)
-            else:
-                speech = await self._npc_call(self.agents[s.name].speak, election_speeches)
-                text = speech.text
-            election_speeches.append((s.name, speech))
-            self._broadcast_speech(s, speech)
-            e.record_speech(
-                s.pos, text, phase="election", claim=speech.claim,
-                accuse=speech.accuse, defend=speech.defend,
-            )
-            self.emit({"type": "speech", "seat": s.pos, "name": s.name, "text": text, "election": True})
-            await asyncio.sleep(0.3)
-        await self._answer_table_questions()
-        # Human-facing adapters expose a withdrawal window; unattended
-        # research callers retain their existing no-prompt election protocol.
-        if self.onboarding:
-            remaining = []
-            for s in up_players:
+        phase = self._step_state.get("election_phase", 0)
+
+        # ---- Phase 0: 收集上警名单 ----
+        if phase == 0:
+            alive = e.alive_seats()
+            up_positions = list(self._step_state.get("election_up", []))
+            start = self._step_state.get("election_cursor", 0)
+            for i in range(start, len(alive)):
+                s = alive[i]
                 if s.is_player:
-                    response = await self.ask_player("election_withdraw", {})
-                    withdraw = response["withdraw"]
+                    resp = await self.ask_player("election_up", {})
+                    if resp.get("up"):
+                        up_positions.append(s.pos)
                 else:
-                    own_claim = next(sp.claim for name, sp in election_speeches if name == s.name)
-                    withdraw = (await self._npc_call(self.agents[s.name].election_choice, withdraw=True) if self.planner is not None else
-                                own_claim != "seer" and any(sp.claim == "seer" for name, sp in election_speeches if name != s.name) and self.agents[s.name].style.aggression < 0.9)
-                if withdraw:
-                    self.emit({"type": "narration", "text": f"#{s.pos} {s.name} " + ("withdraws." if e.locale == "en" else "退警。")})
-                else:
-                    remaining.append(s)
-            up_players = remaining
+                    agent = self.agents[s.name]
+                    up = await self._npc_call(agent.election_choice, action="election_up") if self.planner is not None else (s.role == "seer" or
+                          (s.is_wolf and agent.brain.wolf_strategy == "bluff") or
+                          agent.style.aggression > 0.82)
+                    if up:
+                        up_positions.append(s.pos)
+                self._step_state["election_up"] = up_positions
+                self._step_state["election_cursor"] = i + 1
+                self._checkpoint()
+            self._step_state.pop("election_cursor", None)
+            up_players = [e.seat_at(p) for p in up_positions]
             if not up_players:
                 self.emit({"type": "narration", "text": t(e.locale, "sheriff_nobody")})
+                self._clear_election_state()
                 return
-        votes = {}
-        for s in e.alive_seats():
-            if s.is_player:
-                resp = await self.ask_player("vote",
-                    {"candidates": [{"pos": u.pos, "name": u.name} for u in up_players], "sheriff": True})
-                votes[s.pos] = resp.get("target")
+            self.emit({"type": "narration", "text": ("Sheriff candidates: " if e.locale == "en" else "本轮上警名单：") +
+                       ", ".join(f"#{s.pos} {s.name}" for s in up_players)})
+            self._step_state["election_phase"] = 1
+            self._step_state["election_speeches"] = []
+            self._step_state["election_cursor"] = 0
+            self._checkpoint()
+
+        # ---- Phase 1: 候选人发言 ----
+        if self._step_state.get("election_phase", 0) == 1:
+            up_players = sorted((e.seat_at(p) for p in self._step_state.get("election_up", [])),
+                                key=lambda x: x.pos)
+            election_speeches = self._step_state.get("election_speeches", [])
+            start = self._step_state.get("election_cursor", 0)
+            for i in range(start, len(up_players)):
+                s = up_players[i]
+                if s.is_player:
+                    resp = await self.ask_player("speech", {"phase": t(e.locale, "election_phase")})
+                    text = resp.get("text", "")
+                    speech = self._player_speech(text)
+                else:
+                    speech = await self._npc_call(self.agents[s.name].speak, election_speeches)
+                    text = speech.text
+                election_speeches.append((s.name, speech))
+                self._broadcast_speech(s, speech)
+                e.record_speech(
+                    s.pos, text, phase="election", claim=speech.claim,
+                    accuse=speech.accuse, defend=speech.defend,
+                )
+                self._step_state["election_speeches"] = election_speeches
+                self._step_state["election_cursor"] = i + 1
+                # Persist the speech, its cursor and state before publishing it,
+                # so a crash can never strand a published speech off the ledger.
+                self.emit({"type": "speech", "seat": s.pos, "name": s.name,
+                           "text": text, "election": True}, publish=False)
+                self._checkpoint()
+                self._flush_publish()
+                await asyncio.sleep(0.3)
+            self._step_state.pop("election_cursor", None)
+            await self._answer_table_questions()
+            self._step_state["election_phase"] = 2
+            self._step_state["election_cursor"] = 0
+            self._checkpoint()
+
+        # ---- Phase 2: 退警窗口（仅 onboarding；研究调用方无此提示） ----
+        if self._step_state.get("election_phase", 0) == 2:
+            if self.onboarding:
+                election_speeches = self._step_state.get("election_speeches", [])
+                up_positions = self._step_state.get("election_up", [])
+                remaining = list(self._step_state.get("election_remaining", []))
+                start = self._step_state.get("election_cursor", 0)
+                for i in range(start, len(up_positions)):
+                    p = up_positions[i]
+                    s = e.seat_at(p)
+                    if s.is_player:
+                        response = await self.ask_player("election_withdraw", {})
+                        withdraw = response["withdraw"]
+                    else:
+                        own_claim = next(sp.claim for name, sp in election_speeches if name == s.name)
+                        withdraw = (await self._npc_call(self.agents[s.name].election_choice, withdraw=True, action="election_withdraw") if self.planner is not None else
+                                    own_claim != "seer" and any(sp.claim == "seer" for name, sp in election_speeches if name != s.name) and self.agents[s.name].style.aggression < 0.9)
+                    if withdraw:
+                        self.emit({"type": "narration", "text": f"#{s.pos} {s.name} " + ("withdraws." if e.locale == "en" else "退警。")})
+                    else:
+                        remaining.append(p)
+                    self._step_state["election_remaining"] = remaining
+                    self._step_state["election_cursor"] = i + 1
+                    self._checkpoint()
+                self._step_state.pop("election_cursor", None)
+                self._step_state["election_up"] = remaining
+                self._step_state.pop("election_remaining", None)
+                if not remaining:
+                    self.emit({"type": "narration", "text": t(e.locale, "sheriff_nobody")})
+                    self._clear_election_state()
+                    return
+            self._step_state["election_phase"] = 3
+            self._step_state["election_cursor"] = 0
+            self._checkpoint()
+
+        # ---- Phase 3: 警长投票（int 键字典以 [pos, target] 对持久化） ----
+        if self._step_state.get("election_phase", 0) == 3:
+            up_positions = self._step_state.get("election_up", [])
+            candidates = [{"pos": p, "name": e.seat_at(p).name} for p in up_positions]
+            alive = e.alive_seats()
+            votes = dict(self._step_state.get("election_vote_pairs", []))
+            start = self._step_state.get("election_cursor", 0)
+            for i in range(start, len(alive)):
+                s = alive[i]
+                if s.is_player:
+                    resp = await self.ask_player("vote", {"candidates": candidates, "sheriff": True})
+                    votes[s.pos] = resp.get("target")
+                else:
+                    votes[s.pos] = await self._npc_call(self.agents[s.name].vote, candidates, sheriff=True)
+                self._step_state["election_vote_pairs"] = sorted(votes.items())
+                self._step_state["election_cursor"] = i + 1
+                self._checkpoint()
+            self._step_state.pop("election_cursor", None)
+            self._step_state["election_phase"] = 4
+            self._checkpoint()
+
+        # ---- Phase 4: 统计 + 揭晓警长（无外部调用） ----
+        if self._step_state.get("election_phase", 0) == 4:
+            votes = dict(self._step_state.get("election_vote_pairs", []))
+            self._broadcast_votes(votes)
+            tally = {}
+            for v in votes.values():
+                if v:
+                    tally[v] = tally.get(v, 0) + 1
+            self.emit(ballot_event(e, votes, tally, sheriff=True))
+            leaders = [pos for pos in tally if tally[pos] == max(tally.values())] if tally else []
+            if len(leaders) == 1:
+                sheriff = leaders[0]
+                e.sheriff = sheriff
+                self.emit({"type": "narration",
+                           "sheriff": sheriff,
+                           "text": t(e.locale, "sheriff_elected", pos=sheriff, name=e.seat_at(sheriff).name)})
             else:
-                votes[s.pos] = await self._npc_call(self.agents[s.name].vote,
-                    [{"pos": u.pos, "name": u.name} for u in up_players], sheriff=True)
-        self._broadcast_votes(votes)
-        tally = {}
-        for v in votes.values():
-            if v:
-                tally[v] = tally.get(v, 0) + 1
-        self.emit(ballot_event(e, votes, tally, sheriff=True))
-        leaders = [pos for pos in tally if tally[pos] == max(tally.values())] if tally else []
-        if len(leaders) == 1:
-            sheriff = leaders[0]
-            e.sheriff = sheriff
-            self.emit({"type": "narration",
-                       "sheriff": sheriff,
-                       "text": t(e.locale, "sheriff_elected", pos=sheriff, name=e.seat_at(sheriff).name)})
-        else:
-            self.emit({"type": "narration", "text": t(e.locale, "sheriff_tie")})
+                self.emit({"type": "narration", "text": t(e.locale, "sheriff_tie")})
+            self._clear_election_state()
+
+    def _clear_election_state(self):
+        """Drop the per-step election cursor/accumulators after the sheriff is
+        settled (or the election aborts with no candidates)."""
+        for key in ("election_phase", "election_up", "election_speeches",
+                    "election_remaining", "election_vote_pairs", "election_cursor"):
+            self._step_state.pop(key, None)
 
     # ---------------- 投票阶段 ----------------
     async def _vote_phase(self):
         e = self.engine
+        if self._step_state.get("vote_settled"):
+            # The vote + exile were already applied and committed atomically
+            # (the marker is set with the batch commit below).  A resume after a
+            # mid-death-trigger crash re-enters here and must skip straight past
+            # the vote instead of re-asking every seat.
+            return
         e.phase = "vote"
         alive = e.alive_seats()
         # 玩家投票候选时附带其已知信息
@@ -875,8 +1688,13 @@ class GameSession:
                     if r["target"] == s.pos:
                         note = t(e.locale, "note_hunt" if r["result"] == "wolf" else "note_safe")
             candidates.append({"pos": s.pos, "name": s.name, "note": note})
-        votes = {}
-        for s in alive:
+        resuming = self._resume_step == "vote"
+        # ``votes`` is int-keyed; persisted as a sorted list of ``[pos, target]``
+        # pairs so a JSON checkpoint round-trip cannot turn its keys into strings.
+        votes = dict(self._step_state.get("vote_pairs", [])) if resuming else {}
+        start = self._step_state.get("vote_cursor", 0) if resuming else 0
+        for i in range(start, len(alive)):
+            s = alive[i]
             if s.is_player:
                 resp = await self.ask_player("vote", {"candidates": [c for c in candidates if c["pos"] != s.pos] +
                                              [{"pos": 0, "name": target_label(0, e.locale)}]})
@@ -884,6 +1702,11 @@ class GameSession:
             else:
                 cands = [{"pos": x.pos, "name": x.name} for x in alive] + [{"pos": 0, "name": target_label(0, e.locale)}]
                 votes[s.pos] = await self._npc_call(self.agents[s.name].vote, cands)
+            self._step_state["vote_pairs"] = sorted(votes.items())
+            self._step_state["vote_cursor"] = i + 1
+            self._checkpoint()
+        self._step_state.pop("vote_pairs", None)
+        self._step_state.pop("vote_cursor", None)
         self._broadcast_votes(votes)
         tally = e.vote_tally(votes)
         self.emit(ballot_event(e, votes, tally))
@@ -895,6 +1718,12 @@ class GameSession:
             exiled = top[0] if len(top) == 1 else None
         for ev in e.resolve_vote(votes, exiled):
             await self._emit_event(ev)
+        # Record the settled position *with* the batch commit: a resume re-enters
+        # and skips the vote, proceeding straight to the death-trigger chain
+        # (which is idempotent via ``_triggered``).  Without this marker a crash
+        # after settlement re-ran the whole vote (a second ballot + re-requests).
+        self._step_state["vote_settled"] = True
+        self._commit_batch()
 
     def _broadcast_votes(self, votes: dict[int, int | None]):
         e = self.engine
@@ -906,29 +1735,42 @@ class GameSession:
 
     async def _post_death_triggers(self):
         e = self.engine
-        # Drain newly created deaths too, regardless of seating order.
+        # Drain newly created deaths too, regardless of seating order.  A seat is
+        # marked triggered only *after* its (possibly replayed) gun decision is
+        # resolved, so a crash while the shooter prompt is open leaves the seat
+        # untriggered — the resume re-finds it and re-applies the committed shot
+        # instead of losing it or double-firing.
         while True:
             s = next((s for s in e.seats.values()
                       if not s.alive and s.pos not in self._triggered), None)
             if s is None:
                 break
-            self._triggered.add(s.pos)
             if s.role == "hunter" and s.death_cause not in ("poison", "knight_duel"):
                 tgt = await self._gun_target(s, "猎人")
+                self._triggered.add(s.pos)
                 if tgt:
                     events = []
                     e.trigger_hunter(s.pos, tgt, events)
-                    self._triggered.add(s.pos)
                     for ev in events:
                         await self._emit_event(ev)
+                    # Commit the shot's state + events atomically, then publish.
+                    self._commit_batch()
+                else:
+                    self._checkpoint()
             elif s.role == "wolf_king" and s.death_cause in ("exile", "hunter_gun"):
                 tgt = await self._gun_target(s, "狼王")
+                self._triggered.add(s.pos)
                 if tgt:
                     events = []
                     e.trigger_wolf_king(s.pos, tgt, events)
-                    self._triggered.add(s.pos)
                     for ev in events:
                         await self._emit_event(ev)
+                    self._commit_batch()
+                else:
+                    self._checkpoint()
+            else:
+                self._triggered.add(s.pos)
+                self._checkpoint()
 
     async def _gun_target(self, shooter, role_cn) -> Optional[int]:
         e = self.engine
@@ -944,22 +1786,36 @@ class GameSession:
 
     # ---------------- 事件广播 ----------------
     async def _emit_event(self, ev):
+        """Record one settlement event and apply its agent observations.
+
+        Publishing and durability are the *caller's* responsibility.  A
+        settlement (resolve_night, a death-trigger shot, a day skill, a vote)
+        produces a *batch* of events plus engine mutations; the caller records
+        every event, then calls ``_commit_batch()`` (one checkpoint + one flush)
+        so the whole batch is durable before the first event becomes visible.
+
+        A per-event checkpoint here would tear the batch: the settle marker is
+        already set, so a crash after the first event would let a resume skip
+        the rest (Shawn's wolf-knife + witch-poison repro: engine had both
+        deaths, the ledger only the first).
+        """
         et = ev.type
         if et == "death":
-            self.emit({"type": "death", "seat": ev.seat, "text": ev.text})
+            self.emit({"type": "death", "seat": ev.seat, "text": ev.text}, publish=False)
         elif et == "flip":
-            self.emit({"type": "flip", "seat": ev.seat, "text": ev.text, "role_cn": ev.data.get("role_cn")})
+            self.emit({"type": "flip", "seat": ev.seat, "text": ev.text,
+                       "role_cn": ev.data.get("role_cn")}, publish=False)
             seat = self.engine.seat_at(ev.seat)
             for agent in self.agents.values():
                 agent.observe_flip(seat.name, seat.role_cn, seat.is_wolf)
         elif et == "exile":
-            self.emit({"type": "exile", "seat": ev.seat, "text": ev.text})
+            self.emit({"type": "exile", "seat": ev.seat, "text": ev.text}, publish=False)
             seat = self.engine.seat_at(ev.seat)
             for agent in self.agents.values():
                 agent.observe_exile(self.engine.day_count, seat.name, seat.is_wolf)
         elif et == "system":
-            self.emit({"type": "narration", "text": self.host.narrate("system", ev.text)})
-        await asyncio.sleep(0.3)
+            self.emit({"type": "narration", "text": self.host.narrate("system", ev.text)},
+                      publish=False)
 
     # ---------------- 辅助 ----------------
     def _seats_desc(self) -> str:

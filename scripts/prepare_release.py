@@ -115,6 +115,7 @@ def allowed_path(name):
     if path.suffix in {".key", ".pem", ".log", ".pyc"} or path.name == ".DS_Store":
         return False
     if name.startswith(("werewolf_web/data/reviews/", "werewolf_web/data/npc_memory/",
+                        "werewolf_web/data/checkpoints/",
                         "docs/research-runs/", "docs/audit-assets/", "outputs/", "output/", "playtest/")):
         return False
     if path.name.startswith("host_style") and path.suffix == ".json":

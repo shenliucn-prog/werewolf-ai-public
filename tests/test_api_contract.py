@@ -47,20 +47,35 @@ class StreamContractTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(error.exception.status_code, 409)
             session._play = AsyncMock()
             self.assertEqual([event async for event in response.body_iterator], [])
-            self.assertNotIn("contract-test", GAMES)
+            # The game task owns the lifetime: stream close does NOT drop the game.
+            self.assertIn("contract-test", GAMES)
             session._play.assert_awaited_once()
         finally:
+            session.abandon()
             GAMES.pop("contract-test", None)
 
-    async def test_disconnect_cancels_game_and_drops_pending(self):
+    async def test_disconnect_keeps_game_pending_and_allows_reattach(self):
         session = GameSession("classic", {"enabled": False})
+
         async def waiting_game():
             await session.ask_player("speech", {})
+
         session._play = waiting_game
-        events = session.events()
-        self.assertEqual((await anext(events))["type"], "request")
-        await events.aclose()
+        first = session.events()
+        event = await anext(first)
+        self.assertEqual(event["type"], "request")
+        self.assertEqual(event["kind"], "speech")
+        self.assertEqual(event["event_no"], 1)
+        await first.aclose()
+
+        # Stream close no longer ends the game or drops the pending action.
+        self.assertFalse(session.finished)
+        self.assertIsNotNone(session.pending)
+        self.assertEqual(session.pending["kind"], "speech")
+        # The recovery view re-presents the exact pending action for reattach.
+        view = session.recovery_view(1)
+        self.assertEqual(view["pending"]["kind"], "speech")
+        self.assertEqual(view["pending"]["event_no"], 1)
+        self.assertEqual(view["next_event_no"], 2)
+        session.abandon()
         self.assertTrue(session.finished)
-        self.assertIsNone(session.pending)
-        with self.assertRaises(RuntimeError):
-            await anext(session.events())

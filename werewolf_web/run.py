@@ -19,6 +19,7 @@ from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import config
+from . import checkpoint
 from .ai.llm import LLMClient, LLMRuntimeConfig
 from .ai.decision_runtime import ModelTurnError, create_runtime
 from .ai.host import HostAgent
@@ -30,6 +31,66 @@ config.ensure_dirs()
 app = FastAPI(title="狼人杀 Web 版")
 
 GAMES: dict[str, "GameSession"] = {}
+
+# Per-game restore locks (§7 single-writer): two concurrent reconnects for the
+# same game_id must not each load the checkpoint, each run a model preflight and
+# each register their own live instance.  ``restore_game`` double-checks inside
+# the lock, so the already-live fast path stays lock-free.
+_RESTORE_LOCKS: dict[str, asyncio.Lock] = {}
+
+
+async def restore_game(game_id: str):
+    """game_id-keyed restore on startup (§7): rehydrate a game from its
+    checkpoint when it is not already live in ``GAMES``.
+
+    Offline games (no planner) restore self-contained.  A model game re-derives
+    its runtime from trusted local configuration — never from the save — and is
+    refused if the saved endpoint no longer matches the configured credential.
+    A missing or corrupt save (or any invalid component) returns ``None`` rather
+    than guessing.
+    """
+    if not game_id:
+        return None
+    runner = GAMES.get(game_id)
+    if runner is not None:
+        return runner
+    lock = _RESTORE_LOCKS.setdefault(game_id, asyncio.Lock())
+    async with lock:
+        runner = GAMES.get(game_id)
+        if runner is not None:
+            return runner
+        try:
+            path = checkpoint.checkpoint_path(game_id)
+            payload = checkpoint.load_checkpoint(path)
+        except (ValueError, OSError):
+            return None
+        if payload.get("session_id") != game_id:
+            # A checkpoint must never be restored under a different key.
+            return None
+        try:
+            planner = None
+            planner_snap = payload.get("planner")
+            if planner_snap is not None:
+                planner = create_runtime(backend=planner_snap.get("backend"))
+            # Construct with a deferred preflight, restore first, then reserve and
+            # persist the preflight budget unit *before* running the liveness
+            # check.  Ordering matters (§7): validate + restore config and budget,
+            # persist the preflight reservation, then execute the check — so a
+            # crash between the reservation and the check still restores the
+            # consumed call, and success leaves ``verified=True`` (not clobbered).
+            runner = GameSession(payload.get("board_id", "classic"),
+                                 {"enabled": False} if planner is None else None,
+                                 session_id=game_id, planner=planner,
+                                 checkpoint_path=path, _defer_preflight=True)
+            runner.restore(payload)
+            if planner is not None:
+                planner.reserve()
+                runner._checkpoint()
+                await asyncio.to_thread(planner.preflight_check)
+        except (ValueError, KeyError, TypeError, ModelTurnError):
+            return None
+        GAMES[game_id] = runner
+        return runner
 
 
 # ---------------- API ----------------
@@ -70,7 +131,8 @@ async def start(req: Request):
                              locale=body.get("locale", "zh-CN"), names=body.get("names"),
                              personalities=body.get("personalities"),
                              conjecture=body.get("conjecture", False),
-                             player_role=body.get("player_role"), onboarding=True)
+                             player_role=body.get("player_role"), onboarding=True,
+                             checkpoint_path=checkpoint.checkpoint_path(game_id))
         # Only explicit offline selection bypasses a real-model preflight.
         # Runtime commands come from trusted local configuration, never HTTP.
         offline = isinstance(body.get("llm"), dict) and body["llm"].get("enabled") is False
@@ -99,24 +161,58 @@ async def cast_options(locale: str = "zh-CN"):
 
 
 @app.get("/api/stream")
-async def stream(game_id: Optional[str] = None):
-    runner = GAMES.get(game_id or "")
+async def stream(game_id: Optional[str] = None, after: int = 0):
+    runner = await restore_game(game_id or "")
     if not runner:
         raise HTTPException(status_code=404, detail="No active game. Start a new game.")
-    # Reserve before returning the response: two GETs must never start two
-    # game loops or split one player's private events between consumers.
-    if runner.stream_claimed or runner.finished:
-        raise HTTPException(status_code=409, detail="Game stream already opened; resume is not supported.")
-    runner.stream_claimed = True
+    # One live viewer at a time: a concurrent GET must not split the single
+    # human seat's events between two consumers.  Reattach (after a previous
+    # stream closed) is allowed and resumes at ``after`` with no missing or
+    # duplicate events.
+    if runner.stream_active:
+        raise HTTPException(status_code=409, detail="Game stream already opened.")
+    runner.stream_active = True
 
     async def event_source():
         try:
-            async for event in runner.run():
+            async for event in runner.run(after=max(0, after)):
                 yield event
         finally:
-            GAMES.pop(game_id or "", None)
+            runner.stream_active = False
 
     return StreamingResponse(event_source(), media_type="text/event-stream")
+
+
+@app.get("/api/rejoin")
+async def rejoin(game_id: str, last_event_no: int = 0):
+    """Player-scoped recovery view (§6): init, own private results, numbered
+    public events for catch-up, the pending action, and the live-stream
+    hand-off point.  Restores from the checkpoint if the process restarted."""
+    runner = await restore_game(game_id)
+    if not runner:
+        raise HTTPException(status_code=404, detail="No such game.")
+    return {"ok": True, "view": runner.recovery_view(max(0, last_event_no))}
+
+
+@app.post("/api/leave")
+async def leave(req: Request):
+    """Explicit abandon: stream close is no longer the only way to end a game.
+
+    The on-disk checkpoint is removed too, so an abandoned game (and its secrets)
+    cannot be resurrected by a later rejoin."""
+    body = await _json_object(req)
+    game_id = body.get("game_id", "")
+    runner = GAMES.get(game_id)
+    if not runner:
+        return {"ok": False, "error": "no game"}
+    runner.abandon()
+    GAMES.pop(game_id, None)
+    _RESTORE_LOCKS.pop(game_id, None)
+    try:
+        os.remove(checkpoint.checkpoint_path(game_id))
+    except (ValueError, OSError):
+        pass
+    return {"ok": True}
 
 
 @app.post("/api/action")

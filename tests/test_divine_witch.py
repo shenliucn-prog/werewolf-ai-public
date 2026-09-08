@@ -190,3 +190,21 @@ class DivineSessionTest(unittest.IsolatedAsyncioTestCase):
                             else: answer = {"target": data["candidates"][0]["pos"] if data.get("candidates") else None}
                             self.assertTrue(session.submit(answer), (kind, answer))
                         self.assertTrue(ended)
+
+    async def test_screen_completes_without_errors(self):
+        """The research screening entry must finish cleanly — no error events.
+
+        Regression: ``ScreenSession.emit`` overrode the pre-publish-signature
+        ``emit(event)``; once the base gained ``emit(obj, publish=...)``, a
+        ``publish=`` call raised TypeError, which the session layer swallowed as
+        an error event, so the screen silently reported ``status: "failed"``.
+        """
+        from werewolf_web.research.divine_witch_screen import run_one, BOARDS
+        sleep = asyncio.sleep
+        async def fast(_): await sleep(0)
+        with patch("werewolf_web.run.asyncio.sleep", fast):
+            for board in BOARDS:
+                with self.subTest(board=board):
+                    game = await run_one(board, 3, 0)
+                    self.assertEqual(game["errors"], [], game)
+                    self.assertNotEqual(game["status"], "failed", game)
