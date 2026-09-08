@@ -141,7 +141,7 @@ the information-boundary inventory the project already wants.
 ### 4.4 Model runtime (uniform interface + adapters)
 
 The recovery layer never talks to a vendor directly. It calls one uniform
-interface (`RuntimeBase`) with three responsibilities:
+protocol — an *extended* `DecisionRuntime` — with three responsibilities:
 
 - **connection re-verification** — re-establish liveness on restore; saved
   `verified=True` is never trusted (section 7);
@@ -149,10 +149,12 @@ interface (`RuntimeBase`) with three responsibilities:
   local configuration before re-attaching credentials (section 7);
 - **call-budget restore** — resume the `calls` counter from the reserved value.
 
-Common persisted fields (`RuntimeBase`): `backend`, `model`, `max_calls`,
-`timeout`, `calls`. `verified` is **not** persisted — it is transient liveness,
-re-established on restore (section 7). The backends below are adapters that
-implement the interface:
+The protocol is wider than any one implementation: `RuntimeBase` provides a
+*default* implementation (persisting `backend`, `model`, `max_calls`, `timeout`,
+`calls`), but an adapter is not required to inherit it — `CodexPlayerRuntime`,
+for instance, does not. `verified` is **not** persisted — it is transient
+liveness, re-established on restore (section 7). The backends below are
+adapters that implement the protocol:
 
 - **api** (`APIPlayerRuntime`): persist `config` fields `base_url`, `model`,
   `temperature`, `timeout_seconds`, `max_calls`, `reasoning_effort`,
@@ -355,8 +357,9 @@ extract `GameSession` **before** adding snapshot code.)
    unchanged (event sequences / replay hashes unchanged).
 2. **Define state and the secrecy boundary.** Add whitelisted
    `snapshot/restore` to `GameEngine`, `Brain`, `MatchState`, `CognitiveProfile`,
-   `StrategicNPCAgent`, `ModelNPCAgent`, `RuntimeBase` and each adapter (`api`,
-   `command`, `codex`), and `GameConjectures`. Tests: round-trip `snapshot → restore` yields a
+   `StrategicNPCAgent`, `ModelNPCAgent`, the `DecisionRuntime` protocol and each
+   adapter (`api`, `command`, `codex`; `RuntimeBase` supplies a default), and
+   `GameConjectures`. Tests: round-trip `snapshot → restore` yields a
    byte-identical `public_state` and identical RNG state; snapshot contains no
    `api_key`, no `argv`, no transient run fields; unknown schema version is
    rejected.
