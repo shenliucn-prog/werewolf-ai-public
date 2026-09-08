@@ -78,7 +78,7 @@ class PlayableLocalesTest(unittest.IsolatedAsyncioTestCase):
     async def test_initialization_failure_is_visible(self):
         session = GameSession("classic", {"enabled": False}, locale="en")
         with patch.object(session.engine, "setup", side_effect=RuntimeError("test failure")), \
-                self.assertLogs("werewolf_web.run", level="ERROR"):
+                self.assertLogs("werewolf_web.session", level="ERROR"):
             events = [event async for event in session.events()]
         self.assertEqual(events[0]["type"], "error")
         self.assertTrue(session.finished)

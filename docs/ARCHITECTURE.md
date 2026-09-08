@@ -3,7 +3,8 @@
 ## Supported execution paths
 
 Browser (`static/`) and terminal (`chat_game.py`) consume **the same
-`GameSession`** in `run.py`. The latter also contains the FastAPI adapter.
+`GameSession`**, defined in `session.py`. `run.py` is the FastAPI adapter and
+re-exports `GameSession` (and its `GameRunner` alias) for compatibility.
 `GameSession.events()` starts one game, emits dictionaries and accepts validated
 action dictionaries via `submit()`. It has one consumer and cannot be resumed.
 The browser converts these events to views; it never decides legal actions.
@@ -120,11 +121,12 @@ hardening. Never put a public proxy in front of this server unchanged.
 
 ## Known architectural debt
 
-`run.py` still couples the transport-neutral class to FastAPI imports and startup
-directory creation. Extracting it into a session module is a useful later refactor,
-but changes imports, test patches and replay hashes: do it as a dedicated,
-behavior-preserving change. Do not introduce a plugin framework before there is
-a second genuine implementation. Other debts: synchronous model calls, unbounded
+`GameSession` has been extracted to `session.py`; `run.py` is now a thin FastAPI
+adapter that re-exports `GameSession`/`GameRunner` so existing importers keep
+working. Startup directory creation (`config.ensure_dirs()`) still lives at
+`run.py` import time, so a direct `session` importer that writes memory should
+call it itself. Do not introduce a plugin framework before there is a second
+genuine implementation. Other debts: synchronous model calls, unbounded
 unopened sessions, runtime retention, an older separate observer loop and a large
 Chinese-source persona/strategy layer. These limit hosting and onboarding, not
 the ability to modify the local game with tests.
