@@ -13,6 +13,23 @@ information. This is the first step toward a game a player can reliably finish.
 Explicitly **out of scope for this phase**: context-budget / memory retrieval
 (section 9). Do not fold those two workstreams together.
 
+### Layering: recovery is model-agnostic
+
+The recovery path never assumes a specific model vendor. Three layers, with
+knowledge flowing only downward (the recovery layer knows the interface, not the
+vendors):
+
+- **Game recovery layer** — checkpoints, decision numbers, budget accounting,
+  state restore, and event catch-up. It does not know *which* model or adapter
+  produced a decision.
+- **Uniform model interface** — the only thing the recovery layer calls:
+  connection re-verification, non-secret config validation, and call-budget
+  restore.
+- **Concrete adapters** — `api`, `command`, and `codex` each implement the
+  interface. Codex is an *optional* adapter; the core recovery flow has no
+  Codex-specific branch, and "Codex is installed" is never a proxy for "the
+  game can recover".
+
 ## 2. Acceptance criteria
 
 1. **Refresh does not lose the game.** Closing or refreshing the browser (SSE)
@@ -26,6 +43,11 @@ Explicitly **out of scope for this phase**: context-budget / memory retrieval
    validation, protected directory/file permissions, corruption handling, and a
    single-writer constraint. Restore never sends the current API key to a
    base URL the save designates but the user did not configure.
+5. **Recovery is model-agnostic.** The recovery layer restores through the
+   uniform model interface and is exercised against each adapter independently
+   (`api`, `command`, `codex`). One adapter's availability does not gate the
+   others, and recoverability is judged per adapter — never by whether Codex
+   happens to be installed.
 
 ## 3. The event ledger is not a save file
 
@@ -116,11 +138,21 @@ Each component needs a whitelisted `to_dict`/`from_dict` pair. This is the
 largest mechanical surface (especially `Brain`), but bounded, and it doubles as
 the information-boundary inventory the project already wants.
 
-### 4.4 Model runtime (redacted, per backend)
+### 4.4 Model runtime (uniform interface + adapters)
 
-Common (`RuntimeBase`): `backend`, `model`, `max_calls`, `timeout`, `calls`.
-`verified` is **not** persisted — it is transient liveness, re-established on
-restore (section 7).
+The recovery layer never talks to a vendor directly. It calls one uniform
+interface (`RuntimeBase`) with three responsibilities:
+
+- **connection re-verification** — re-establish liveness on restore; saved
+  `verified=True` is never trusted (section 7);
+- **non-secret config validation** — confirm persisted parameters match trusted
+  local configuration before re-attaching credentials (section 7);
+- **call-budget restore** — resume the `calls` counter from the reserved value.
+
+Common persisted fields (`RuntimeBase`): `backend`, `model`, `max_calls`,
+`timeout`, `calls`. `verified` is **not** persisted — it is transient liveness,
+re-established on restore (section 7). The backends below are adapters that
+implement the interface:
 
 - **api** (`APIPlayerRuntime`): persist `config` fields `base_url`, `model`,
   `temperature`, `timeout_seconds`, `max_calls`, `reasoning_effort`,
@@ -132,9 +164,9 @@ restore (section 7).
   `WEREWOLF_AGENT_COMMAND` and validated on restore.
 - **codex** (`CodexPlayerRuntime`): persist `model`, `effort`, `max_calls`,
   `timeout`, `calls`. No credential is stored (it uses the existing local Codex
-  login). On restore, the `codex` binary's presence on PATH is re-checked and the
-  Codex connection is re-verified — liveness is never trusted from the save
-  (section 7).
+  login). An optional adapter: its connection re-verification confirms the
+  `codex` binary is on PATH and the local login is valid, but the recovery
+  layer only calls the uniform re-verify method and never branches on Codex.
 - **legacy expression** (`LLMClient`, host narration and NPC rephrasing on the
   `planner is None` path): persist `calls`, `failures`, `unavailable_reason`,
   and its `runtime` config (`base_url`, `model`, `temperature`,
@@ -323,8 +355,8 @@ extract `GameSession` **before** adding snapshot code.)
    unchanged (event sequences / replay hashes unchanged).
 2. **Define state and the secrecy boundary.** Add whitelisted
    `snapshot/restore` to `GameEngine`, `Brain`, `MatchState`, `CognitiveProfile`,
-   `StrategicNPCAgent`, `ModelNPCAgent`, `RuntimeBase` + the three backends, and
-   `GameConjectures`. Tests: round-trip `snapshot → restore` yields a
+   `StrategicNPCAgent`, `ModelNPCAgent`, `RuntimeBase` and each adapter (`api`,
+   `command`, `codex`), and `GameConjectures`. Tests: round-trip `snapshot → restore` yields a
    byte-identical `public_state` and identical RNG state; snapshot contains no
    `api_key`, no `argv`, no transient run fields; unknown schema version is
    rejected.
