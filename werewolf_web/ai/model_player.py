@@ -88,8 +88,17 @@ class ModelNPCAgent(StrategicNPCAgent):
 
     def election_choice(self, withdraw=False):
         key = "withdraw" if withdraw else "up"
-        return self.decide("withdraw from election" if withdraw else "join sheriff election",
-                           {key: {"type": "boolean"}})[key]
+        return self.decide("decide whether to withdraw from election" if withdraw else
+                           "decide whether to join sheriff election",
+                           {key: {"type": "boolean"}},
+                           choice_meaning=({"true": "withdraw: stop competing for sheriff",
+                                            "false": "stay: continue competing for sheriff"} if withdraw else
+                                           {"true": "join: compete for sheriff",
+                                            "false": "decline: do not compete for sheriff"}),
+                           considerations="Choose strategically; neither answer is prescribed. "
+                           "Consider your role, your public claims and earlier request for the badge. "
+                           "Withdrawing is not voting for another candidate. If you change your "
+                           "publicly stated intention, account for it in your next speech.")[key]
 
     def vote(self, candidates, sheriff=False):
         positions = [c["pos"] for c in candidates if sheriff or c["pos"] != self.seat.pos]

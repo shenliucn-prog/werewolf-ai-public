@@ -273,6 +273,6 @@ class CodexPlayerTest(unittest.IsolatedAsyncioTestCase):
                         else:
                             action = {"target": event["data"]["candidates"][0]["pos"]}
                         self.assertTrue(session.submit(action), event)
-        for expected in ("seer", "wolves", "witch potions", "join sheriff election",
-                         "public speech", "withdraw from election", "sheriff vote", "exile vote"):
+        for expected in ("seer", "wolves", "witch potions", "decide whether to join sheriff election",
+                         "public speech", "decide whether to withdraw from election", "sheriff vote", "exile vote"):
             self.assertIn(expected, tasks)

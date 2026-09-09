@@ -176,7 +176,28 @@ def build_public_context(agent):
         "older_statement_summaries": older_statement_summaries(agent.brain, entries),
         "disputed_verbatim": disputed_verbatim(entries, agent.brain),
         "public_facts": public_facts(entries),
+        "statements_of_flipped_seers": statements_of_flipped_seers(entries, getattr(agent.brain, "flips", [])),
     }
+
+
+def statements_of_flipped_seers(entries, flips):
+    """Keep scarce public information-role evidence beyond the sliding window.
+
+    Uses only observed public flips and public speech, never engine check results.
+    Original excerpts stay attributed; a role reveal does not certify a claim.
+    """
+    names = {name for name, role, _wolf in flips if role == "seer"}
+    rows = [row for row in _speech_rows(entries) if row["event"].get("name") in names]
+    items = []
+    for row in rows[-3:]:
+        event = row["event"]
+        original = event.get("text") or ""
+        items.append({"name": event.get("name"), "seat": event.get("seat"),
+                      "event_no": event.get("event_no"), "day": row.get("day"),
+                      "night": row.get("night"), "phase": row.get("phase"),
+                      "text": original[:1200], "truncated": len(original) > 1200,
+                      "status": "attributed statement; speaker publicly flipped seer"})
+    return items
 
 
 def bound_information(info: dict) -> dict:
@@ -217,6 +238,7 @@ def fit_request_budget(request: dict, max_chars: int = MAX_REQUEST_CHARS) -> dic
     earlier = details.get("earlier_this_round") if isinstance(details, dict) else None
     disputed = request.get("public_context", {}).get("disputed_verbatim")
     disputed_items = disputed.get("items") if isinstance(disputed, dict) else None
+    seer_statements = request.get("public_context", {}).get("statements_of_flipped_seers")
     summaries = request.get("public_context", {}).get("older_statement_summaries", [])
 
     def over_budget() -> bool:
@@ -241,6 +263,8 @@ def fit_request_budget(request: dict, max_chars: int = MAX_REQUEST_CHARS) -> dic
     while disputed_items and over_budget():
         disputed_items.pop(0)
         disputed["truncated"] = True
+    while seer_statements and over_budget():
+        seer_statements.pop(0)
     if over_budget():
         # The fixed parts alone (rules/persona/instructions/information) already
         # exceed the budget — a misconfiguration, not a game-state problem.
