@@ -222,7 +222,11 @@ class Brain:
         self.claim_order: list[tuple[str, str]] = []   # 跳身份的先后顺序
         self.accuse_log: list[tuple[int, str, str]] = []   # (day, 谁, 踩谁)
         self.defend_log: list[tuple[int, str, str]] = []   # (day, 谁, 保谁)
-        self.vote_log: list[tuple[int, str, str]] = []     # (day, 谁, 投谁)
+        self.vote_log: list[tuple[int, str, str, str]] = []     # (day, 谁, 投谁, 票种)
+        # Challenge events and named targets. A target is not an exact quote:
+        # context resolves prior utterances as candidates, never certain links.
+        self.disputed_event_nos: list[int] = []
+        self.disputed_targets: list[tuple[int, str]] = []
         self.flips: list[tuple[str, str, bool]] = []       # (谁, 身份, 是否狼)
         self.resolved_exiles: set[tuple[int, str]] = set()
         self.speeches: list[tuple[int, str, str]] = []     # (day, 谁, 话)
@@ -324,8 +328,12 @@ class Brain:
         if is_wolf:
             self.sus.pop(nm, None)
 
-    def observe_speech(self, day: int, who: str, sp: Speech, text: str):
+    def observe_speech(self, day: int, who: str, sp: Speech, text: str, event_no=None):
         self.speeches.append((day, who, text))
+        if event_no is not None and (sp.accuse or sp.defend):
+            self.disputed_event_nos.append(event_no)
+            for target in dict.fromkeys(t for t in (sp.accuse, sp.defend) if t):
+                self.disputed_targets.append((event_no, target))
         if sp.claim:
             self.claims[who] = sp.claim
             if not any(w == who and c == sp.claim for w, c in self.claim_order):
@@ -343,9 +351,9 @@ class Brain:
         if len(text.strip()) < 12:
             self.silent.add(who)
 
-    def observe_vote(self, day: int, who: str, tgt: Optional[str]):
+    def observe_vote(self, day: int, who: str, tgt: Optional[str], sheriff: bool = False):
         if tgt:
-            self.vote_log.append((day, who, tgt))
+            self.vote_log.append((day, who, tgt, "sheriff" if sheriff else "exile"))
 
     def observe_exile(self, day: int, nm: str, is_wolf: bool):
         """Public exile: update vote evidence and exactly one personal read."""
@@ -355,14 +363,14 @@ class Brain:
         self.resolved_exiles.add(key)
         # A public exile resolves a voter's own binary call once.  Do not use
         # speeches here: a player can accuse and later vote differently.
-        my_vote = next((target for d, who, target in reversed(self.vote_log)
-                        if d == day and who == self.name), None)
+        my_vote = next((target for d, who, target, kind in reversed(self.vote_log)
+                        if d == day and who == self.name and kind == "exile"), None)
         if my_vote == nm:
             reaction = "correct_read" if is_wolf else "wrong_read"
             self.match_state.react(reaction)
             self._state_event(reaction)
-        for d, who, t in self.vote_log:
-            if t == nm:
+        for d, who, t, kind in self.vote_log:
+            if t == nm and kind == "exile":
                 self.ensured(who)
                 self.sus[who] += (-0.15 if is_wolf else 0.12)
 
@@ -476,8 +484,8 @@ class Brain:
         for w in sorted({w for _d, w, t in self.defend_log if t == nm}):
             logit -= (0.5 - self._base_suspicion(w)) * 0.65
 
-        # 投票关系：同样按投票人的可信度加权累加
-        for w in sorted({w for _d, w, t in self.vote_log if t == nm}):
+        # 投票关系：同样按投票人的可信度加权累加（只看放逐票，警长票不算踩人）
+        for w in sorted({w for _d, w, t, kind in self.vote_log if t == nm and kind == "exile"}):
             logit += (0.5 - self._base_suspicion(w)) * 0.30
 
         # —— 跳身份的行为学 ——
@@ -1201,6 +1209,8 @@ class Brain:
             "accuse_log": self.accuse_log,
             "defend_log": self.defend_log,
             "vote_log": self.vote_log,
+            "disputed_event_nos": self.disputed_event_nos,
+            "disputed_targets": self.disputed_targets,
             "flips": self.flips,
             "resolved_exiles": sorted(self.resolved_exiles),
             "speeches": self.speeches,
@@ -1254,6 +1264,9 @@ class Brain:
         accuse_log = tuples(require_list(data, "accuse_log", where), "accuse_log")
         defend_log = tuples(require_list(data, "defend_log", where), "defend_log")
         vote_log = tuples(require_list(data, "vote_log", where), "vote_log")
+        # Legacy 3-tuples (day, who, target) carry no vote kind; mark it unknown
+        # rather than fabricating "exile" for an old record.
+        vote_log = [v if len(v) == 4 else v + ("unknown",) for v in vote_log]
         flips = tuples(require_list(data, "flips", where), "flips")
         resolved_exiles = set()
         for item in require_list(data, "resolved_exiles", where):
@@ -1294,6 +1307,13 @@ class Brain:
                 raise ValueError(f"{where}: bluff_checks values must be objects")
             bluff_checks[int(night)] = check
         rng = decode_rng(data.get("rng"))
+        disputed = require_list(data, "disputed_event_nos", where) if "disputed_event_nos" in data else []
+        if any(type(x) is not int or x < 1 for x in disputed):
+            raise ValueError(f"{where}: disputed_event_nos must be positive integers")
+        targets = tuples(require_list(data, "disputed_targets", where), "disputed_targets") if "disputed_targets" in data else []
+        if any(len(row) != 2 or type(row[0]) is not int or row[0] not in disputed
+               or not isinstance(row[1], str) or not row[1] for row in targets):
+            raise ValueError(f"{where}: invalid disputed_targets")
 
         # ---- apply ----
         self.name = name
@@ -1307,6 +1327,8 @@ class Brain:
         self.accuse_log = accuse_log
         self.defend_log = defend_log
         self.vote_log = vote_log
+        self.disputed_event_nos = disputed
+        self.disputed_targets = targets
         self.flips = flips
         self.resolved_exiles = resolved_exiles
         self.speeches = speeches

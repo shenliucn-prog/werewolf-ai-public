@@ -80,7 +80,7 @@ class DialogueCoherenceTest(unittest.IsolatedAsyncioTestCase):
         checked = e.player_seat()
         e.seer_results = [{"night": 1, "target": checked.pos, "name": checked.name, "result": "good"}]
         agent = SimpleNamespace(seat=target, brain=brain,
-                                observe_speech=lambda day, who, sp: brain.observe_speech(day, who, sp, sp.text))
+                                observe_speech=lambda day, who, sp, event_no=None: brain.observe_speech(day, who, sp, sp.text, event_no))
         s.agents = {target.name: agent}
         question = s._player_speech(f"{target.pos}号不说自己验了谁吗？")
         self.assertEqual(question.question_to, target.name)

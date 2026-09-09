@@ -57,6 +57,10 @@ def parse_action(kind: str, data: dict, text: str) -> dict | None:
         return None
     if kind in ("speech", "table_reply"):
         return {"text": text}
+    if kind == "table_answer":
+        if text.casefold() in ("skip", "pass", "跳过", "暂不回答", "不回答", "pass on"):
+            return {"skip": True}
+        return {"answer": text} if text.strip() else None
 
     candidates = data.get("candidates", [])
     if kind == "vote":
@@ -176,6 +180,9 @@ def _ordinary_request_prompt(kind: str, data: dict, locale: str = "zh-CN") -> st
     if kind == "table_reply":
         return (f"\n{data.get('from', 'Someone')} interrupted: {data.get('text', '')}\nReply briefly, or press Enter to pass:\n> " if en
                 else f"\n{data.get('from', '有人')} 打断你：{data.get('text', '')}\n简短回应，或直接回车暂不回应：\n> ")
+    if kind == "table_answer":
+        return (f"\nAnswer {data.get('from', 'the questioner')}'s question, or type skip to pass:\n> " if en
+                else f"\n请简短回答 {data.get('from', '提问者')} 的追问；输入 跳过 或直接回车暂不回答：\n> ")
     if kind == "election_up":
         return "\nRun for sheriff? Type yes or no:\n> " if en else "\n是否上警？输入 上警 / 不上警：\n> "
     candidates = ", ".join(item["name"] if item["pos"] == 0 else (f"#{item['pos']} {item['name']}" if en else f"{item['pos']}号{item['name']}")

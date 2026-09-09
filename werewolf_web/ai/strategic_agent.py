@@ -101,11 +101,11 @@ class StrategicNPCAgent:
     def information_set(self) -> InformationSet:
         return InformationSet.from_brain(self.brain)
 
-    def observe_speech(self, day: int, who: str, speech: Speech):
-        self.brain.observe_speech(day, who, speech, speech.text)
+    def observe_speech(self, day: int, who: str, speech: Speech, event_no=None):
+        self.brain.observe_speech(day, who, speech, speech.text, event_no)
 
-    def observe_vote(self, day: int, who: str, target_name: str | None):
-        self.brain.observe_vote(day, who, target_name)
+    def observe_vote(self, day: int, who: str, target_name: str | None, sheriff: bool = False):
+        self.brain.observe_vote(day, who, target_name, sheriff)
 
     def observe_flip(self, name: str, role_name: str, is_wolf: bool):
         self.brain.observe_flip(name, role_name, is_wolf)

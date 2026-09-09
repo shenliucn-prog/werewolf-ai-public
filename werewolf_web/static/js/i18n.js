@@ -58,6 +58,7 @@ const EN = {
   "无人投票（平安日）": "No votes; no one is exiled", "票": "votes",
   "轮到你发言": "Your turn to speak", "输入你的发言...": "Type your statement...",
   "发送发言": "Send statement", "有人": "Someone", "正在打岔": "is interrupting",
+  "在追问你": "is asking you", "回答": "Answer", "跳过": "Skip",
   "简短回应，或让主持人继续推进...": "Reply briefly, or let the host continue...",
   "暂不回应": "Pass", "回应": "Reply", "是否上警竞选警长？": "Run for sheriff?",
   "上警": "Run", "不上警": "Sit out", "投票放逐": "Vote to exile",

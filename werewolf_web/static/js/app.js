@@ -438,6 +438,13 @@ function showAction(d) {
       <button class="send-btn" id="sendTableReply">${tr("回应")}</button></div>`;
     $("#skipTableReply").onclick = () => submitAction({ text: "" });
     $("#sendTableReply").onclick = () => submitAction({ text: $("#tableReplyInput").value.trim() });
+  } else if (kind === "table_answer") {
+    panelEl.innerHTML = `<h4>${escapeHtml(data.from || tr("有人"))} ${tr("在追问你")}</h4>
+      <textarea id="tableAnswerInput" maxlength="4000" aria-label="${tr("回答")}" placeholder="${tr("简短回应，或让主持人继续推进...")}"></textarea>
+      <div class="btn-row"><button class="cand-btn" id="skipTableAnswer">${tr("跳过")}</button>
+      <button class="send-btn" id="sendTableAnswer">${tr("回答")}</button></div>`;
+    $("#skipTableAnswer").onclick = () => submitAction({ skip: true });
+    $("#sendTableAnswer").onclick = () => submitAction({ answer: $("#tableAnswerInput").value.trim() });
   } else if (kind === "election_withdraw") {
     panelEl.innerHTML = `<p>${tr("警上发言结束，是否退警？")}</p><button id="withdrawYes">${tr("退警")}</button><button id="withdrawNo">${tr("不退警")}</button>`;
     $("#withdrawYes").onclick = () => submitAction({withdraw:true});

@@ -272,7 +272,7 @@ class TableQuestionCommitTest(unittest.IsolatedAsyncioTestCase):
             await session._step_setup()
             names = [n for n in session.agents]
             target_name, asker_name = names[0], names[1]
-            session._pending_questions = {target_name: asker_name}
+            session._pending_questions = [[target_name, asker_name]]
             session.planner = SimpleNamespace(verified=True, calls=0)  # force model path
 
             seen = {}
@@ -293,11 +293,11 @@ class TableQuestionCommitTest(unittest.IsolatedAsyncioTestCase):
 
             await session._answer_table_questions()
 
-            self.assertEqual(seen["disk_pending"], {target_name: asker_name})
+            self.assertEqual(seen["disk_pending"], [[target_name, asker_name]])
             self.assertEqual(seen["disk_answered"], 0)
             self.assertEqual(seen["disk_marker"], [target_name, asker_name])
             # After commit: question removed, budget spent, marker cleared.
-            self.assertNotIn(target_name, session._pending_questions)
+            self.assertNotIn([target_name, asker_name], session._pending_questions)
             self.assertEqual(session._questions_answered, 1)
             self.assertNotIn("answering_question", session._step_state)
 
