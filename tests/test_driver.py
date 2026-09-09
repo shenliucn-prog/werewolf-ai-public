@@ -612,6 +612,7 @@ class TerminalDriverEntryTest(unittest.IsolatedAsyncioTestCase):
         saved = {"driver": "agent", "adapter": "codex"}
         with contextlib.redirect_stdout(io.StringIO()):
             with patch("werewolf_web.ai.decision_runtime.create_runtime", fake_create_runtime), \
+                 patch("werewolf_web.config.raw_env", return_value={"LLM_ENABLED": "true"}), \
                  patch("werewolf_web.settings.load_settings", return_value=saved), \
                  patch.object(chat_game, "_repl", new=fake_repl):
                 result = await chat_game.play("classic", 7, False, "zh-CN",
