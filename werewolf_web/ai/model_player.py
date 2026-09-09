@@ -1,8 +1,10 @@
 """Provider-independent NPC decisions and lawful per-seat model context."""
+import json
 import random
 from copy import deepcopy
 from dataclasses import asdict
 
+from .. import perf
 from ..recovery import check_version, require_str
 from .brain import Speech
 from .strategic_agent import StrategicNPCAgent
@@ -15,10 +17,11 @@ def object_schema(properties):
 
 
 class ModelNPCAgent(StrategicNPCAgent):
-    def __init__(self, *args, planner, public_record, **kwargs):
+    def __init__(self, *args, planner, public_record, recorder=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.planner = planner
         self.public_record = public_record
+        self.recorder = recorder
         # Isolated per-seat, per-game decision memory; never emitted publicly.
         self.model_decisions = []
 
@@ -53,7 +56,16 @@ class ModelNPCAgent(StrategicNPCAgent):
         # §9 request-size budget: the final serialized request is bounded, not
         # just the history counts.
         request = model_context.fit_request_budget(request)
+        request_chars = len(json.dumps(request, ensure_ascii=False))
+        t0 = perf.now()
         value = self.planner.complete(request, object_schema(properties))
+        if self.recorder is not None:
+            # Privacy-safe: the request body and any private decision stay out;
+            # only its serialized size and the observed call duration are kept.
+            self.recorder.model_call(
+                seat=self.seat.pos, task=task,
+                backend=getattr(self.planner, "backend", None),
+                request_chars=request_chars, dur_ms=perf.elapsed_ms(t0))
         if not isinstance(value, dict) or set(value) != set(properties):
             raise ModelTurnError("Invalid decision fields; no offline substitution.")
         for key, spec in properties.items():
@@ -117,14 +129,14 @@ class ModelNPCAgent(StrategicNPCAgent):
 
     @classmethod
     def restore_agent(cls, snapshot: dict, engine, llm, planner, public_record,
-                      memory_dir: str | None = None) -> "ModelNPCAgent":
+                      memory_dir: str | None = None, recorder=None) -> "ModelNPCAgent":
         """Side-effect-free rebuild for the model-driven agent (see base class)."""
         check_version(snapshot, "ModelNPCAgent.snapshot")
         name = require_str(snapshot, "name", "ModelNPCAgent.snapshot",
                            allow_empty=False)
         agent = cls(name, engine, llm, planner=planner,
                     public_record=public_record, memory_dir=memory_dir,
-                    private_rng=random.Random(0), emit_start=False)
+                    recorder=recorder, private_rng=random.Random(0), emit_start=False)
         agent.restore(snapshot)
         return agent
 

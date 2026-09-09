@@ -187,7 +187,7 @@ class CodexPlayerTest(unittest.IsolatedAsyncioTestCase):
         text = f"{targets[0].pos}号怎么咬的人？另外{targets[1].pos}号你觉得10不对劲怎么还投他。我懵了"
         speech = session._player_speech(text)
         self.assertEqual(speech.text, text)
-        self.assertEqual(set(session._pending_questions), {s.name for s in targets})
+        self.assertEqual({t for t, _a in session._pending_questions}, {s.name for s in targets})
 
     def test_runtime_rejects_tool_events_and_counts_budget(self):
         runtime = CodexPlayerRuntime(max_calls=1)

@@ -18,6 +18,7 @@ from typing import Optional
 
 from . import config
 from . import driver as driver_mod
+from . import perf
 from .game import engine as eng_mod
 from .ai.brain import Speech
 from .ai.llm import LLMClient, LLMRuntimeConfig
@@ -44,6 +45,7 @@ class GameSession:
                  personalities: dict | None = None, conjecture: bool = False,
                  player_role: str | None = None, onboarding: bool = False,
                  planner=None, checkpoint_path: Optional[str] = None,
+                 perf_path: Optional[str] = None,
                  _defer_preflight: bool = False):
         if planner is not None and not planner.verified and not _defer_preflight:
             raise ValueError("Model preflight required before opening a game.")
@@ -51,6 +53,8 @@ class GameSession:
             raise ValueError("Model-player conjecture tables are not yet integrated; choose normal mode.")
         self.planner = planner
         self.session_id = session_id
+        # Optional local-only perf sink (opt-in; never affects game behavior).
+        self.perf_recorder = perf.Recorder(perf_path)
         # Gameplay driver lock: how NPC decisions are produced ("api"/"agent"/
         # "offline"), and the agent adapter ("command"/"codex").  Durable, so a
         # restore can refuse an offline->counted (or vice versa) switch and
@@ -99,7 +103,7 @@ class GameSession:
         self._table_extra_turns = 0
         self._table_extra_by_name: dict[str, int] = {}
         self._table_pairs: set[frozenset[str]] = set()
-        self._pending_questions = {}
+        self._pending_questions: list[list[str, str]] = []  # [target, asker] pairs
         self._questions_answered = 0
         self._table_cooldown = False
         # 显式状态机游标：_play() 被分解为一系列小步骤，由 _step 驱动。
@@ -174,7 +178,10 @@ class GameSession:
             self._init_event = obj
         if obj.get("type") == "request":
             self._pending_event_no = self._event_no
-        self.public_record.observe(obj, self.engine.day_count)
+        self.public_record.observe(
+            obj, obj.get("day", self.engine.day_count),
+            obj.get("night", self.engine.night_count),
+            obj.get("phase", self.engine.phase))
         self._events.append(obj)
         return obj
 
@@ -291,7 +298,10 @@ class GameSession:
         if not self.checkpoint_path:
             return
         from . import checkpoint as cp
+        t0 = perf.now()
         cp.save_checkpoint(self.checkpoint_path, self.snapshot())
+        self.perf_recorder.checkpoint(
+            dur_ms=perf.elapsed_ms(t0), bytes=os.path.getsize(self.checkpoint_path))
         hook = self.progress_hook
         if hook is not None:
             hook(self)
@@ -372,7 +382,7 @@ class GameSession:
             "table_extra_turns": self._table_extra_turns,
             "table_extra_by_name": dict(self._table_extra_by_name),
             "table_pairs": [sorted(pair) for pair in self._table_pairs],
-            "pending_questions": dict(self._pending_questions),
+            "pending_questions": [list(pair) for pair in self._pending_questions],
             "questions_answered": self._questions_answered,
             "table_cooldown": self._table_cooldown,
             "last_llm_status": (list(self._last_llm_status)
@@ -539,7 +549,8 @@ class GameSession:
                 from .ai.model_player import ModelNPCAgent
                 self.agents[name] = ModelNPCAgent.restore_agent(
                     agent_snap, self.engine, self.llm, self.planner,
-                    self.public_record, memory_dir=memory_dir)
+                    self.public_record, memory_dir=memory_dir,
+                    recorder=self.perf_recorder)
             else:
                 self.agents[name] = StrategicNPCAgent.restore_agent(
                     agent_snap, self.engine, self.llm, memory_dir=memory_dir)
@@ -569,7 +580,16 @@ class GameSession:
         self._table_extra_turns = snapshot.get("table_extra_turns", 0)
         self._table_extra_by_name = dict(snapshot.get("table_extra_by_name", {}))
         self._table_pairs = {frozenset(pair) for pair in snapshot.get("table_pairs", [])}
-        self._pending_questions = dict(snapshot.get("pending_questions", {}))
+        raw_questions = snapshot.get("pending_questions", [])
+        if isinstance(raw_questions, dict):
+            # Legacy format {target: asker}; a key->value is a reliable target->asker
+            # pair, so this migration fabricates nothing.
+            self._pending_questions = [[t, a] for t, a in raw_questions.items()]
+        elif isinstance(raw_questions, list):
+            self._pending_questions = [list(pair) for pair in raw_questions
+                                       if isinstance(pair, (list, tuple)) and len(pair) == 2]
+        else:
+            self._pending_questions = []
         self._questions_answered = snapshot.get("questions_answered", 0)
         self._table_cooldown = bool(snapshot.get("table_cooldown"))
         last = snapshot.get("last_llm_status")
@@ -617,7 +637,9 @@ class GameSession:
         # a consistent prompt, never a pending action without its event number.
         self.emit({"type": "request", "kind": kind, "data": data})
         self._checkpoint()
+        t0 = perf.now()
         resp = await self.q.get()
+        self.perf_recorder.human_idle(kind=kind, dur_ms=perf.elapsed_ms(t0))
         self._end_attempt(decision, calls, "accepted")
         decision["result"] = resp
         decision["committed"] = True
@@ -642,6 +664,13 @@ class GameSession:
                 return False
         elif kind in ("speech", "table_reply"):
             if not isinstance(resp.get("text"), str) or len(resp["text"]) > 4000:
+                return False
+        elif kind == "table_answer":
+            # Answer (non-empty text) or explicit skip; anything else is invalid.
+            if resp.get("skip") is True:
+                pass
+            elif not (isinstance(resp.get("answer"), str) and resp["answer"].strip()
+                      and len(resp["answer"]) <= 4000):
                 return False
         elif kind in ("election_up", "election_withdraw"):
             if not isinstance(resp.get("up" if kind == "election_up" else "withdraw"), bool):
@@ -686,6 +715,7 @@ class GameSession:
         self.event_q.put_nowait(_SENTINEL)
         if self._game_task_ref is not None and not self._game_task_ref.done():
             self._game_task_ref.cancel()
+        self.perf_recorder.flush()
 
     async def events(self, after: int = 0):
         """Yield events with ``event_no > after``, then live until the end.
@@ -846,6 +876,11 @@ class GameSession:
             # Committed decision reused verbatim — no new call, no budget.
             return replayed["result"]
         decision = self._open_decision(slot)
+        # Perf metadata (privacy-safe: seat position only, never name/role).
+        seat_pos = agent.seat.pos if agent is not None and getattr(agent, "seat", None) is not None else None
+        backend = getattr(self.planner, "backend", None)
+        model = getattr(self.planner, "model", None)
+        effort = getattr(self.planner, "effort", None)
         while True:
             memory = getattr(agent, "model_decisions", [])
             checkpoint = len(memory)
@@ -860,12 +895,20 @@ class GameSession:
             # Pre-call reservation: state-before-call + attempt are durable
             # before the external request goes out.
             self._checkpoint()
+            t0 = perf.now()
             try:
                 result = await asyncio.to_thread(call, *args, **kwargs)
             except ModelTurnError:
                 del memory[checkpoint:]
                 self._end_attempt(decision, getattr(self.planner, "calls", 0), "error")
                 self._checkpoint()
+                self.perf_recorder.decision(
+                    decision_no=decision["decision_no"], step=self._current_step,
+                instance=self._slot_instance(), seat=seat_pos,
+                    kind=act, attempt_no=len(decision["attempts"]), backend=backend,
+                    model=model, effort=effort, calls_before=calls_before,
+                    calls_after=getattr(self.planner, "calls", 0), outcome="error",
+                    dur_ms=perf.elapsed_ms(t0))
                 self.emit({"type": "narration", "text": (
                     "Model response failed. Game paused without substituting a local player. Retry after checking the connection, or stop. Budget limits still apply."
                     if self.engine.locale == "en" else "模型响应失败，对局已暂停，未替换为离线玩家。检查连接后可重试，或结束本局；调用上限仍有效。")})
@@ -876,6 +919,13 @@ class GameSession:
             self._end_attempt(decision, getattr(self.planner, "calls", 0), "accepted")
             decision["result"] = result
             decision["committed"] = True
+            self.perf_recorder.decision(
+                decision_no=decision["decision_no"], step=self._current_step,
+                instance=self._slot_instance(), seat=seat_pos,
+                kind=act, attempt_no=len(decision["attempts"]), backend=backend,
+                model=model, effort=effort, calls_before=calls_before,
+                calls_after=getattr(self.planner, "calls", 0), outcome="accepted",
+                dur_ms=perf.elapsed_ms(t0))
             # Post-result commit: the accepted result is durable before the
             # engine applies it in the calling step.
             self._checkpoint()
@@ -926,7 +976,9 @@ class GameSession:
             handler = getattr(self, f"_step_{step}", None)
             if handler is None:
                 raise RuntimeError(f"Unknown game step {step!r}")
+            t0 = perf.now()
             await handler()
+            self.perf_recorder.step(step=step, dur_ms=perf.elapsed_ms(t0))
 
     async def _step_setup(self):
         e = self.engine
@@ -940,7 +992,8 @@ class GameSession:
                     from .ai.model_player import ModelNPCAgent
                     self.agents[s.name] = ModelNPCAgent(
                         s.name, e, self.llm, memory_dir=self.memory_dir,
-                        planner=self.planner, public_record=self.public_record)
+                        planner=self.planner, public_record=self.public_record,
+                        recorder=self.perf_recorder)
                 else:
                     self.agents[s.name] = StrategicNPCAgent(
                         s.name, e, self.llm, memory_dir=self.memory_dir)
@@ -1108,7 +1161,7 @@ class GameSession:
             self.speech_events.append((seat.name, speech))
             self._broadcast_speech(seat, speech)
             e.record_speech(
-                pos, text, claim=speech.claim,
+                pos, text, phase="day", claim=speech.claim,
                 accuse=speech.accuse, defend=speech.defend,
             )
             self._step_state["speeches_cursor"] = i + 1
@@ -1116,8 +1169,8 @@ class GameSession:
             # agent/engine mutations commit atomically before the speech reaches
             # the live queue — a crash here loses nothing the player already saw,
             # and a resume re-enters at the next seat instead of re-emitting.
-            self.emit({"type": "speech", "seat": pos, "name": seat.name, "text": text},
-                      publish=False)
+            self.emit({"type": "speech", "seat": pos, "name": seat.name, "text": text,
+                       "phase": "day"}, publish=False)
             self._checkpoint()
             self._flush_publish()
             await asyncio.sleep(0.3)
@@ -1193,6 +1246,7 @@ class GameSession:
             campaign_flow.generate_review_once(self)
         # 3) The model review is a separate, retryable step after the commit.
         await self._write_review(reveal)
+        self.perf_recorder.flush()
 
     async def _write_review(self, reveal: str):
         """Generate and publish the post-game review, retryably.
@@ -1243,7 +1297,9 @@ class GameSession:
                     pos = int(next(g for g in match.groups() if g is not None))
                     target = next((s for s in self.engine.alive_seats() if s.pos == pos and not s.is_player), None)
                     if target:
-                        self._pending_questions[target.name] = self.engine.player_seat().name
+                        pair = [target.name, self.engine.player_seat().name]
+                        if pair not in self._pending_questions:
+                            self._pending_questions.append(pair)
         if re.search(r"验|查验|check|result", text, re.I) and re.search(r"吗|呢|谁|不说|报出来|请|[?？]|who|which|why|please", text, re.I):
             for seat in self.engine.alive_seats():
                 if not seat.is_player and (re.search(rf"(?<!\d){seat.pos}\s*号|#\s*{seat.pos}\b|(?:seat|player)\s+{seat.pos}\b", text, re.I) or seat.name.casefold() in text.casefold()):
@@ -1288,26 +1344,51 @@ class GameSession:
         return Speech(text=text, claim=claim, accuse=accuse, defend=defend, question_to=question_to)
 
     def _broadcast_speech(self, seat, speech: Speech):
-        if speech.question_to and speech.question_to in self.agents:
-            self._pending_questions[speech.question_to] = seat.name
+        # Queue the question whether it targets an NPC or the human player, as an
+        # order-preserving [target, asker] pair.  Distinct askers of one target are
+        # both kept (never silently overwritten); a duplicate pair is idempotent.
+        if speech.question_to:
+            pair = [speech.question_to, seat.name]
+            if pair not in self._pending_questions:
+                self._pending_questions.append(pair)
+        # Every call site emits the speech immediately after this broadcast, so
+        # ``event_no + 1`` is the event number that speech will receive; pass it
+        # so a dispute can reference the *exact* statement by ledger number.
+        event_no = self._event_no + 1
         for agent in self.agents.values():
-            agent.observe_speech(self.engine.day_count, seat.name, speech)
+            agent.observe_speech(self.engine.day_count, seat.name, speech, event_no)
 
     async def _answer_table_questions(self):
         """A bounded public clarification window after ordered speeches.
 
-        A question is removed from the pending set — and the answer budget
-        spent — only *after* its reply is committed.  The in-flight question is
-        recorded in ``_step_state["answering_question"]`` before the model call,
-        so a crash before the commit re-asks it on resume instead of dropping it
-        permanently (Shawn's repro: empty questions, uncommitted decision, zero
-        retries after restore).
+        NPCs and the human player both answer.  A question is removed from the
+        pending set — and the answer budget spent — only *after* its reply (or an
+        explicit skip) is committed.  The in-flight question is recorded in
+        ``_step_state["answering_question"]`` before the call, so a crash before
+        the commit re-asks it on resume instead of dropping it permanently.
+
+        The human's reply is persisted before it is published (``_publish_table_speech``
+        checkpoints first) and a duplicate submit of the same request is a no-op,
+        so the same reply is never posted twice.  A skip publishes nothing and
+        consumes no model budget, but it does spend one clarification opportunity
+        — the ``_questions_answered`` cap keeps the window bounded.
         """
-        for target, asker in list(self._pending_questions.items()):
+        player_name = self.engine.player_seat().name
+        for pair in list(self._pending_questions):
+            target, asker = pair
+            if self._questions_answered >= 2:
+                # Budget spent: drop the rest durably and move on.
+                self._pending_questions.remove(pair)
+                self._step_state.pop("answering_question", None)
+                self._checkpoint()
+                continue
+            if target == player_name:
+                await self._answer_human_question(pair, asker)
+                continue
             agent = self.agents.get(target)
-            if not agent or not agent.seat.alive or self._questions_answered >= 2:
-                # Unanswerable or budget spent: drop it durably and move on.
-                self._pending_questions.pop(target, None)
+            if not agent or not agent.seat.alive:
+                # Unanswerable: drop it durably and move on.
+                self._pending_questions.remove(pair)
                 self._step_state.pop("answering_question", None)
                 self._checkpoint()
                 continue
@@ -1328,15 +1409,51 @@ class GameSession:
             # checkpoint persists the spent budget, the answered question and the
             # reply together, then publishes once.
             self._questions_answered += 1
-            self._pending_questions.pop(target, None)
+            self._pending_questions.remove(pair)
             self._step_state.pop("answering_question", None)
             await self._publish_table_speech(agent.seat, response, "clarification")
+
+    async def _answer_human_question(self, pair, asker):
+        """Ask the human to answer a public clarification (answer or skip).
+
+        Answering publishes a table speech (persisted before visible); skipping
+        publishes nothing and consumes no model budget, but spends one
+        clarification opportunity so a player cannot stall the window forever.
+        """
+        target, _asker = pair
+        player = self.engine.player_seat()
+        if not player.alive:
+            self._pending_questions.remove(pair)
+            self._step_state.pop("answering_question", None)
+            self._checkpoint()
+            return
+        if self._step_state.get("answering_question") != [target, asker]:
+            self.emit({"type": "narration", "text": (
+                f"Host: Before voting, you are asked to answer {asker}'s question. This is a claim, not a host-verified result." if self.engine.locale == "en" else
+                f"主持人：投票前，请你回答 {asker} 的追问。这是玩家口径，不代表主持人认证。")},
+                publish=False)
+        self._step_state["answering_question"] = [target, asker]
+        self._checkpoint()
+        self._flush_publish()
+        response = await self.ask_player("table_answer", {"from": asker})
+        self._questions_answered += 1
+        self._pending_questions.remove(pair)
+        self._step_state.pop("answering_question", None)
+        if response.get("skip"):
+            self._checkpoint()
+            return
+        text = (response.get("answer") or "").strip()
+        if not text:
+            self._checkpoint()
+            return
+        speech = self._player_speech(text)
+        await self._publish_table_speech(player, speech, "clarification")
 
     def _reset_table_talk(self):
         self._table_extra_turns = 0
         self._table_extra_by_name = {}
         self._table_pairs = set()
-        self._pending_questions = {}
+        self._pending_questions = []
         self._questions_answered = 0
         self._table_cooldown = False
 
@@ -1353,7 +1470,7 @@ class GameSession:
         # Durability before visibility: the table speech and its counters persist
         # before the event reaches the live queue.
         self.emit({"type": "speech", "seat": seat.pos, "name": seat.name,
-                   "text": speech.text, "table_talk": True}, publish=False)
+                   "text": speech.text, "table_talk": True, "phase": "table_talk"}, publish=False)
         self._checkpoint()
         self._flush_publish()
         await asyncio.sleep(0.25)
@@ -1715,7 +1832,7 @@ class GameSession:
                 # Persist the speech, its cursor and state before publishing it,
                 # so a crash can never strand a published speech off the ledger.
                 self.emit({"type": "speech", "seat": s.pos, "name": s.name,
-                           "text": text, "election": True}, publish=False)
+                           "text": text, "election": True, "phase": "election"}, publish=False)
                 self._checkpoint()
                 self._flush_publish()
                 await asyncio.sleep(0.3)
@@ -1784,7 +1901,7 @@ class GameSession:
         # ---- Phase 4: 统计 + 揭晓警长（无外部调用） ----
         if self._step_state.get("election_phase", 0) == 4:
             votes = dict(self._step_state.get("election_vote_pairs", []))
-            self._broadcast_votes(votes)
+            self._broadcast_votes(votes, sheriff=True)
             tally = {}
             for v in votes.values():
                 if v:
@@ -1866,13 +1983,13 @@ class GameSession:
         self._step_state["vote_settled"] = True
         self._commit_batch()
 
-    def _broadcast_votes(self, votes: dict[int, int | None]):
+    def _broadcast_votes(self, votes: dict[int, int | None], sheriff: bool = False):
         e = self.engine
         for voter_pos, target_pos in votes.items():
             voter_name = e.seat_at(voter_pos).name
             target_name = target_label(0, e.locale) if target_pos == 0 else e.seat_at(target_pos).name if target_pos else None
             for agent in self.agents.values():
-                agent.observe_vote(e.day_count, voter_name, target_name)
+                agent.observe_vote(e.day_count, voter_name, target_name, sheriff)
 
     async def _post_death_triggers(self):
         e = self.engine
@@ -1941,16 +2058,23 @@ class GameSession:
         deaths, the ledger only the first).
         """
         et = ev.type
+        ev_data = getattr(ev, "data", None) or {}
         if et == "death":
-            self.emit({"type": "death", "seat": ev.seat, "text": ev.text}, publish=False)
+            self.emit({"type": "death", "seat": ev.seat, "text": ev.text,
+                       "day": ev_data.get("day"), "night": ev_data.get("night"),
+                       "phase": ev_data.get("phase")}, publish=False)
         elif et == "flip":
             self.emit({"type": "flip", "seat": ev.seat, "text": ev.text,
-                       "role_cn": ev.data.get("role_cn")}, publish=False)
+                       "role_cn": ev_data.get("role_cn"),
+                       "day": ev_data.get("day"), "night": ev_data.get("night"),
+                       "phase": ev_data.get("phase")}, publish=False)
             seat = self.engine.seat_at(ev.seat)
             for agent in self.agents.values():
                 agent.observe_flip(seat.name, seat.role_cn, seat.is_wolf)
         elif et == "exile":
-            self.emit({"type": "exile", "seat": ev.seat, "text": ev.text}, publish=False)
+            self.emit({"type": "exile", "seat": ev.seat, "text": ev.text,
+                       "day": ev_data.get("day"), "night": ev_data.get("night"),
+                       "phase": ev_data.get("phase")}, publish=False)
             seat = self.engine.seat_at(ev.seat)
             for agent in self.agents.values():
                 agent.observe_exile(self.engine.day_count, seat.name, seat.is_wolf)

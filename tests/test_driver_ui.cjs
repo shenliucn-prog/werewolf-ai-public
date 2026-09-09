@@ -85,7 +85,26 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 10));
   assert.equal(guidance.hidden, false);
   assert.match(guidance.textContent, /未配置模型或离线模式/);
 
+  // ---- table_answer (human clarification): answer / skip controls ----
+  w.eval('gameId = "ui-test"');
+  w.eval('showAction({kind: "table_answer", data: {from: "Alice"}})');
+  assert.ok(w.document.querySelector('#tableAnswerInput'));
+  assert.ok(w.document.querySelector('#skipTableAnswer'));
+  assert.ok(w.document.querySelector('#sendTableAnswer'));
+  w.document.querySelector('#skipTableAnswer').click();
+  await flush();
+  const skipAction = requests.filter(r => r.url === '/api/action').pop().body;
+  assert.equal(skipAction.skip, true);
+  assert.equal(skipAction.game_id, 'ui-test');
+  w.eval('showAction({kind: "table_answer", data: {from: "Alice"}})');
+  w.document.querySelector('#tableAnswerInput').value = '我来回答';
+  w.document.querySelector('#sendTableAnswer').click();
+  await flush();
+  const answerAction = requests.filter(r => r.url === '/api/action').pop().body;
+  assert.equal(answerAction.answer, '我来回答');
+  assert.equal(answerAction.game_id, 'ui-test');
+
   assert.deepEqual(errors, []);
-  console.log('PASS: driver selector (api/agent/offline), pre-configured connection, and unconfigured guidance');
+  console.log('PASS: driver selector (api/agent/offline), pre-configured connection, unconfigured guidance, and table_answer controls');
   w.close();
 })().catch(error => { console.error(error); w.close(); process.exitCode = 1; });

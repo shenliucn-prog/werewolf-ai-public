@@ -58,8 +58,8 @@ class InformationSet:
                 for name, role, is_wolf in brain.flips
             ],
             public_votes=[
-                {"day": day, "voter": voter, "target": target}
-                for day, voter, target in brain.vote_log
+                {"day": day, "voter": voter, "target": target, "kind": kind}
+                for day, voter, target, kind in brain.vote_log
             ],
             private=private,
             public_rules=({"board_id": engine.board_id, "witch": witch_rule_text(engine.locale, engine.board)}

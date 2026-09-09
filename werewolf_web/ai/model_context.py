@@ -40,16 +40,27 @@ FACT_WINDOW = 24         # total number of fact entries shown
 # counts.
 MAX_REQUEST_CHARS = 24000
 
+# Cap on the contested-speech section (§phase-2): disputed originals are kept
+# word-for-word, referenced by event_no, within this character budget — never
+# unbounded.  When the budget is exceeded, older items are dropped and a
+# ``truncated`` marker is set.
+DISPUTED_MAX_CHARS = 1600
+
 
 def _speech_rows(entries):
     return [r for r in entries if r["event"].get("type") == "speech"]
 
 
 def recent_public_statements(entries):
-    """The most recent public speeches, word-for-word (bounded)."""
+    """The most recent public speeches, word-for-word (bounded).
+
+    Each row carries ``day``/``night``/``phase`` so a sheriff-candidacy speech is
+    never read as a plain day speech, and ordering is by ``event_no``.
+    """
     rows = _speech_rows(entries)[-VERBATIM_SPEECHES:]
     return [
-        {"day": r["day"], "seat": r["event"].get("seat"), "name": r["event"].get("name"),
+        {"day": r["day"], "night": r.get("night"), "phase": r.get("phase"),
+         "seat": r["event"].get("seat"), "name": r["event"].get("name"),
          "text": r["event"].get("text"), "event_no": r["event"].get("event_no")}
         for r in rows
     ]
@@ -78,22 +89,91 @@ def older_statement_summaries(brain):
     return items
 
 
+def disputed_verbatim(entries, brain, max_chars=DISPUTED_MAX_CHARS):
+    """Keep challenges and candidate originals, without inventing exact links.
+
+    Accuse/defend identifies a person, not a particular utterance. Prior
+    utterances are therefore explicitly candidates; later utterances cannot be
+    the source. Prefer candidates within the shared bounded text budget.
+    """
+    disputed_nos = set(getattr(brain, "disputed_event_nos", None) or [])
+    if not disputed_nos:
+        return {"items": [], "truncated": False}
+    items = []
+    size = 0
+    truncated = False
+    rows = list(_speech_rows(entries))
+    targets = getattr(brain, "disputed_targets", [])
+    if not isinstance(targets, (list, tuple)):
+        targets = []  # Older brains have only challenge event numbers.
+    candidates = set()
+    for challenge_no, target in targets:
+        candidates.update(row["event"]["event_no"] for row in rows
+                          if row["event"].get("name") == target
+                          and isinstance(row["event"].get("event_no"), int)
+                          and row["event"]["event_no"] < challenge_no)
+    selected = [row for row in rows
+                if row["event"].get("event_no") in candidates | disputed_nos]
+    selected.sort(key=lambda row: (row["event"].get("event_no") not in candidates,
+                                   -row["event"].get("event_no", 0)))
+    for row in selected:
+        event = row["event"]
+        text = event.get("text") or ""
+        remaining = max_chars - size
+        if remaining <= 0:
+            truncated = True
+            break
+        if len(text) > remaining:
+            # Keep a truncated original (still referenced by event_no) so the
+            # contested statement is not dropped entirely, and mark the cut.
+            text = text[:max(0, remaining - 1)] + "…"
+            truncated = True
+        items.append({
+            "day": row.get("day"), "night": row.get("night"),
+            "phase": row.get("phase"), "seat": event.get("seat"),
+            "name": event.get("name"), "text": text,
+            "event_no": event.get("event_no"),
+            "reference_status": "candidate_original" if event.get("event_no") in candidates else "challenge",
+            "exact_reference": "unknown",
+        })
+        size += len(text)
+        if truncated:
+            break
+    items.sort(key=lambda item: item["event_no"])
+    return {"items": items, "truncated": truncated}
+
+
 def public_facts(entries):
-    """Settled public facts: flips, deaths/exiles, and recent ballots."""
+    """Settled public facts: flips, deaths/exiles, and recent ballots.
+
+    Every entry carries ``day``/``night``/``phase`` so a night-2 death is never
+    read as a day-1 event, and every ballot carries ``vote_kind`` so a sheriff
+    ballot is never read as an exile vote.  Order is by ``event_no`` (the ledger),
+    never by a monotonic 4-tuple guess.
+    """
     facts = []
     for r in entries:
         ev = r["event"]
         kind = ev.get("type")
+        temporal = {"day": r.get("day"), "night": r.get("night"),
+                    "phase": r.get("phase")}
         if kind == "flip":
-            facts.append({"kind": "flip", "day": r["day"], "seat": ev.get("seat"),
-                          "text": ev.get("text"), "event_no": ev.get("event_no")})
+            facts.append({"kind": "flip", "seat": ev.get("seat"),
+                          "text": ev.get("text"), "event_no": ev.get("event_no"),
+                          **temporal})
         elif kind in ("death", "exile"):
-            facts.append({"kind": kind, "day": r["day"], "seat": ev.get("seat"),
-                          "text": ev.get("text"), "event_no": ev.get("event_no")})
+            facts.append({"kind": kind, "seat": ev.get("seat"),
+                          "text": ev.get("text"), "event_no": ev.get("event_no"),
+                          **temporal})
     ballots = [r for r in entries if r["event"].get("type") == "ballots"]
     for r in ballots[-BALLOT_WINDOW:]:
         ev = r["event"]
-        facts.append({"kind": "ballots", "day": r["day"],
+        sheriff = ev.get("sheriff")
+        # An absent ``sheriff`` field is a legacy record whose kind we cannot
+        # reliably infer — mark it unknown rather than fabricating "exile".
+        vote_kind = "sheriff" if sheriff is True else ("exile" if sheriff is False else "unknown")
+        facts.append({"kind": "ballots", "vote_kind": vote_kind,
+                      "day": r.get("day"), "night": r.get("night"),
                       "ballots": ev.get("ballots"), "tally": ev.get("tally"),
                       "event_no": ev.get("event_no")})
     return facts[-FACT_WINDOW:]
@@ -105,6 +185,7 @@ def build_public_context(agent):
     return {
         "recent_public_statements": recent_public_statements(entries),
         "older_statement_summaries": older_statement_summaries(agent.brain),
+        "disputed_verbatim": disputed_verbatim(entries, agent.brain),
         "public_facts": public_facts(entries),
     }
 
@@ -145,6 +226,8 @@ def fit_request_budget(request: dict, max_chars: int = MAX_REQUEST_CHARS) -> dic
     decisions = request.get("own_previous_decisions")
     details = request.get("details")
     earlier = details.get("earlier_this_round") if isinstance(details, dict) else None
+    disputed = request.get("public_context", {}).get("disputed_verbatim")
+    disputed_items = disputed.get("items") if isinstance(disputed, dict) else None
 
     def over_budget() -> bool:
         return _serialized_size(request) > max_chars
@@ -155,6 +238,11 @@ def fit_request_budget(request: dict, max_chars: int = MAX_REQUEST_CHARS) -> dic
         earlier.pop(0)
     while decisions and over_budget():
         decisions.pop(0)
+    # Contested originals are the highest-value context; drop them last, and mark
+    # the section truncated so the model knows text is missing.
+    while disputed_items and over_budget():
+        disputed_items.pop(0)
+        disputed["truncated"] = True
     if over_budget():
         # The fixed parts alone (rules/persona/instructions/information) already
         # exceed the budget — a misconfiguration, not a game-state problem.

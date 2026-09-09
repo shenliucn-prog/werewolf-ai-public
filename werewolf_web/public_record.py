@@ -16,12 +16,13 @@ class PublicRecord:
         self.locale = locale
         self.entries = []
 
-    def observe(self, event, day):
+    def observe(self, event, day, night=None, phase=None):
         # An explicit allowlist excludes role prompts, private results, init
         # payloads, research tables and internal NPC state.
         if event.get("type") not in {"speech", "narration", "ballots", "death", "flip", "exile"}:
             return
-        self.entries.append({"day": day, "event": copy.deepcopy(event)})
+        self.entries.append({"day": day, "night": night, "phase": phase,
+                             "event": copy.deepcopy(event)})
 
     def query(self, question):
         q = question.strip().casefold()
@@ -44,7 +45,15 @@ class PublicRecord:
         lines = []
         for row in rows:
             ev = row["event"]
-            prefix = f"[Day {row['day']}] " if en else f"[第{row['day']}天] "
+            phase = row.get("phase")
+            night = row.get("night")
+            # A night/dawn death or flip is labeled by the *night* it resolved in,
+            # never the previous day's counter — the player-facing history must
+            # not mislabel "night 3" as "day 2".
+            if ev["type"] in ("death", "flip", "exile") and phase in ("night", "dawn") and night is not None:
+                prefix = f"[Night {night}] " if en else f"[第{night}夜] "
+            else:
+                prefix = f"[Day {row['day']}] " if en else f"[第{row['day']}天] "
             text = (f"#{ev['seat']} {ev['name']}: {ev['text']}" if ev["type"] == "speech" else ev.get("text", ""))
             lines.append(prefix + text)
         return "\n".join(lines) or ("No matching public records yet." if en else "尚无对应公开记录。")

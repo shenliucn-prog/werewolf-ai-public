@@ -315,13 +315,18 @@ class GameEngine:
         seat.alive = False
         seat.death_cause = cause
         role_cn = seat.role_cn
+        # Temporal context, captured at kill time so a night death is stamped
+        # with the *night* it resolves in (not the previous day's number) and a
+        # day exile with its day.  ``phase`` is a category (night/dawn/day/vote),
+        # never an ordering key — order is carried by the event ledger's event_no.
+        temporal = {"day": self.day_count, "night": self.night_count, "phase": self.phase}
         events.append(GameEvent(type="death", seat=pos,
                                 text=t(self.locale, "death", pos=pos, name=seat.name),
-                                data={"name": seat.name, "role": seat.role, "cause": cause}))
+                                data={"name": seat.name, "role": seat.role, "cause": cause, **temporal}))
         # 翻牌公告
         events.append(GameEvent(type="flip", seat=pos,
                                 text=t(self.locale, "flip", pos=pos, name=seat.name, role=role_cn),
-                                data={"name": seat.name, "role": seat.role, "role_cn": role_cn}))
+                                data={"name": seat.name, "role": seat.role, "role_cn": role_cn, **temporal}))
         # 连锁触发
         if seat.role == "hunter" and cause not in ("poison", "knight_duel"):
             pass  # 猎人开枪由外部（runner）收集目标后调用 trigger_hunter
@@ -458,7 +463,9 @@ class GameEngine:
         self.last_exiled_wolf = seat.is_wolf
         events.append(GameEvent(type="exile", seat=exiled,
                                 text=t(self.locale, "exile", pos=exiled, name=seat.name),
-                                data={"name": seat.name, "role": seat.role}))
+                                data={"name": seat.name, "role": seat.role,
+                                      "day": self.day_count, "night": self.night_count,
+                                      "phase": self.phase}))
         # 翻牌由 _kill 统一播报，这里不再重复发一次（否则同一个人翻两次牌，
         # 观察者会把踩保关系的权重算两遍）
         self._kill(exiled, "exile", events)

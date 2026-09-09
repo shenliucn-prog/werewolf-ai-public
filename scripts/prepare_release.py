@@ -116,6 +116,7 @@ def allowed_path(name):
         return False
     if name.startswith(("werewolf_web/data/reviews/", "werewolf_web/data/npc_memory/",
                         "werewolf_web/data/checkpoints/", "werewolf_web/data/campaign/",
+                        "werewolf_web/data/perf/",
                         "werewolf_web/data/settings.json", "werewolf_web/data/teaching.json",
                         "docs/research-runs/", "docs/audit-assets/", "outputs/", "output/", "playtest/")):
         return False
