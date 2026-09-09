@@ -15,6 +15,7 @@ from copy import deepcopy
 from datetime import datetime
 
 from .. import config
+from ..conversation import FloorPolicy
 from . import prompts
 from .llm import LLMClient
 from ..i18n import normalize_locale, role_name, role_desc, board_display, witch_rule_text
@@ -219,19 +220,21 @@ class HostAgent:
         Returning text means the host has closed the current thread.  It never
         selects a side or evaluates hidden roles.
         """
+        reason = FloorPolicy.close_reason(topic_turns=topic_turns, extra_turns=extra_turns,
+            speaker_extra_turns=speaker_extra_turns, repeated_pair=repeated_pair)
         if self.locale == "en":
-            if extra_turns >= 7:
+            if reason == "space":
                 return "💬 Host: Let's make room for players who have not spoken."
-            if repeated_pair or topic_turns >= 3:
+            if reason == "pair":
                 return "💬 Host: Log the point; this cannot become a two-person debate. Next speaker."
-            if speaker_extra_turns >= 2:
+            if reason == "speaker":
                 return "💬 Host: That is enough added detail. Let's hear another voice."
             return None
-        if extra_turns >= 7:
+        if reason == "space":
             return "💬 主持人：大家先收一收，留一点空间给还没说话的人。"
-        if repeated_pair or topic_turns >= 3:
+        if reason == "pair":
             return "💬 主持人：这个点先记下，不要变成两个人的拉扯，换下一位。"
-        if speaker_extra_turns >= 2:
+        if reason == "speaker":
             return "💬 主持人：这位玩家已经补充得够充分了，我们听听其他人的看法。"
         return None
 

@@ -6,7 +6,8 @@ Browser (`static/`) and terminal (`chat_game.py`) consume **the same
 `GameSession`**, defined in `session.py`. `run.py` is the FastAPI adapter and
 re-exports `GameSession` (and its `GameRunner` alias) for compatibility.
 `GameSession.events()` starts one game, emits dictionaries and accepts validated
-action dictionaries via `submit()`. It has one consumer and cannot be resumed.
+action dictionaries via `submit()`. It supports checkpoint recovery and numbered
+event catch-up; the Web adapter permits one live SSE consumer per game.
 The browser converts these events to views; it never decides legal actions.
 
 All normal entry points inject `ModelNPCAgent` through a preflight-verified
@@ -16,8 +17,8 @@ protocol](MODEL_CONNECTIONS.md). HTTP bodies cannot supply executable commands;
 server owners select non-API adapters only through local environment configuration.
 
 The LLM owns speech, candidacy/withdrawal, votes and skills; the engine validates
-and resolves rules. Requests contain the actor's lawful `InformationSet`, full
-public history and only that seat's prior decisions. Model calls run off the
+and resolves rules. Requests contain the actor's lawful `InformationSet`, bounded
+public context and only that seat's bounded prior decisions. Model calls run off the
 event loop so HTTP/SSE and retry controls remain responsive. Failure pauses at
 the exact failed call for explicit retry/stop; completed actions are not replayed.
 Public history is memory, not proof the model understood it. The local Brain
@@ -33,7 +34,17 @@ Other Agent wrappers must enforce their own tool isolation and role boundaries.
 | `game/engine.py`, `models.py` | Authoritative roles, legal resolution, deaths, victory, event ledger | Model wording or UI state |
 | `ai/brain.py`, `strategy.py` | One NPC's lawful observations, beliefs and local decisions | Another NPC's private belief or unrevealed good role |
 | `ai/strategic_agent.py` | Playable adapter, observations, optional expression, scoped memory | Replacement rule adjudication |
-| `ai/model_player.py` | Provider-independent lawful prompt context, private decision memory, validated actions | Hidden opponent knowledge or rule adjudication |
+| `ai/statement_memory.py` | Read-only, bounded source-linked public statement summaries; explicit unknown-source legacy fallback | Private beliefs, inferred truth, duplicate durable memory or contradiction adjudication |
+| `lifecycle.py` | Stateless background-task supervision, recoverable-fault and abandon transitions | Rule execution, campaign settlement, save encoding or a second copy of session flags |
+| `decision_execution.py` | Model attempt reservation, durable result commit, replay and explicit retry coordination | Engine action application, checkpoint encoding, independent counters or silent fallback |
+| `restore_coordinator.py` | Shared trusted-runtime configuration and restore/reconcile/reserve/persist/preflight ordering | HTTP registry locks, terminal rendering, save codec or credentials sourced from saves |
+| `session_codec.py` | Trusted full-state whitelist, tagged-value encoding and existing validate/apply restore procedure | Player observations, file writes, network preflight or a new save format |
+| `participants.py` | Match-scoped stable identity and controller binding for every seat, including the human | A second copy of private memory, budgets or pending actions |
+| `actions.py` | Detached requests/proposals, durable-counter-derived IDs and context-local model binding | A second decision counter, rule adjudication or provider-specific prompts |
+| `conversation.py` | Clarification queue, durable active interruption, score/seat arbitration and deterministic floor limits | Engine/model access, private-role scoring, IO or arrival-time priority |
+| `observations.py` | Detached, budgeted model observations and public recovery-event selection | Rule adjudication, model calls or full-ledger public export |
+| `ai/model_player.py` | Trusted legacy seat adapter, action constraints and private decision memory | Hidden opponent knowledge or rule adjudication |
+| `ai/model_controller.py` | Engine-free model invocation and response validation from detached observations | Engine access, extra budget reservation, retries or silent fallback |
 | `ai/decision_runtime.py` | API and Agent-wrapper protocol, preflight, timeouts and call budgets | Rule decisions, public secrets or silent fallback |
 | `ai/codex_player.py` | Optional Codex protocol adapter (backward-compatible class alias) | Global Agent settings or product-wide vendor dependency |
 | `ai/host.py` | Public rules help, narration, bounded interruptions; separate postgame review | Live private-identity tutoring or inventing unimplemented rules |
@@ -45,6 +56,10 @@ Other Agent wrappers must enforce their own tool isolation and role boundaries.
 The information boundary is a coding contract with regression tests, **not an
 enforced capability sandbox**: adapters hold the engine, which knows all roles.
 Review every new read of `seat.role`, `is_wolf`, engine history and private results.
+The first refactoring slice moves actual model invocation behind an engine-free
+controller, but the legacy seat adapter and observation assembler remain trusted
+code with engine access. This is not yet the full Participant/interaction-queue
+migration. See [refactoring progress and boundaries](REFACTOR_PROGRESS.md).
 The legacy `NPCAgent` in `ai/npc.py` is not the playable decision path; persona
 parsing still lives there. `cli_game.py` is an older omniscient observer, not proof
 of browser/chat parity. Avoid building new human-play features only in that loop.
@@ -110,14 +125,16 @@ game events. Never commit real users' private game logs or credentials.
 - `POST /api/start`: settings object; returns an opaque `game_id`, not public roles.
 - `GET /api/stream?game_id=...`: one SSE consumer. Missing game: 404; second
   connection: 409. Closing it cancels the game and removes its registry entry.
-- `POST /api/action`: `game_id` plus the current action payload. Rejected actions
+- `POST /api/action`: `game_id`, the current `request_id`, plus the action payload. Rejected actions
   keep the pending turn. Speech is limited to 4,000 characters.
 - `POST /api/host_chat`: `game_id`, `question` (1–320 characters); does not consume
   a turn. Malformed JSON/non-object bodies and invalid ID types return 422.
 
 The game ID acts as a bearer capability: anyone holding it can act in that game.
-There is no authentication, multi-worker coordination, reconnect or public hosting
-hardening. Never put a public proxy in front of this server unchanged.
+There is no account authentication, multi-worker coordination or public hosting
+hardening. Request IDs prevent stale submissions; they are not credentials.
+Reconnect uses `/api/rejoin` and checkpoint recovery. Never put a public proxy
+in front of this server unchanged.
 
 ## Known architectural debt
 

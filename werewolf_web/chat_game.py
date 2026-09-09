@@ -13,6 +13,7 @@ import json
 import secrets
 
 from .run import GameSession
+from . import restore_coordinator
 
 
 def _number(text: str, candidates: list[dict]) -> int | None:
@@ -269,6 +270,9 @@ async def _repl(session: GameSession) -> int:
             if event["type"] == "error":
                 return 1
             continue
+        if event.get("event_no") != session._pending_event_no:
+            # Historical prompts are not new turns after a restart.
+            continue
         kind, data = event["kind"], event.get("data", {})
         while True:
             raw = await asyncio.to_thread(input, _request_prompt(kind, data, locale))
@@ -285,7 +289,8 @@ async def _repl(session: GameSession) -> int:
             if kind == "conjecture" and edit_conjecture(data, raw):
                 continue
             action = parse_action(kind, data, raw)
-            if action is not None and session.submit(action):
+            if action is not None and session.submit(action, request_id=event.get("request_id"),
+                                                     require_request_id=True):
                 break
             print("🎙️ I did not understand that action. Use a clear seat number or ? for rules." if locale == "en"
                   else "🎙️ 我没听懂这个行动。可以换成明确的座位号，或输入 ? 加规则问题。")
@@ -320,24 +325,13 @@ async def play(board_id: str, seed: int | None, offline: bool, locale: str, name
             try:
                 # Re-derive the runtime from trusted local config, matching the
                 # save's driver/adapter lock; explicit CLI flags override it.
-                driver = payload.get("driver")
-                adapter = payload.get("adapter")
-                if driver is None:
-                    driver, adapter = driver_mod.infer_legacy_driver(
-                        planner_snap, payload.get("campaign_counted"))
-                kwargs = driver_mod.restore_runtime_kwargs(
-                    driver, adapter, user_settings.load_settings(),
-                    command=agent_command)
+                kwargs = restore_coordinator.runtime_kwargs(
+                    payload, user_settings.load_settings(), command=agent_command,
+                    model=model, effort=effort, max_calls=max_calls)
                 if kwargs is None:
                     print("Cannot resume: this game needs a locally configured agent command." if locale == "en"
                           else "无法续玩：本局需要本地已配置的 Agent 命令。")
                     return 1
-                if model:
-                    kwargs["model"] = model
-                if effort:
-                    kwargs["effort"] = effort
-                if max_calls is not None:
-                    kwargs["max_calls"] = max_calls
                 planner = create_runtime(**kwargs)
                 print(json.dumps(planner.public_status(), ensure_ascii=False), flush=True)
             except (ModelTurnError, ValueError) as error:
@@ -352,16 +346,11 @@ async def play(board_id: str, seed: int | None, offline: bool, locale: str, name
             # reservation, then run the liveness check — so a crash between the
             # reservation and the check still restores the consumed call, and
             # success leaves the runtime verified (not clobbered by restore).
-            session.restore(payload)
-            if session.campaign_profile and not campaign_flow.resume(
-                    session.campaign_profile, resume_game_id, session):
+            if not await restore_coordinator.restore_and_verify(
+                    session, payload, resume_campaign=campaign_flow.resume):
                 print("This game was abandoned and cannot be resumed." if locale == "en"
                       else "本局已放弃，无法续玩。")
                 return 1
-            if planner is not None:
-                planner.reserve()
-                session._checkpoint()
-                await asyncio.to_thread(planner.preflight_check)
         except (ValueError, KeyError, TypeError, ModelTurnError) as error:
             print("Could not resume this game: " + str(error))
             return 1

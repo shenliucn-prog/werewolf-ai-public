@@ -26,6 +26,8 @@ from __future__ import annotations
 
 import json
 
+from .statement_memory import statement_summaries
+
 VERBATIM_SPEECHES = 12   # most recent public speeches shown word-for-word
 DECISION_MEMORY = 8      # most recent of the actor's own decisions shown
 CLAIM_WINDOW = 16        # most recent role claims summarized
@@ -66,27 +68,14 @@ def recent_public_statements(entries):
     ]
 
 
-def older_statement_summaries(brain):
+def older_statement_summaries(brain, entries=()):
     """Attributed claims from the structured observation logs.
 
     These are claims, not facts: each entry records *who said what about whom*,
     so the model can never mistake a claim for a settled flip.  No verbatim text
     is carried — the archive holds that, keyed by event number.
     """
-    items = []
-    claims = [{"who": who, "claimed_role": role}
-              for who, role in brain.claim_order[-CLAIM_WINDOW:]]
-    if claims:
-        items.append({"kind": "role_claims", "items": claims})
-    accusations = [{"day": day, "who": who, "accused": target}
-                   for day, who, target in brain.accuse_log[-ACCUSE_DEFEND_WINDOW:]]
-    if accusations:
-        items.append({"kind": "accusations", "items": accusations})
-    defences = [{"day": day, "who": who, "defended": target}
-                for day, who, target in brain.defend_log[-ACCUSE_DEFEND_WINDOW:]]
-    if defences:
-        items.append({"kind": "defences", "items": defences})
-    return items
+    return statement_summaries(entries, brain, CLAIM_WINDOW, ACCUSE_DEFEND_WINDOW)
 
 
 def disputed_verbatim(entries, brain, max_chars=DISPUTED_MAX_CHARS):
@@ -184,7 +173,7 @@ def build_public_context(agent):
     entries = agent.public_record.entries
     return {
         "recent_public_statements": recent_public_statements(entries),
-        "older_statement_summaries": older_statement_summaries(agent.brain),
+        "older_statement_summaries": older_statement_summaries(agent.brain, entries),
         "disputed_verbatim": disputed_verbatim(entries, agent.brain),
         "public_facts": public_facts(entries),
     }
@@ -228,6 +217,7 @@ def fit_request_budget(request: dict, max_chars: int = MAX_REQUEST_CHARS) -> dic
     earlier = details.get("earlier_this_round") if isinstance(details, dict) else None
     disputed = request.get("public_context", {}).get("disputed_verbatim")
     disputed_items = disputed.get("items") if isinstance(disputed, dict) else None
+    summaries = request.get("public_context", {}).get("older_statement_summaries", [])
 
     def over_budget() -> bool:
         return _serialized_size(request) > max_chars
@@ -238,6 +228,14 @@ def fit_request_budget(request: dict, max_chars: int = MAX_REQUEST_CHARS) -> dic
         earlier.pop(0)
     while decisions and over_budget():
         decisions.pop(0)
+    # Source metadata is useful but still history, not an untrimmable fixed
+    # instruction. Remove the oldest linked summary first (unknowns first).
+    while over_budget():
+        populated = [group for group in summaries if group.get("items")]
+        if not populated:
+            break
+        group = min(populated, key=lambda g: g["items"][0].get("event_no") or -1)
+        group["items"].pop(0)
     # Contested originals are the highest-value context; drop them last, and mark
     # the section truncated so the model knows text is missing.
     while disputed_items and over_budget():

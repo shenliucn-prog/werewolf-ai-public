@@ -46,7 +46,10 @@ class ModelContextTest(unittest.TestCase):
         self.assertEqual(kinds, {"role_claims", "accusations", "defences"})
         # Each summary is attributed to a speaker — a claim, not a bare fact.
         claims = next(s for s in summaries if s["kind"] == "role_claims")
-        self.assertEqual(claims["items"][0], {"who": "阿承", "claimed_role": "seer"})
+        self.assertEqual(claims["items"][0], {
+            "who": "阿承", "claimed_role": "seer", "day": None,
+            "night": None, "phase": None, "event_no": None,
+            "reference_status": "unknown"})
         accusations = next(s for s in summaries if s["kind"] == "accusations")
         self.assertEqual(accusations["items"][0]["accused"], "阿岚")
 

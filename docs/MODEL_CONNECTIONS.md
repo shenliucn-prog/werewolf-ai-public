@@ -39,6 +39,17 @@ API 路径兼容提供 Chat Completions 协议的远程或本地模型服务，�
 Python embedding can inject any `DecisionRuntime` implementation after its
 `preflight()` succeeds. Desktop apps can also consume `/api/start`, SSE
 `/api/stream?game_id=...`, `/api/action` and `/api/host_chat`; retain the session id.
+For each human `request` event, echo its `request_id` with the action, e.g.
+`{"game_id":"...","request_id":"...","target":3}`. Missing or stale IDs are
+rejected without consuming the current turn. After reconnect, use the pending
+request in `/api/rejoin`; it retains the original ID. Older saves gain an ID
+at delivery without rewriting the archive. Reload an older Web client after
+updating the server. Local embedding should call
+`submit(payload, request_id=event["request_id"], require_request_id=True)`;
+unbound `submit(payload)` remains only for trusted legacy in-process callers.
+
+真人行动须回传当前提示的 `request_id`，过期或缺失编号不会消耗行动。
+重连后使用恢复视图里的待处理请求；升级服务端后请刷新旧网页。
 Human actions and NPC model decisions are separate channels; public streams
 must not contain NPC private prompts.
 
