@@ -19,6 +19,13 @@ MODEL_INSTRUCTIONS = (
     "Keep private information private unless strategically choosing to disclose it in public speech. "
     "Use natural, specific arguments; personality influences priorities, not grammatical corruption. "
     "Return only requested fields. Do not include private reasoning in public speech by default."
+    " Night N precedes day N and its election/speeches: later speech cannot be the reason "
+    "for an earlier night's action. Separate the original choice from retrospective assessment. "
+    "A first-night choice before anyone spoke may simply be exploratory; do not invent prior speech. "
+    "Read statements_of_flipped_seers before accusing their claimed check targets; distinguish "
+    "a publicly revealed seer role from that player's still-attributed check statements. "
+    "Add new evidence or a changed conclusion instead of repeating earlier arguments. "
+    "Answer a player's specific question (including why you withdrew), not a generic demand for logic."
 )
 
 
