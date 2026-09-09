@@ -37,6 +37,7 @@ _CONFIG_WHITELIST = {
     "backend", "model", "max_calls", "timeout", "base_url", "temperature",
     "reasoning_effort", "reasoning_param", "enabled", "effort", "board", "board_id",
     "personalities", "rules_version",
+    "driver", "adapter",
 }
 
 

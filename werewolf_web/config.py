@@ -34,6 +34,21 @@ def _get(key, default=None):
     return _env.get(key) or os.environ.get(key, default)
 
 
+def raw_env():
+    """The raw environment (``.env`` then ``os.environ``), with no fallbacks.
+
+    ``Config`` applies built-in defaults for the ``LLM_*`` keys; driver
+    resolution needs the *un-defaulted* values so "no model configured
+    anywhere" stays a reachable, reportable state instead of silently
+    resolving to the default ``api`` backend.
+    """
+    merged = dict(os.environ)
+    for key, value in _env.items():
+        if value:
+            merged[key] = value
+    return merged
+
+
 class Config:
     LLM_BASE_URL = _get("LLM_BASE_URL", "https://api.deepseek.com/v1")
     LLM_API_KEY = _get("LLM_API_KEY", "")

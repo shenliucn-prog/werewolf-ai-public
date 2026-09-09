@@ -1,8 +1,10 @@
 """Local user settings: the model/rules configuration snapshot, minus credentials.
 
 A small, atomic, checksummed JSON store so a first-time connection check is not
-repeated every session.  Only whitelisted fields are stored — never ``api_key``,
-``command``, ``token`` or any other credential.
+repeated every session.  Only whitelisted fields are stored — never ``api_key``
+or ``token``.  ``command`` (the agent-command argv) and ``agent_connections``
+are trusted local config, persisted only by the trusted CLI (``trusted=True``),
+never from an HTTP request.
 """
 from __future__ import annotations
 
@@ -16,21 +18,32 @@ from . import config
 SETTINGS_PATH = os.path.join(config.DATA_DIR, "settings.json")
 SETTINGS_SCHEMA_VERSION = 1
 
-# Whitelisted config fields; anything else (credentials, commands, …) is dropped.
+# Whitelisted config fields; anything else (credentials, …) is dropped.
 ALLOWED_KEYS = {
     "backend", "model", "max_calls", "timeout", "base_url", "temperature",
     "reasoning_effort", "reasoning_param", "enabled", "effort",
+    "driver", "adapter",
 }
 
+# Trusted local-only keys: an executable argv and named agent connections.  These
+# are stored only by the trusted CLI; the Web can read them but never write them.
+TRUSTED_KEYS = {"command", "agent_connections"}
 
-def sanitize(config_dict):
-    """Whitelist + deep-copy a config dict; credentials are never retained."""
+
+def sanitize(config_dict, trusted=False):
+    """Whitelist + deep-copy a config dict; credentials are never retained.
+
+    ``trusted=True`` (the local CLI) additionally keeps the agent-command argv and
+    named agent connections; the Web path keeps them out so an HTTP request can
+    never plant an executable in local settings.
+    """
     if config_dict is None:
         return None
     if not isinstance(config_dict, dict):
         raise ValueError("settings: config must be an object")
+    keys = ALLOWED_KEYS | (TRUSTED_KEYS if trusted else set())
     return deepcopy({key: value for key, value in config_dict.items()
-                     if key in ALLOWED_KEYS})
+                     if key in keys})
 
 
 def _canonical(data) -> bytes:
@@ -44,9 +57,9 @@ def _digest(data) -> str:
     return hashlib.sha256(_canonical(data)).hexdigest()
 
 
-def save_settings(config_dict) -> None:
+def save_settings(config_dict, trusted=False) -> None:
     """Persist a sanitized config snapshot atomically (0700 dir / 0600 file)."""
-    payload = sanitize(config_dict)
+    payload = sanitize(config_dict, trusted=trusted)
     envelope = {
         "schema_version": SETTINGS_SCHEMA_VERSION,
         "checksum": _digest(payload) if payload is not None else "",

@@ -28,6 +28,13 @@ loss reviews use the model and can be retried.
 **Offline simulation must be explicitly selected.** It is a rule-flow test,
 makes no model calls and does not count toward campaign progress.
 
+**Game driver.** NPC decisions use one of three drivers: `api` (a model API,
+including keyless local servers), `agent` (your own Agent — the `command` or
+`codex` adapter is a second layer), or `offline`. Configuration resolves in the
+order request > saved local settings > environment; when nothing usable is
+configured the game reports *unconfigured* instead of silently starting offline
+or falling back to a broken API connection.
+
 ## Quick start
 
 Python 3.10+ is required. Fork and clone your fork to customize the game, or

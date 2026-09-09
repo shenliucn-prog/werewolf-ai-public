@@ -46,6 +46,14 @@
       <details class="llm-settings">
         <summary data-i18n="模型设置">模型设置</summary>
         <div class="llm-settings-body">
+          <label><span data-i18n="驱动">驱动</span> <select id="driverMode">
+            <option value="" data-i18n="使用服务器默认">使用服务器默认</option>
+            <option value="api" data-i18n="模型 API（含本地服务）">模型 API（含本地服务）</option>
+            <option value="agent" data-i18n="本机 Agent 连接">本机 Agent 连接</option>
+            <option value="offline" data-i18n="离线规则测试">离线规则测试</option>
+          </select></label>
+          <label id="agentConnectionRow" hidden><span data-i18n="预配置连接">预配置连接</span> <select id="agentConnection"></select></label>
+          <p id="setupGuidance" class="setup-guidance" role="alert" hidden></p>
           <label><span data-i18n="模式">模式</span> <select id="llmMode"><option value="" data-i18n="使用服务器默认">使用服务器默认</option><option value="local" data-i18n="离线规则测试（非 LLM 对局）">离线规则测试（非 LLM 对局）</option><option value="custom" data-i18n="本局模型连接（API 或本地服务）">本局模型连接（API 或本地服务）</option></select></label>
           <label><span data-i18n="接口地址">接口地址</span> <input id="llmBaseUrl" placeholder="https://.../v1" autocomplete="off"></label>
           <label><span data-i18n="模型名">模型名</span> <input id="llmModel" placeholder="例如 gpt-4o-mini" autocomplete="off"></label>

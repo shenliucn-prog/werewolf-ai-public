@@ -291,8 +291,9 @@ async def play(board_id: str, seed: int | None, offline: bool, locale: str, name
                personalities=None, conjecture=False, player_role=None, backend=None,
                model=None, effort=None, max_calls=None, agent_command=None,
                resume_game_id=None):
+    from . import driver as driver_mod
     from .ai.decision_runtime import create_runtime, ModelTurnError
-    from . import checkpoint, campaign_flow
+    from . import checkpoint, campaign_flow, settings as user_settings
     if resume_game_id is not None:
         # Rehydrate an interrupted chat game from its checkpoint (§7).  Board,
         # roles and locale come from the save; only the trusted local model
@@ -310,8 +311,27 @@ async def play(board_id: str, seed: int | None, offline: bool, locale: str, name
         planner_snap = payload.get("planner")
         if planner_snap is not None:
             try:
-                planner = create_runtime(planner_snap.get("backend"), model=model,
-                                         effort=effort, max_calls=max_calls, command=agent_command)
+                # Re-derive the runtime from trusted local config, matching the
+                # save's driver/adapter lock; explicit CLI flags override it.
+                driver = payload.get("driver")
+                adapter = payload.get("adapter")
+                if driver is None:
+                    driver, adapter = driver_mod.infer_legacy_driver(
+                        planner_snap, payload.get("campaign_counted"))
+                kwargs = driver_mod.restore_runtime_kwargs(
+                    driver, adapter, user_settings.load_settings(),
+                    command=agent_command)
+                if kwargs is None:
+                    print("Cannot resume: this game needs a locally configured agent command." if locale == "en"
+                          else "无法续玩：本局需要本地已配置的 Agent 命令。")
+                    return 1
+                if model:
+                    kwargs["model"] = model
+                if effort:
+                    kwargs["effort"] = effort
+                if max_calls is not None:
+                    kwargs["max_calls"] = max_calls
+                planner = create_runtime(**kwargs)
                 print(json.dumps(planner.public_status(), ensure_ascii=False), flush=True)
             except (ModelTurnError, ValueError) as error:
                 print(str(error))
@@ -339,13 +359,37 @@ async def play(board_id: str, seed: int | None, offline: bool, locale: str, name
             print("Could not resume this game: " + str(error))
             return 1
         return await _repl(session)
+    # Resolve the gameplay driver exactly as the web does (shared resolution).
+    explicit = {}
+    if offline:
+        explicit["offline"] = True
+    if backend is not None:
+        explicit["backend"] = backend
+    if model:
+        explicit["model"] = model
+    if effort:
+        explicit["effort"] = effort
+    if max_calls is not None:
+        explicit["max_calls"] = max_calls
+    resolved = driver_mod.resolve_driver(explicit=explicit,
+                                         saved=user_settings.load_settings(),
+                                         command=agent_command)
+    if not resolved["configured"]:
+        print(resolved["reason"] or
+              ("No model or offline mode configured." if locale == "en" else
+               "未配置模型或离线模式。"))
+        return 1
+    offline_mode = resolved["driver"] == "offline"
     planner = None
-    if not offline and backend != "legacy":
+    if offline_mode:
+        print("TEST MODE: local decisions, optional wording only. Not model-player gameplay." if locale == "en" else
+              "测试模式：本地规则决策，模型至多润色台词。这不是大模型玩家对局。", flush=True)
+    else:
         if conjecture:
             print("Model-player conjecture tables are not integrated yet / 模型玩家猜想表尚未接入；请选择普通模式。")
             return 1
         try:
-            planner = create_runtime(backend, model=model, effort=effort, max_calls=max_calls, command=agent_command)
+            planner = create_runtime(**resolved["runtime_kwargs"])
             print(json.dumps(planner.public_status(), ensure_ascii=False), flush=True)
             print("Checking LLM before dealing roles… / 发身份前验证 LLM 连接……", flush=True)
             await asyncio.to_thread(planner.preflight)
@@ -354,16 +398,14 @@ async def play(board_id: str, seed: int | None, offline: bool, locale: str, name
             return 1
         print("Model connection verified. No silent offline fallback." if locale == "en" else
               "模型连接验证通过；本局不会静默切换离线玩家。", flush=True)
-    else:
-        print("TEST MODE: local decisions, optional wording only. Not model-player gameplay." if locale == "en" else
-              "测试模式：本地规则决策，模型至多润色台词。这不是大模型玩家对局。", flush=True)
-    llm_options = {"enabled": False} if offline or planner is not None else None
+    llm_options = {"enabled": False} if offline_mode or planner is not None else None
     session_id = "chat-" + secrets.token_urlsafe(12)
     session = GameSession(board_id, llm_options, session_id=session_id,
                           seed=seed, locale=locale, names=names,
                           personalities=personalities, conjecture=conjecture, player_role=player_role,
                           onboarding=True, planner=planner,
                           checkpoint_path=checkpoint.checkpoint_path(session_id))
+    session.driver, session.adapter = resolved["driver"], resolved["adapter"]
     print("Text only; voice and visual gameplay are not designed or implemented." if locale == "en" else
           "当前仅文字驱动；语音和视觉玩法尚无方案、尚未实现。")
     print("At any prompt: /seats, /history, votes, speeches, or ?question. These never submit an action." if locale == "en" else
@@ -381,6 +423,7 @@ async def campaign_play(profile_id: str, offline: bool, locale: str, seed: int |
     Offline / legacy rule tests are an explicit choice and never count toward
     campaign progress (no archive registration, no hook).
     """
+    from . import driver as driver_mod
     from .ai.decision_runtime import create_runtime, ModelTurnError
     from . import campaign_flow, checkpoint, settings as user_settings
     from .campaign import LEVELS
@@ -390,36 +433,59 @@ async def campaign_play(profile_id: str, offline: bool, locale: str, seed: int |
     role, board_id = level["role"], level["board"]
     game_id = "campaign-" + secrets.token_urlsafe(12)
 
-    if offline or backend == "legacy":
+    explicit = {}
+    if offline:
+        explicit["offline"] = True
+    if backend is not None:
+        explicit["backend"] = backend
+    if model:
+        explicit["model"] = model
+    if effort:
+        explicit["effort"] = effort
+    if max_calls is not None:
+        explicit["max_calls"] = max_calls
+    saved = user_settings.load_settings()
+    resolved = driver_mod.resolve_driver(explicit=explicit, saved=saved,
+                                         command=agent_command)
+    if not resolved["configured"]:
+        print(resolved["reason"] or
+              ("No model or offline mode configured." if locale == "en" else
+               "未配置模型或离线模式。"))
+        return 1
+
+    if resolved["driver"] == "offline":
         print("Offline rule test — not counted toward campaign progress." if locale == "en"
               else "离线规则测试——不计入闯关成绩。")
         session = GameSession(board_id, {"enabled": False}, session_id=game_id,
                               seed=seed, locale=locale, player_role=role, onboarding=True)
+        session.driver, session.adapter = resolved["driver"], resolved["adapter"]
         return await _repl(session)
 
     try:
         campaign_flow.begin_attempt(profile_id, game_id, role, board_id,
-                                    config={"backend": backend, "model": model})
+                                    config={"driver": resolved["driver"],
+                                            "adapter": resolved["adapter"],
+                                            "backend": resolved["backend"],
+                                            "model": resolved["model"]})
     except ValueError as error:
         print(str(error))
         return 1
 
     planner = None
-    saved = user_settings.load_settings() or {}
-    eff = dict(saved)                       # keep base_url/timeout/etc.
-    if backend: eff["backend"] = backend
-    if model: eff["model"] = model
-    if effort: eff["effort"] = effort
-    if max_calls: eff["max_calls"] = max_calls
     try:
-        kwargs = user_settings.runtime_kwargs(eff)
-        if agent_command is not None:
-            kwargs["command"] = agent_command   # local CLI only; never from HTTP
-        planner = create_runtime(**kwargs)
+        planner = create_runtime(**resolved["runtime_kwargs"])
         print(json.dumps(planner.public_status(), ensure_ascii=False), flush=True)
         print("Checking LLM before dealing roles… / 发身份前验证 LLM 连接……", flush=True)
         await asyncio.to_thread(planner.preflight)
-        user_settings.save_settings(eff)    # merge, never drop saved fields
+        # Persist the resolved config; only the trusted CLI may store the agent
+        # command argv (the web's save path drops it).
+        persist = dict(saved or {})
+        for key in ("driver", "adapter", "backend", "model", "effort", "max_calls"):
+            if resolved[key] is not None:
+                persist[key] = resolved[key]
+        if resolved["command"] is not None:
+            persist["command"] = resolved["command"]
+        user_settings.save_settings(persist, trusted=True)
     except (ModelTurnError, ValueError) as error:
         print(str(error))
         return 1
@@ -428,6 +494,7 @@ async def campaign_play(profile_id: str, offline: bool, locale: str, seed: int |
                           seed=seed, locale=locale, player_role=role, onboarding=True,
                           planner=planner,
                           checkpoint_path=checkpoint.checkpoint_path(game_id))
+    session.driver, session.adapter = resolved["driver"], resolved["adapter"]
     session.campaign_profile = profile_id
     session._checkpoint()
     session.progress_hook = campaign_flow.progress_hook(profile_id, game_id)

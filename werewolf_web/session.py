@@ -17,6 +17,7 @@ from dataclasses import replace
 from typing import Optional
 
 from . import config
+from . import driver as driver_mod
 from .game import engine as eng_mod
 from .ai.brain import Speech
 from .ai.llm import LLMClient, LLMRuntimeConfig
@@ -50,6 +51,11 @@ class GameSession:
             raise ValueError("Model-player conjecture tables are not yet integrated; choose normal mode.")
         self.planner = planner
         self.session_id = session_id
+        # Gameplay driver lock: how NPC decisions are produced ("api"/"agent"/
+        # "offline"), and the agent adapter ("command"/"codex").  Durable, so a
+        # restore can refuse an offline->counted (or vice versa) switch and
+        # re-derive the runtime from trusted local config.
+        self.driver, self.adapter = driver_mod.driver_from_planner(planner)
         # Campaign association (durable): the profile this game settles into, or
         # None for a free-play game.  Lets a restored game re-attach its hook.
         self.campaign_profile = None
@@ -345,6 +351,8 @@ class GameSession:
             "board_id": self.engine.board_id,
             "locale": self.engine.locale,
             "session_id": self.session_id,
+            "driver": self.driver,
+            "adapter": self.adapter,
             "campaign_profile": self.campaign_profile,
             "campaign_counted": self.campaign_counted,
             "campaign_review_state": self.campaign_review_state,
@@ -417,6 +425,23 @@ class GameSession:
                 raise ValueError("GameSession.snapshot: planner snapshot without a live planner")
         elif self.planner is not None:
             raise ValueError("GameSession.snapshot: legacy snapshot but a live planner is attached")
+
+        # Driver lock: infer a legacy save's driver, then enforce it against the
+        # live runtime *before* any mutation.  The runtime is always re-derived
+        # from trusted local config; this refuses offline<->counted switches and
+        # adapter mismatches instead of guessing.
+        counted_raw = snapshot.get("campaign_counted")
+        if counted_raw is not None and not isinstance(counted_raw, bool):
+            raise ValueError("GameSession.snapshot: campaign_counted must be a boolean or null")
+        driver = snapshot.get("driver")
+        adapter = snapshot.get("adapter")
+        if driver is None:
+            driver, adapter = driver_mod.infer_legacy_driver(planner_snap, counted_raw)
+        if driver not in driver_mod.DRIVERS:
+            raise ValueError(f"GameSession.snapshot: unknown driver {driver!r}")
+        if adapter is not None and adapter not in driver_mod.ADAPTERS:
+            raise ValueError(f"GameSession.snapshot: unknown adapter {adapter!r}")
+        driver_mod.validate_restore(driver, adapter, counted_raw, self.planner)
 
         entries = snapshot.get("public_record")
         if not isinstance(entries, list):
@@ -530,6 +555,8 @@ class GameSession:
             raise ValueError("GameSession.snapshot: campaign_counted must be a boolean or null")
         self.campaign_counted = counted
         self.campaign_review_state = review_state
+        self.driver = driver
+        self.adapter = adapter
         self.memory_dir = memory_dir
         self.conjecture = bool(snapshot.get("conjecture"))
         self.onboarding = bool(snapshot.get("onboarding"))
