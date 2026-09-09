@@ -20,12 +20,14 @@ const connectionsResponse = {connections: [
   {name: 'local-codex', adapter: 'codex', model: 'gpt-x'},
 ]};
 let startResponse = {ok: true, game_id: 'ui-test'};
+let rejoinResponse = null;
 w.fetch = async (url, options = {}) => {
   const body = options.body ? JSON.parse(options.body) : null;
   requests.push({url, body});
   let response;
   let ok = true;
   if (url === '/api/agent_connections') response = connectionsResponse;
+  else if (url.startsWith('/api/rejoin')) response = rejoinResponse;
   else if (url.startsWith('/api/boards')) response = {
     boards: [{id:'classic',name:'Classic',difficulty:'Intro',roles:['seer','werewolf','werewolf','villager']}],
     roles: {seer:{cn:'Seer'},werewolf:{cn:'Werewolf'},villager:{cn:'Villager'}}};
@@ -103,6 +105,30 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 10));
   const answerAction = requests.filter(r => r.url === '/api/action').pop().body;
   assert.equal(answerAction.answer, '我来回答');
   assert.equal(answerAction.game_id, 'ui-test');
+
+  // A detached old button must not submit its payload for the next question.
+  w.eval('showAction({kind:"table_answer", request_id:"old-request", data:{from:"Alice"}})');
+  const oldButton = w.document.querySelector('#skipTableAnswer');
+  w.eval('showAction({kind:"table_answer", request_id:"new-request", data:{from:"Bob"}})');
+  const beforeStale = requests.filter(r => r.url === '/api/action').length;
+  oldButton.click();
+  await flush();
+  assert.equal(requests.filter(r => r.url === '/api/action').length, beforeStale);
+  w.document.querySelector('#skipTableAnswer').click();
+  await flush();
+  assert.equal(requests.filter(r => r.url === '/api/action').pop().body.request_id, 'new-request');
+
+  // Real frontend rejoin path retains the server's durable request identity.
+  rejoinResponse = {ok:true, view:{finished:false, public_events:[], private_events:[],
+    terminal:[], next_event_no:42, pending:{type:'request', kind:'table_answer',
+      request_id:'restored-request', event_no:41, data:{from:'Bob'}}}};
+  await w.eval('rejoin()');
+  w.document.querySelector('#tableAnswerInput').value = '恢复后的答案';
+  w.document.querySelector('#sendTableAnswer').click();
+  await flush();
+  const recovered = requests.filter(r => r.url === '/api/action').pop().body;
+  assert.equal(recovered.request_id, 'restored-request');
+  assert.equal(recovered.answer, '恢复后的答案');
 
   assert.deepEqual(errors, []);
   console.log('PASS: driver selector (api/agent/offline), pre-configured connection, unconfigured guidance, and table_answer controls');

@@ -376,6 +376,8 @@ function showTally(tally) {
 // ---------- 玩家行动面板 ----------
 function showAction(d) {
   pendingReq = d;
+  // Bind buttons to this prompt, not whichever prompt is current on click.
+  const submitAction = payload => sendActionForRequest(payload, d);
   const kind = d.kind, data = d.data || {};
   panelEl.style.display = "block";
   panelEl.innerHTML = "";
@@ -516,14 +518,18 @@ function showAction(d) {
 }
 
 async function submitAction(payload) {
+  return sendActionForRequest(payload, pendingReq);
+}
+
+async function sendActionForRequest(payload, submitted) {
   if (!payload) return;
+  if (submitted !== pendingReq) return;
   panelEl.style.display = "none";
-  const submitted = pendingReq;
   try {
   const response = await fetch("/api/action", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...payload, game_id: gameId })
+    body: JSON.stringify({ ...payload, game_id: gameId, request_id: submitted?.request_id })
   });
   const result = await response.json();
   if (!response.ok || !result.ok) throw new Error("action rejected");

@@ -13,12 +13,15 @@ import logging
 import os
 import re
 from copy import deepcopy
-from dataclasses import replace
+from dataclasses import replace, asdict
 from typing import Optional
 
 from . import config
 from . import driver as driver_mod
 from . import perf
+from . import lifecycle
+from . import decision_execution
+from . import session_codec
 from .game import engine as eng_mod
 from .ai.brain import Speech
 from .ai.llm import LLMClient, LLMRuntimeConfig
@@ -27,6 +30,11 @@ from .ai.strategic_agent import StrategicNPCAgent
 from .ai.host import HostAgent
 from .i18n import t, role_name, board_display, witch_rule_text
 from .public_record import PublicRecord, ballot_event, target_label
+from .participants import participant_roster
+from .observations import ObservationGateway
+from .actions import ActionRequest, ActionProposal, request_id as action_request_id
+from .participants import Participant
+from .conversation import QuestionQueue, InterruptionIntent, FloorPolicy
 
 _SENTINEL = object()
 
@@ -90,6 +98,7 @@ class GameSession:
         # user's games cannot influence another user's NPC profiles.
         self.memory_dir = os.path.join(config.DATA_DIR, "npc_memory", session_id)
         self.agents: dict[str, StrategicNPCAgent] = {}
+        self.participants = {}
         self._q: Optional[asyncio.Queue] = None
         self._event_q: Optional[asyncio.Queue] = None
         self.pending: Optional[dict] = None
@@ -103,8 +112,7 @@ class GameSession:
         self._table_extra_turns = 0
         self._table_extra_by_name: dict[str, int] = {}
         self._table_pairs: set[frozenset[str]] = set()
-        self._pending_questions: list[list[str, str]] = []  # [target, asker] pairs
-        self._questions_answered = 0
+        self.questions = QuestionQueue()
         self._table_cooldown = False
         # 显式状态机游标：_play() 被分解为一系列小步骤，由 _step 驱动。
         # _step_state 存放跨步骤的循环局部值（夜间行动、夜间事件等），
@@ -155,6 +163,24 @@ class GameSession:
         if self._q is None:
             self._q = asyncio.Queue()
         return self._q
+
+    # Compatibility accessors for existing research callers/tests. The queue is
+    # the only live owner; new code uses enqueue/begin/finish instead of lists.
+    @property
+    def _pending_questions(self):
+        return self.questions.pending
+
+    @_pending_questions.setter
+    def _pending_questions(self, pairs):
+        self.questions.pending = deepcopy(pairs)
+
+    @property
+    def _questions_answered(self):
+        return self.questions.answered
+
+    @_questions_answered.setter
+    def _questions_answered(self, value):
+        self.questions.answered = value
 
     @property
     def event_q(self):
@@ -321,322 +347,52 @@ class GameSession:
 
     @staticmethod
     def _freeze(value):
-        """Recursively convert non-JSON game objects for the snapshot."""
-        if isinstance(value, Speech):
-            return {"__speech__": True, "text": value.text, "claim": value.claim,
-                    "accuse": value.accuse, "defend": value.defend,
-                    "question_to": value.question_to,
-                    "protected_facts": list(value.protected_facts)}
-        if isinstance(value, eng_mod.GameEvent):
-            return {"__event__": True, **value.to_dict()}
-        if isinstance(value, dict):
-            return {key: GameSession._freeze(val) for key, val in value.items()}
-        if isinstance(value, (list, tuple)):
-            return [GameSession._freeze(val) for val in value]
-        return value
+        return session_codec.freeze(value)
 
     @staticmethod
     def _thaw(value):
-        """Inverse of :meth:`_freeze`."""
-        if isinstance(value, dict):
-            if value.get("__speech__"):
-                return Speech(text=value.get("text", ""), claim=value.get("claim"),
-                              accuse=value.get("accuse"), defend=value.get("defend"),
-                              question_to=value.get("question_to"),
-                              protected_facts=tuple(value.get("protected_facts", [])))
-            if value.get("__event__"):
-                return eng_mod.GameEvent.from_dict(value)
-            return {key: GameSession._thaw(val) for key, val in value.items()}
-        if isinstance(value, list):
-            return [GameSession._thaw(val) for val in value]
-        return value
+        return session_codec.thaw(value)
 
     def snapshot(self) -> dict:
-        """Full logical-state snapshot (whitelisted; never emitted or stored
-        with credentials)."""
-        from .recovery import SCHEMA_VERSION
-        planner = self.planner
-        return {
-            "schema_version": SCHEMA_VERSION,
-            "board_id": self.engine.board_id,
-            "locale": self.engine.locale,
-            "session_id": self.session_id,
-            "driver": self.driver,
-            "adapter": self.adapter,
-            "campaign_profile": self.campaign_profile,
-            "campaign_counted": self.campaign_counted,
-            "campaign_review_state": self.campaign_review_state,
-            "conjecture": self.conjecture,
-            "onboarding": self.onboarding,
-            "engine": self.engine.snapshot(),
-            "agents": {name: agent.snapshot() for name, agent in self.agents.items()},
-            "planner": planner.snapshot() if planner is not None and hasattr(planner, "snapshot") else None,
-            "llm": self.llm.snapshot(),
-            "conjecture_ledger": (self.conjecture_ledger.snapshot()
-                                  if self.conjecture_ledger is not None else None),
-            "public_record": deepcopy(self.public_record.entries),
-            "pending": deepcopy(self.pending),
-            "speech_events": [[name, self._freeze(sp)] for name, sp in self.speech_events],
-            "player_last_speech": self.player_last_speech,
-            "triggered": sorted(self._triggered),
-            "table_extra_turns": self._table_extra_turns,
-            "table_extra_by_name": dict(self._table_extra_by_name),
-            "table_pairs": [sorted(pair) for pair in self._table_pairs],
-            "pending_questions": [list(pair) for pair in self._pending_questions],
-            "questions_answered": self._questions_answered,
-            "table_cooldown": self._table_cooldown,
-            "last_llm_status": (list(self._last_llm_status)
-                                if self._last_llm_status is not None else None),
-            "step": self._step,
-            "current_step": self._current_step,
-            "step_state": self._freeze(self._step_state),
-            "decision_no": self._decision_no,
-            "decision_log": self._freeze(self.decision_log),
-            "finished": self.finished,
-            # Event ledger (§5.4 / §6): durable so a process restart re-presents
-            # the same numbered transcript with no missing/duplicate events.
-            "event_no": self._event_no,
-            "events": deepcopy(self._events),
-            "pending_event_no": self._pending_event_no,
-        }
+        return session_codec.snapshot(self)
 
     def restore(self, snapshot: dict) -> None:
-        """Restore full logical state in place (strict, validate-then-apply).
-
-        The session shell (board/seed/session_id/planner) must already exist;
-        this fills it from a whitelisted snapshot.  Transient run state — the
-        asyncio queues, ``stream_claimed``, ``_events_started`` — is reset, not
-        resurrected (see §4.2).
-
-        The restore is atomic: the *whole* snapshot is validated against
-        throwaway copies of the live components before any attribute on
-        ``self`` is touched, so a corrupt snapshot — however deep the defect —
-        raises with the session left unchanged, never half-restored.
-        """
-        from .recovery import check_version
-        check_version(snapshot, "GameSession.snapshot")
-        snapshot = deepcopy(snapshot)
-
-        # ================= Phase 1: validate (no mutation of ``self``) ======
-        board_id = snapshot.get("board_id")
-        if not isinstance(board_id, str) or not board_id:
-            raise ValueError("GameSession.snapshot: board_id must be a non-empty string")
-        session_id = snapshot.get("session_id")
-        if not isinstance(session_id, str) or not session_id:
-            raise ValueError("GameSession.snapshot: session_id must be a non-empty string")
-        review_state = snapshot.get("campaign_review_state")
-        if review_state not in (None, "done", "unavailable"):
-            raise ValueError(
-                "GameSession.snapshot: campaign_review_state must be null, 'done' or 'unavailable'")
-
-        planner_snap = snapshot.get("planner")
-        if planner_snap is not None:
-            if self.planner is None or not hasattr(self.planner, "restore"):
-                raise ValueError("GameSession.snapshot: planner snapshot without a live planner")
-        elif self.planner is not None:
-            raise ValueError("GameSession.snapshot: legacy snapshot but a live planner is attached")
-
-        # Driver lock: infer a legacy save's driver, then enforce it against the
-        # live runtime *before* any mutation.  The runtime is always re-derived
-        # from trusted local config; this refuses offline<->counted switches and
-        # adapter mismatches instead of guessing.
-        counted_raw = snapshot.get("campaign_counted")
-        if counted_raw is not None and not isinstance(counted_raw, bool):
-            raise ValueError("GameSession.snapshot: campaign_counted must be a boolean or null")
-        driver = snapshot.get("driver")
-        adapter = snapshot.get("adapter")
-        if driver is None:
-            driver, adapter = driver_mod.infer_legacy_driver(planner_snap, counted_raw)
-        if driver not in driver_mod.DRIVERS:
-            raise ValueError(f"GameSession.snapshot: unknown driver {driver!r}")
-        if adapter is not None and adapter not in driver_mod.ADAPTERS:
-            raise ValueError(f"GameSession.snapshot: unknown adapter {adapter!r}")
-        driver_mod.validate_restore(driver, adapter, counted_raw, self.planner)
-
-        entries = snapshot.get("public_record")
-        if not isinstance(entries, list):
-            raise ValueError("GameSession.snapshot: public_record must be an array")
-
-        ledger_snap = snapshot.get("conjecture_ledger")
-
-        agents = snapshot.get("agents")
-        if not isinstance(agents, dict):
-            raise ValueError("GameSession.snapshot: agents must be an object")
-        for name in agents:
-            if not isinstance(name, str) or not name:
-                raise ValueError("GameSession.snapshot: agent names must be non-empty strings")
-
-        # Event ledger (§5.4 / §6): restored verbatim so reattach after a
-        # process restart re-presents the exact numbered transcript.  The
-        # contiguous numbering invariant (1..event_no) is checked, not assumed.
-        event_no = snapshot.get("event_no", 0)
-        if type(event_no) is not int or event_no < 0:
-            raise ValueError("GameSession.snapshot: event_no must be a non-negative integer")
-        events = snapshot.get("events", [])
-        if not isinstance(events, list):
-            raise ValueError("GameSession.snapshot: events must be an array")
-        if len(events) != event_no:
-            raise ValueError("GameSession.snapshot: event ledger length does not match event_no")
-        for index, event in enumerate(events):
-            if not isinstance(event, dict):
-                raise ValueError("GameSession.snapshot: events must be objects")
-            if event.get("event_no") != index + 1:
-                raise ValueError("GameSession.snapshot: event ledger numbering is not contiguous")
-        pending_event_no = snapshot.get("pending_event_no")
-        if pending_event_no is not None and (type(pending_event_no) is not int or pending_event_no < 0):
-            raise ValueError("GameSession.snapshot: pending_event_no must be an integer or null")
-
-        # Validate every component snapshot by restoring it into a throwaway
-        # copy of the live object, so any component defect fires here too.
-        probe_engine = deepcopy(self.engine)
-        probe_engine.restore(snapshot["engine"])
-
-        # The live key is bound to the configured endpoint; a probe client
-        # mirrors that endpoint (disabled, so no network/client side effects)
-        # and re-runs llm.restore's endpoint-trust + budget checks untouched.
-        probe_llm = LLMClient(replace(self.llm.runtime, enabled=False, api_key=""))
-        probe_llm.restore(snapshot["llm"])
-
-        probe_planner = None
-        if planner_snap is not None:
-            probe_planner = deepcopy(self.planner)
-            probe_planner.restore(planner_snap)
-
-        probe_public = PublicRecord(probe_engine.locale)
-        probe_public.entries = deepcopy(entries)
-
-        probe_ledger = None
-        if ledger_snap is not None:
-            from .game.conjecture import GameConjectures
-            probe_ledger = GameConjectures(probe_engine)
-            probe_ledger.restore(ledger_snap)
-
-        memory_dir = os.path.join(config.DATA_DIR, "npc_memory", session_id)
-        probe_agents = {}
-        for name, agent_snap in agents.items():
-            if probe_planner is not None:
-                from .ai.model_player import ModelNPCAgent
-                probe_agents[name] = ModelNPCAgent.restore_agent(
-                    agent_snap, probe_engine, probe_llm, probe_planner,
-                    probe_public, memory_dir=memory_dir)
-            else:
-                probe_agents[name] = StrategicNPCAgent.restore_agent(
-                    agent_snap, probe_engine, probe_llm, memory_dir=memory_dir)
-
-        # ================= Phase 2: apply (cannot fail) ====================
-        # Everything above has validated, so each in-place restore below re-runs
-        # the same checks against the live object and succeeds.
-        self.engine.restore(snapshot["engine"])
-        self.llm.restore(snapshot["llm"])
-        if planner_snap is not None:
-            self.planner.restore(planner_snap)
-
-        self.public_record = PublicRecord(self.engine.locale)
-        self.public_record.entries = deepcopy(entries)
-
-        if ledger_snap is not None:
-            from .game.conjecture import GameConjectures
-            self.conjecture_ledger = GameConjectures(self.engine)
-            self.conjecture_ledger.restore(ledger_snap)
-        else:
-            self.conjecture_ledger = None
-
-        # Rebuild agents side-effect-free (no engine RNG, no match_start),
-        # against the restored engine/llm/planner and the restored memory_dir.
-        self.agents = {}
-        for name, agent_snap in agents.items():
-            if self.planner is not None:
-                from .ai.model_player import ModelNPCAgent
-                self.agents[name] = ModelNPCAgent.restore_agent(
-                    agent_snap, self.engine, self.llm, self.planner,
-                    self.public_record, memory_dir=memory_dir,
-                    recorder=self.perf_recorder)
-            else:
-                self.agents[name] = StrategicNPCAgent.restore_agent(
-                    agent_snap, self.engine, self.llm, memory_dir=memory_dir)
-
-        # Session loop state (durable fields only).
-        self.session_id = session_id
-        profile = snapshot.get("campaign_profile")
-        if profile is not None and not isinstance(profile, str):
-            raise ValueError("GameSession.snapshot: campaign_profile must be a string or null")
-        self.campaign_profile = profile
-        counted = snapshot.get("campaign_counted")
-        if counted is not None and not isinstance(counted, bool):
-            raise ValueError("GameSession.snapshot: campaign_counted must be a boolean or null")
-        self.campaign_counted = counted
-        self.campaign_review_state = review_state
-        self.driver = driver
-        self.adapter = adapter
-        self.memory_dir = memory_dir
-        self.conjecture = bool(snapshot.get("conjecture"))
-        self.onboarding = bool(snapshot.get("onboarding"))
-        self.finished = bool(snapshot.get("finished"))
-        self.pending = deepcopy(snapshot.get("pending"))
-        self.speech_events = [(name, self._thaw(sp))
-                              for name, sp in snapshot.get("speech_events", [])]
-        self.player_last_speech = snapshot.get("player_last_speech", "")
-        self._triggered = set(snapshot.get("triggered", []))
-        self._table_extra_turns = snapshot.get("table_extra_turns", 0)
-        self._table_extra_by_name = dict(snapshot.get("table_extra_by_name", {}))
-        self._table_pairs = {frozenset(pair) for pair in snapshot.get("table_pairs", [])}
-        raw_questions = snapshot.get("pending_questions", [])
-        if isinstance(raw_questions, dict):
-            # Legacy format {target: asker}; a key->value is a reliable target->asker
-            # pair, so this migration fabricates nothing.
-            self._pending_questions = [[t, a] for t, a in raw_questions.items()]
-        elif isinstance(raw_questions, list):
-            self._pending_questions = [list(pair) for pair in raw_questions
-                                       if isinstance(pair, (list, tuple)) and len(pair) == 2]
-        else:
-            self._pending_questions = []
-        self._questions_answered = snapshot.get("questions_answered", 0)
-        self._table_cooldown = bool(snapshot.get("table_cooldown"))
-        last = snapshot.get("last_llm_status")
-        self._last_llm_status = tuple(last) if isinstance(last, list) else None
-        self._step = snapshot.get("step")
-        self._current_step = snapshot.get("current_step")
-        self._step_state = self._thaw(snapshot.get("step_state", {}))
-        self._decision_no = snapshot.get("decision_no", 0)
-        self.decision_log = self._thaw(snapshot.get("decision_log", []))
-        self._event_no = event_no
-        self._events = deepcopy(events)
-        self._init_event = next((e for e in self._events if e.get("type") == "init"), None)
-        self._pending_event_no = pending_event_no
-        # Transient, deliberately not restored (see §4.2).
-        self.stream_claimed = False
-        self._events_started = False
-        self._q = None
-        self._event_q = None
-        self.stream_active = False
-        self._game_task_ref = None
-        self.faulted = False
-        self.progress_hook = None
-        # The restored ledger is already durable and re-presented by the
-        # ``events(after)`` catch-up path, not the live queue.  Align the
-        # publish cursor to the ledger end so a subsequent ``_flush_publish``
-        # hands only *newly* emitted events to the fresh queue — never re-publishes
-        # the pre-restart transcript from a stale cursor.
-        self._published_upto = len(self._events)
+        session_codec.restore(self, snapshot)
 
 
-    async def ask_player(self, kind: str, data: dict) -> dict:
-        slot = f"human:{self._current_step}:{self._slot_instance()}:{kind}"
+
+    async def ask_player(self, kind: str, data: dict, *, action=None) -> dict:
+        slot = f"human:{self._current_step}:{self._slot_instance()}:{action or kind}"
         replayed = self._replay_decision(slot)
         if replayed is not None:
             # The action was already accepted and committed; return the accepted
             # response without re-presenting the prompt or re-blocking on input.
             return replayed["result"]
-        self.pending = {"kind": kind, "data": data}
-        decision = self._open_decision(slot)
+        resuming = (self.pending == {"kind": kind, "data": data}
+                    and self._pending_event_no is not None)
+        decision = next((d for d in reversed(self.decision_log)
+                         if d["slot"] == slot and not d["committed"]), None) if resuming else None
+        if decision is None:
+            decision = self._open_decision(slot)
+        self.pending = {"kind": kind, "data": deepcopy(data)}
         calls = getattr(self.planner, "calls", 0)
         self._begin_attempt(decision, calls)
         # Emit the request (which assigns ``_pending_event_no``) *before* the
         # checkpoint, so the pending action, its event number and the request
         # event commit atomically — a crash while the player is deciding restores
         # a consistent prompt, never a pending action without its event number.
-        self.emit({"type": "request", "kind": kind, "data": data})
+        number = self._pending_event_no if resuming else self._event_no + 1
+        request = self._human_request(number)
+        if resuming:
+            # Keep the durable ID. Recovery views and event catch-up may both
+            # show this prompt; submit still accepts it at most once.
+            event = request.to_event()
+            event["event_no"] = number
+            self.event_q.put_nowait(event)
+        else:
+            self.emit(request.to_event(), publish=False)
         self._checkpoint()
+        self._flush_publish()
         t0 = perf.now()
         resp = await self.q.get()
         self.perf_recorder.human_idle(kind=kind, dur_ms=perf.elapsed_ms(t0))
@@ -647,9 +403,28 @@ class GameSession:
         self._checkpoint()
         return resp
 
-    def submit(self, resp: dict):
+    def _human_request(self, event_no=None):
+        participant = (Participant.from_seat(self.session_id, self.engine.player_seat(),
+                                            self.driver, self.adapter) if self.engine.seats else
+                       Participant(self.session_id, eng_mod.PLAYER_ID, None, "human"))
+        return ActionRequest.human(participant,
+            self._pending_event_no if event_no is None else event_no,
+            self.engine.phase, self.pending["kind"], self.pending["data"])
+
+    def submit(self, resp: dict, *, request_id=None, require_request_id=False):
         if not self.pending or not isinstance(resp, dict):
             return False
+        if require_request_id or request_id is not None:
+            if not isinstance(request_id, str) or not request_id or self._pending_event_no is None:
+                return False
+            request = self._human_request()
+            try:
+                resp = request.accept(ActionProposal(request_id, request.participant, resp))
+            except ValueError:
+                return False
+        else:
+            # Trusted in-process legacy callers only; Web/CLI require IDs.
+            resp = deepcopy(resp)
         kind, data = self.pending["kind"], self.pending["data"]
         if kind == "conjecture":
             try:
@@ -702,20 +477,11 @@ class GameSession:
         """Start the game loop exactly once.  The game task owns the session's
         lifetime: a closed SSE stream no longer ends the game — it keeps running
         while blocked on ``ask_player`` until gameover or an explicit abandon."""
-        if self._game_task_ref is None or self._game_task_ref.done():
-            self._game_task_ref = asyncio.create_task(self._game_task())
-        return self._game_task_ref
+        return lifecycle.ensure_task(self)
 
     def abandon(self):
         """Explicit leave/abandon: end the game without waiting for a stream."""
-        self._abandoned = True
-        self.finished = True
-        self.pending = None
-        self._pending_event_no = None
-        self.event_q.put_nowait(_SENTINEL)
-        if self._game_task_ref is not None and not self._game_task_ref.done():
-            self._game_task_ref.cancel()
-        self.perf_recorder.flush()
+        lifecycle.abandon(self, _SENTINEL)
 
     async def events(self, after: int = 0):
         """Yield events with ``event_no > after``, then live until the end.
@@ -729,15 +495,23 @@ class GameSession:
         seen = after
         for ev in list(self._events):
             if ev["event_no"] > seen:
-                yield ev
+                yield self._delivery_event(ev)
                 seen = ev["event_no"]
         while True:
             item = await self.event_q.get()
             if item is _SENTINEL:
                 break
             if item["event_no"] > seen:
-                yield item
+                yield self._delivery_event(item)
                 seen = item["event_no"]
+
+    def _delivery_event(self, event):
+        if event.get("type") == "request":
+            # Old saves acquire the same ID in live catch-up and recovery view,
+            # without rewriting their durable event ledger.
+            return {**deepcopy(event), "request_id": action_request_id(
+                self.session_id, "human", event["event_no"])}
+        return event
 
     async def run(self, after: int = 0):
         """SSE view; ``after`` joins the stream at that event number (reattach)."""
@@ -755,19 +529,18 @@ class GameSession:
         Nothing here can leak another seat's private data — it is all read from
         the single human seat's own view.
         """
-        public_events = [
-            row["event"] for row in self.public_record.entries
-            if (row["event"].get("event_no") or 0) > last_event_no
-        ]
+        public_events = ObservationGateway.public_events(self.public_record, last_event_no)
         private_events = [
             e for e in self._events
             if e.get("event_no", 0) > last_event_no and e.get("type") == "private"
         ]
         pending = None
         if self.pending is not None:
-            pending = {"type": "request", "kind": self.pending["kind"],
-                       "data": self.pending["data"],
-                       "event_no": self._pending_event_no}
+            if self._pending_event_no is not None:
+                pending = self._human_request().to_event()
+                pending["event_no"] = self._pending_event_no
+            else:
+                pending = {"type": "request", **deepcopy(self.pending), "event_no": None}
         # End-of-game signals (public only: winner/reason/review/error) so a
         # reattaching client can render the final result after a finished game.
         terminal = [e for e in self._events
@@ -802,41 +575,14 @@ class GameSession:
         }
 
     async def _game_task(self):
-        # Re-entering the loop is the fault -> in_progress transition: a retry in
-        # the *same* process (no restore()) must not stay stuck in the "faulted"
-        # terminal view after it eventually ends.
-        self.faulted = False
-        try:
-            await self._play()
-            # Normal endgame: _step_endgame already set finished=True.  Clear the
-            # now-stale prompt so a finished game shows no pending action.
-            self.pending = None
-            self._pending_event_no = None
-        except ModelTurnError:
-            self._fault(
-                "Model decision failed, timed out or exceeded budget. The game is paused — fix the connection and rejoin to continue; no offline substitution."
-                if self.engine.locale == "en" else
-                "模型决策失败、超时或调用额度耗尽。对局已暂停，请检查连接后重连继续；未切换离线玩家。")
-        except Exception:
-            logging.getLogger(__name__).exception("Game session failed")
-            self._fault(
-                "The game paused due to an unexpected error; rejoin to continue or abandon this game."
-                if self.engine.locale == "en" else
-                "对局因意外错误暂停；可重连继续，或放弃本局。")
-        finally:
-            self.event_q.put_nowait(_SENTINEL)
-            # Persist the paused/faulted state (or the finished flag) so a restart
-            # resumes the exact position.  Skipped on abandon: the caller removes
-            # the save, and a finalizer must not resurrect it.
-            if not self._abandoned:
-                self._checkpoint()
+        await lifecycle.supervise(self, locale=self.engine.locale,
+                                  sentinel=_SENTINEL, logger=logging.getLogger(__name__))
 
     def _fault(self, text: str) -> None:
         """Mark a recoverable fault (§3.3): pause, keep the resume position and
         pending action, and do NOT finish — a fault is neither a loss nor a
         settlement trigger."""
-        self.faulted = True
-        self.emit({"type": "error", "text": text})
+        lifecycle.fault(self, text)
 
     @property
     def terminal_state(self) -> str:
@@ -847,89 +593,11 @@ class GameSession:
         archive-level ``preparing`` / ``in_progress`` live in the campaign
         archive, not here.
         """
-        if self._abandoned:
-            return "abandoned"
-        if self.faulted:
-            return "faulted"
-        if self.finished:
-            return "ended"
-        if self.pending is not None:
-            return "paused"
-        return "in_progress"
+        return lifecycle.terminal_state(self)
 
     async def _npc_call(self, call, *args, action=None, **kwargs):
-        if self.planner is None:
-            return call(*args, **kwargs)
-        agent = getattr(call, "__self__", None)
-        name = agent.name if agent is not None else "?"
-        # The decision identity must name the *concrete action*, not just the
-        # step + actor: within one election an agent 上警/发言/退警/投票, and the
-        # stone ghost acts twice a night.  A method-name default is unambiguous
-        # for speak/vote/table_*; callers that repeat one method per step pass an
-        # explicit ``action`` (election_up/election_withdraw/stone_ghost/…).
-        act = action if action is not None else getattr(call, "__name__", "call")
-        if not isinstance(act, str):
-            act = "call"
-        slot = f"{self._current_step}:{self._slot_instance()}:{name}:{act}"
-        replayed = self._replay_decision(slot)
-        if replayed is not None:
-            # Committed decision reused verbatim — no new call, no budget.
-            return replayed["result"]
-        decision = self._open_decision(slot)
-        # Perf metadata (privacy-safe: seat position only, never name/role).
-        seat_pos = agent.seat.pos if agent is not None and getattr(agent, "seat", None) is not None else None
-        backend = getattr(self.planner, "backend", None)
-        model = getattr(self.planner, "model", None)
-        effort = getattr(self.planner, "effort", None)
-        while True:
-            memory = getattr(agent, "model_decisions", [])
-            checkpoint = len(memory)
-            calls_before = getattr(self.planner, "calls", 0)
-            self._begin_attempt(decision, calls_before)
-            # Reserve the budget *before* the pre-call checkpoint: the external
-            # request may still fail or the process may crash, but the consumed
-            # attempt must survive a restore.  ``complete()`` no longer reserves.
-            reserve = getattr(self.planner, "reserve", None)
-            if reserve is not None:
-                reserve()
-            # Pre-call reservation: state-before-call + attempt are durable
-            # before the external request goes out.
-            self._checkpoint()
-            t0 = perf.now()
-            try:
-                result = await asyncio.to_thread(call, *args, **kwargs)
-            except ModelTurnError:
-                del memory[checkpoint:]
-                self._end_attempt(decision, getattr(self.planner, "calls", 0), "error")
-                self._checkpoint()
-                self.perf_recorder.decision(
-                    decision_no=decision["decision_no"], step=self._current_step,
-                instance=self._slot_instance(), seat=seat_pos,
-                    kind=act, attempt_no=len(decision["attempts"]), backend=backend,
-                    model=model, effort=effort, calls_before=calls_before,
-                    calls_after=getattr(self.planner, "calls", 0), outcome="error",
-                    dur_ms=perf.elapsed_ms(t0))
-                self.emit({"type": "narration", "text": (
-                    "Model response failed. Game paused without substituting a local player. Retry after checking the connection, or stop. Budget limits still apply."
-                    if self.engine.locale == "en" else "模型响应失败，对局已暂停，未替换为离线玩家。检查连接后可重试，或结束本局；调用上限仍有效。")})
-                response = await self.ask_player("model_retry", {})
-                if not response["retry"]:
-                    raise ModelTurnError("Player stopped after model failure.") from None
-                continue
-            self._end_attempt(decision, getattr(self.planner, "calls", 0), "accepted")
-            decision["result"] = result
-            decision["committed"] = True
-            self.perf_recorder.decision(
-                decision_no=decision["decision_no"], step=self._current_step,
-                instance=self._slot_instance(), seat=seat_pos,
-                kind=act, attempt_no=len(decision["attempts"]), backend=backend,
-                model=model, effort=effort, calls_before=calls_before,
-                calls_after=getattr(self.planner, "calls", 0), outcome="accepted",
-                dur_ms=perf.elapsed_ms(t0))
-            # Post-result commit: the accepted result is durable before the
-            # engine applies it in the calling step.
-            self._checkpoint()
-            return result
+        return await decision_execution.execute(
+            self, self.engine.locale, call, *args, action=action, **kwargs)
 
     async def _play(self):
         """Run the game as an explicit state machine.
@@ -983,6 +651,7 @@ class GameSession:
     async def _step_setup(self):
         e = self.engine
         e.setup()
+        self.participants = participant_roster(self.session_id, e.seats.values(), self.driver, self.adapter)
         if self.conjecture:
             from .game.conjecture import GameConjectures
             self.conjecture_ledger = GameConjectures(e)
@@ -997,6 +666,8 @@ class GameSession:
                 else:
                     self.agents[s.name] = StrategicNPCAgent(
                         s.name, e, self.llm, memory_dir=self.memory_dir)
+        for agent in self.agents.values():
+            agent.participant = self.participants[agent.seat.player_id]
         wolf_agents = sorted(
             (agent for agent in self.agents.values()
              if agent.is_wolf and agent.brain.role != "stone_ghost"),
@@ -1138,6 +809,10 @@ class GameSession:
             self.speech_events = []
             self.player_last_speech = ""
         start = self._step_state.get("speeches_cursor", 0) if self._resume_step == "speeches" else 0
+        # Main-speech cursor already advanced. Finish its durable interaction
+        # before the next speaker, including pending human replies after restart.
+        if "table_talk" in self._step_state:
+            await self._continue_table_intent()
         for i in range(start, len(order)):
             pos = order[i]
             seat = e.seat_at(pos)
@@ -1165,11 +840,13 @@ class GameSession:
                 accuse=speech.accuse, defend=speech.defend,
             )
             self._step_state["speeches_cursor"] = i + 1
+            self._start_table_intent(seat, speech, self._event_no + 1)
             # Durability before visibility: the speech event, the cursor and the
             # agent/engine mutations commit atomically before the speech reaches
             # the live queue — a crash here loses nothing the player already saw,
             # and a resume re-enters at the next seat instead of re-emitting.
             self.emit({"type": "speech", "seat": pos, "name": seat.name, "text": text,
+                       "claim": speech.claim, "accuse": speech.accuse, "defend": speech.defend,
                        "phase": "day"}, publish=False)
             self._checkpoint()
             self._flush_publish()
@@ -1297,9 +974,7 @@ class GameSession:
                     pos = int(next(g for g in match.groups() if g is not None))
                     target = next((s for s in self.engine.alive_seats() if s.pos == pos and not s.is_player), None)
                     if target:
-                        pair = [target.name, self.engine.player_seat().name]
-                        if pair not in self._pending_questions:
-                            self._pending_questions.append(pair)
+                        self.questions.enqueue(target.name, self.engine.player_seat().name)
         if re.search(r"验|查验|check|result", text, re.I) and re.search(r"吗|呢|谁|不说|报出来|请|[?？]|who|which|why|please", text, re.I):
             for seat in self.engine.alive_seats():
                 if not seat.is_player and (re.search(rf"(?<!\d){seat.pos}\s*号|#\s*{seat.pos}\b|(?:seat|player)\s+{seat.pos}\b", text, re.I) or seat.name.casefold() in text.casefold()):
@@ -1348,9 +1023,7 @@ class GameSession:
         # order-preserving [target, asker] pair.  Distinct askers of one target are
         # both kept (never silently overwritten); a duplicate pair is idempotent.
         if speech.question_to:
-            pair = [speech.question_to, seat.name]
-            if pair not in self._pending_questions:
-                self._pending_questions.append(pair)
+            self.questions.enqueue(speech.question_to, seat.name)
         # Every call site emits the speech immediately after this broadcast, so
         # ``event_no + 1`` is the event number that speech will receive; pass it
         # so a dispute can reference the *exact* statement by ledger number.
@@ -1374,12 +1047,11 @@ class GameSession:
         — the ``_questions_answered`` cap keeps the window bounded.
         """
         player_name = self.engine.player_seat().name
-        for pair in list(self._pending_questions):
+        for pair in self.questions.window(self._step_state):
             target, asker = pair
-            if self._questions_answered >= 2:
+            if self.questions.answered >= self.questions.LIMIT:
                 # Budget spent: drop the rest durably and move on.
-                self._pending_questions.remove(pair)
-                self._step_state.pop("answering_question", None)
+                self.questions.finish(pair, self._step_state, consume=False)
                 self._checkpoint()
                 continue
             if target == player_name:
@@ -1388,19 +1060,17 @@ class GameSession:
             agent = self.agents.get(target)
             if not agent or not agent.seat.alive:
                 # Unanswerable: drop it durably and move on.
-                self._pending_questions.remove(pair)
-                self._step_state.pop("answering_question", None)
+                self.questions.finish(pair, self._step_state, consume=False)
                 self._checkpoint()
                 continue
             # Announce on first entry only (a resume re-enters mid-question with
             # the marker already set, skips the announcement, and re-asks through
             # the decision replay path).
-            if self._step_state.get("answering_question") != [target, asker]:
+            if self.questions.begin(pair, self._step_state):
                 self.emit({"type": "narration", "text":
                            (f"Host: Before voting, {target}, answer {asker}'s question. This is a claim, not a host-verified result." if self.engine.locale == "en" else
                             f"主持人：投票前请 {target} 回答 {asker} 的追问。这是玩家口径，不代表主持人认证。")},
                           publish=False)
-            self._step_state["answering_question"] = [target, asker]
             self._checkpoint()
             self._flush_publish()
             response = await self._npc_call(agent.table_reply, asker) if self.planner is not None else agent.brain.answer_check_question()
@@ -1408,10 +1078,9 @@ class GameSession:
             # budget/question mutations *before* ``_publish_table_speech``, whose
             # checkpoint persists the spent budget, the answered question and the
             # reply together, then publishes once.
-            self._questions_answered += 1
-            self._pending_questions.remove(pair)
-            self._step_state.pop("answering_question", None)
+            self.questions.finish(pair, self._step_state)
             await self._publish_table_speech(agent.seat, response, "clarification")
+        self.questions.close_window(self._step_state)
 
     async def _answer_human_question(self, pair, asker):
         """Ask the human to answer a public clarification (answer or skip).
@@ -1423,22 +1092,18 @@ class GameSession:
         target, _asker = pair
         player = self.engine.player_seat()
         if not player.alive:
-            self._pending_questions.remove(pair)
-            self._step_state.pop("answering_question", None)
+            self.questions.finish(pair, self._step_state, consume=False)
             self._checkpoint()
             return
-        if self._step_state.get("answering_question") != [target, asker]:
+        if self.questions.begin(pair, self._step_state):
             self.emit({"type": "narration", "text": (
                 f"Host: Before voting, you are asked to answer {asker}'s question. This is a claim, not a host-verified result." if self.engine.locale == "en" else
                 f"主持人：投票前，请你回答 {asker} 的追问。这是玩家口径，不代表主持人认证。")},
                 publish=False)
-        self._step_state["answering_question"] = [target, asker]
         self._checkpoint()
         self._flush_publish()
         response = await self.ask_player("table_answer", {"from": asker})
-        self._questions_answered += 1
-        self._pending_questions.remove(pair)
-        self._step_state.pop("answering_question", None)
+        self.questions.finish(pair, self._step_state)
         if response.get("skip"):
             self._checkpoint()
             return
@@ -1450,11 +1115,11 @@ class GameSession:
         await self._publish_table_speech(player, speech, "clarification")
 
     def _reset_table_talk(self):
+        self._step_state.pop("table_talk", None)
         self._table_extra_turns = 0
         self._table_extra_by_name = {}
         self._table_pairs = set()
-        self._pending_questions = []
-        self._questions_answered = 0
+        self.questions.reset(self._step_state)
         self._table_cooldown = False
 
     async def _publish_table_speech(self, seat, speech: Speech, kind: str):
@@ -1470,90 +1135,131 @@ class GameSession:
         # Durability before visibility: the table speech and its counters persist
         # before the event reaches the live queue.
         self.emit({"type": "speech", "seat": seat.pos, "name": seat.name,
+                   "claim": speech.claim, "accuse": speech.accuse, "defend": speech.defend,
                    "text": speech.text, "table_talk": True, "phase": "table_talk"}, publish=False)
         self._checkpoint()
         self._flush_publish()
         await asyncio.sleep(0.25)
 
+    def _start_table_intent(self, source, speech, event_no=None):
+        self._step_state["table_talk"] = InterruptionIntent.new(
+            self.session_id, source.player_id, asdict(speech), event_no)
+
+    def _finish_table_intent(self, text=None):
+        self._step_state.pop("table_talk", None)
+        if text:
+            self.emit({"type": "narration", "text": text}, publish=False)
+        self._commit_batch()
+
     async def _maybe_table_talk(self, source, source_speech: Speech):
-        """Let the host allow a bounded public interruption after a main turn."""
-        if self._table_cooldown:
-            self._table_cooldown = False
-            return
-        if self._table_extra_turns >= 3 or source_speech.question_to:
-            return
-        # Most free chat follows a public point; a small fraction is social
-        # colour around an otherwise neutral statement.
-        if not (source_speech.accuse or source_speech.defend or source_speech.claim) \
-                and self.engine.rng.random() > 0.16:
+        """Continue one durable interaction; only selection may draw RNG."""
+        if "table_talk" not in self._step_state:
+            # Direct legacy/research calls may have no preceding ledger event.
+            # Do not manufacture an exact source reference for those calls.
+            self._start_table_intent(source, source_speech)
+            self._checkpoint()
+        await self._continue_table_intent()
+
+    async def _continue_table_intent(self):
+        intent = self._step_state["table_talk"]
+        source = next(s for s in self.engine.seats.values() if s.player_id == intent["source_id"])
+        speech = Speech(**intent["source_speech"])
+        next_speaker = ("Host: Continue in speaking order." if self.engine.locale == "en"
+                        else "主持人：继续按顺序发言。")
+        if not source.alive:
+            self._finish_table_intent(next_speaker)
             return
 
-        contenders = []
-        for agent in self.agents.values():
-            seat = agent.seat
-            if not seat.alive or seat.name == source.name:
-                continue
-            if self._table_extra_by_name.get(seat.name, 0) >= 2:
-                continue
-            interest = agent.table_interruption_interest(source.name, source_speech)
-            contenders.append((interest, seat.pos, agent))
-        if not contenders:
-            return
-        interest, _pos, interrupter = max(contenders, key=lambda item: (item[0], -item[1]))
-        if self.engine.rng.random() > interest:
-            return
-
-        pair = frozenset((source.name, interrupter.name))
-        repeated_pair = pair in self._table_pairs
-        opening = self.host.moderate_table_talk(
-            topic_turns=1, extra_turns=self._table_extra_turns,
-            speaker_extra_turns=self._table_extra_by_name.get(interrupter.name, 0),
-            repeated_pair=repeated_pair,
-        )
-        if opening:
-            self.emit({"type": "narration", "text": opening})
-            return
-
-        interruption = await self._npc_call(interrupter.table_interject, source.name, source_speech)
-        self._table_cooldown = True
-        self._table_pairs.add(pair)
-        await self._publish_table_speech(interrupter.seat, interruption, "interrupt")
-
-        if self._table_extra_turns >= 3:
-            self.emit({"type": "narration", "text": "Host: Continue in speaking order." if self.engine.locale == "en" else "主持人：继续按顺序发言。"})
-            return
-
-        # The original speaker may give exactly one short reply.  This keeps
-        # the interaction human, while the host closes it before it becomes a
-        # private two-person debate.
-        closing = self.host.moderate_table_talk(
-            topic_turns=2, extra_turns=self._table_extra_turns,
-            speaker_extra_turns=self._table_extra_by_name.get(source.name, 0),
-            repeated_pair=False,
-        )
-        if closing:
-            self.emit({"type": "narration", "text": closing})
-            return
-        if source.is_player:
-            response = await self.ask_player("table_reply", {
-                "from": interrupter.name,
-                "text": interruption.text,
-            })
-            text = response.get("text", "").strip()
-            if not text:
-                self.emit({"type": "narration", "text": "Host: Continue in speaking order." if self.engine.locale == "en" else "主持人：继续按顺序发言。"})
+        if intent["stage"] == "select":
+            if self._table_cooldown:
+                self._table_cooldown = False
+                self._finish_table_intent()
                 return
-            reply = self._player_speech(text)
-        else:
-            reply = await self._npc_call(self.agents[source.name].table_reply, interrupter.name)
-        await self._publish_table_speech(source, reply, "reply")
-        closing = self.host.moderate_table_talk(
-            topic_turns=3, extra_turns=self._table_extra_turns,
-            speaker_extra_turns=self._table_extra_by_name.get(source.name, 0),
-            repeated_pair=True,
-        )
-        if closing:
-            self.emit({"type": "narration", "text": closing})
+            if self._table_extra_turns >= FloorPolicy.EXTRA_LIMIT or speech.question_to:
+                self._finish_table_intent()
+                return
+            if not (speech.accuse or speech.defend or speech.claim) and self.engine.rng.random() > FloorPolicy.NEUTRAL_CHANCE:
+                self._finish_table_intent()
+                return
+            contenders = []
+            for agent in self.agents.values():
+                seat = agent.seat
+                if not seat.alive or seat.name == source.name:
+                    continue
+                if self._table_extra_by_name.get(seat.name, 0) >= FloorPolicy.SPEAKER_LIMIT:
+                    continue
+                interest = agent.table_interruption_interest(source.name, speech)
+                contenders.append((interest, seat.pos, seat.player_id))
+            chosen = FloorPolicy.choose(contenders)
+            if chosen is None or self.engine.rng.random() > chosen[0]:
+                self._finish_table_intent()
+                return
+            interrupter = next(a for a in self.agents.values() if a.seat.player_id == chosen[2])
+            opening = self.host.moderate_table_talk(
+                topic_turns=1, extra_turns=self._table_extra_turns,
+                speaker_extra_turns=self._table_extra_by_name.get(interrupter.name, 0),
+                repeated_pair=frozenset((source.name, interrupter.name)) in self._table_pairs)
+            if opening:
+                self._finish_table_intent(opening)
+                return
+            intent["interrupter_id"] = interrupter.seat.player_id
+            intent["stage"] = "interrupt"
+            self._checkpoint()
+
+        interrupter = next(a for a in self.agents.values() if a.seat.player_id == intent["interrupter_id"])
+        if not interrupter.seat.alive:
+            self._finish_table_intent(next_speaker)
+            return
+        if intent["stage"] == "interrupt":
+            interruption = await self._npc_call(
+                interrupter.table_interject, source.name, speech,
+                action=f"table-interrupt:{intent['intent_id']}")
+            self._table_cooldown = True
+            self._table_pairs.add(frozenset((source.name, interrupter.name)))
+            intent["interruption"] = asdict(interruption)
+            intent["interruption_event_no"] = self._event_no + 1
+            intent["stage"] = "reply_gate"
+            # Stage + selected actor + speech + counters commit together.
+            await self._publish_table_speech(interrupter.seat, interruption, "interrupt")
+
+        if intent["stage"] == "reply_gate":
+            if self._table_extra_turns >= FloorPolicy.EXTRA_LIMIT:
+                self._finish_table_intent(next_speaker)
+                return
+            closing = self.host.moderate_table_talk(
+                topic_turns=2, extra_turns=self._table_extra_turns,
+                speaker_extra_turns=self._table_extra_by_name.get(source.name, 0),
+                repeated_pair=False)
+            if closing:
+                self._finish_table_intent(closing)
+                return
+            intent["stage"] = "reply"
+            self._checkpoint()
+
+        if intent["stage"] == "reply":
+            if source.is_player:
+                response = await self.ask_player("table_reply", {
+                    "from": interrupter.name, "text": intent["interruption"]["text"]},
+                    action=f"table-reply:{intent['intent_id']}")
+                text = response.get("text", "").strip()
+                if not text:
+                    self._finish_table_intent(next_speaker)
+                    return
+                reply = self._player_speech(text)
+            else:
+                reply = await self._npc_call(
+                    self.agents[source.name].table_reply, interrupter.name,
+                    action=f"table-reply:{intent['intent_id']}")
+            intent["reply_event_no"] = self._event_no + 1
+            intent["stage"] = "close"
+            await self._publish_table_speech(source, reply, "reply")
+
+        if intent["stage"] == "close":
+            closing = self.host.moderate_table_talk(
+                topic_turns=3, extra_turns=self._table_extra_turns,
+                speaker_extra_turns=self._table_extra_by_name.get(source.name, 0),
+                repeated_pair=True)
+            self._finish_table_intent(closing)
 
     def _remember_llm_status(self):
         state = self._model_status()
@@ -1832,6 +1538,7 @@ class GameSession:
                 # Persist the speech, its cursor and state before publishing it,
                 # so a crash can never strand a published speech off the ledger.
                 self.emit({"type": "speech", "seat": s.pos, "name": s.name,
+                           "claim": speech.claim, "accuse": speech.accuse, "defend": speech.defend,
                            "text": text, "election": True, "phase": "election"}, publish=False)
                 self._checkpoint()
                 self._flush_publish()

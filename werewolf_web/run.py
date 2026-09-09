@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import config
 from . import checkpoint
+from . import restore_coordinator
 from . import campaign_flow
 from . import driver as driver_mod
 from . import settings as user_settings
@@ -95,13 +96,7 @@ async def restore_game(game_id: str):
                 # save's driver/adapter lock — never from the save.  The save
                 # omits the agent command argv, so a command-adapter game must
                 # re-resolve it from local settings.
-                driver = payload.get("driver")
-                adapter = payload.get("adapter")
-                if driver is None:
-                    driver, adapter = driver_mod.infer_legacy_driver(
-                        planner_snap, payload.get("campaign_counted"))
-                kwargs = driver_mod.restore_runtime_kwargs(
-                    driver, adapter, user_settings.load_settings())
+                kwargs = restore_coordinator.runtime_kwargs(payload, user_settings.load_settings())
                 if kwargs is None:
                     return None
                 planner = create_runtime(**kwargs)
@@ -115,15 +110,10 @@ async def restore_game(game_id: str):
                                  {"enabled": False} if planner is None else None,
                                  session_id=game_id, planner=planner,
                                  checkpoint_path=path, _defer_preflight=True)
-            runner.restore(payload)
-            if runner.campaign_profile and not campaign_flow.resume(
-                    runner.campaign_profile, game_id, runner):
+            if not await restore_coordinator.restore_and_verify(
+                    runner, payload, resume_campaign=campaign_flow.resume):
                 # abandoned (or reconciled-and-refused): never revive it.
                 return None
-            if planner is not None:
-                planner.reserve()
-                runner._checkpoint()
-                await asyncio.to_thread(planner.preflight_check)
         except (ValueError, KeyError, TypeError, ModelTurnError):
             return None
         GAMES[game_id] = runner
@@ -415,7 +405,8 @@ async def action(req: Request):
     if not runner:
         return {"ok": False, "error": "no game"}
     body.pop("game_id", None)
-    return {"ok": runner.submit(body)}
+    request_id = body.pop("request_id", None)
+    return {"ok": runner.submit(body, request_id=request_id, require_request_id=True)}
 
 
 @app.post("/api/host_chat")

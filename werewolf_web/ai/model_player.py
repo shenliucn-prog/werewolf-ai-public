@@ -1,19 +1,15 @@
 """Provider-independent NPC decisions and lawful per-seat model context."""
-import json
 import random
 from copy import deepcopy
-from dataclasses import asdict
 
-from .. import perf
+from ..driver import driver_from_planner
+from ..participants import Participant
+from ..observations import ObservationGateway
 from ..recovery import check_version, require_str
 from .brain import Speech
 from .strategic_agent import StrategicNPCAgent
 from .decision_runtime import ModelTurnError
-
-
-def object_schema(properties):
-    return {"type": "object", "properties": properties,
-            "required": list(properties), "additionalProperties": False}
+from .model_controller import ModelController, object_schema  # compatibility export
 
 
 class ModelNPCAgent(StrategicNPCAgent):
@@ -22,64 +18,14 @@ class ModelNPCAgent(StrategicNPCAgent):
         self.planner = planner
         self.public_record = public_record
         self.recorder = recorder
+        driver, adapter = driver_from_planner(planner)
+        self.participant = Participant.from_seat("local", self.seat, driver, adapter)
         # Isolated per-seat, per-game decision memory; never emitted publicly.
         self.model_decisions = []
 
     def decide(self, task, properties, **details):
-        from ..onboarding import introduction
-        from . import model_context
-        context = model_context.bound_information(asdict(self.information_set()))
-        context["rules"] = introduction(self.engine, False)
-        request = {
-            "task": task, "language": self.engine.locale, "actor": self.seat.pos,
-            "information": context, "persona": self.persona,
-            "personality_parameters": asdict(self.style),
-            "cognitive_parameters": self.brain.cognition.to_dict(),
-            # §9 context budget: the model never receives the whole transcript.
-            # The full archive stays whole in ``public_record`` / the event
-            # ledger; this is the bounded slice (recent verbatim + attributed
-            # summaries of older speech + settled public facts).
-            "public_context": model_context.build_public_context(self),
-            "own_previous_decisions": self.model_decisions[-model_context.DECISION_MEMORY:],
-            "details": details,
-            "instructions": (
-                "Choose your own strategy, not a prescribed template. Public flips are facts; claims are not. "
-                "Compare dated check claims against flips. Track your own votes and explain changes of stance. "
-                "Distinguish support from accusation. Answer questions addressed to you. "
-                "Never invent historical votes, checks, deaths or utterances. Wolves may deliberately lie "
-                "about their role/checks but must account for contradictions in their earlier public story. "
-                "Keep private information private unless strategically choosing to disclose it in public speech. "
-                "Use natural, specific arguments; personality influences priorities, not grammatical corruption. "
-                "Return only requested fields. Do not include private reasoning in public speech by default."
-            ),
-        }
-        # §9 request-size budget: the final serialized request is bounded, not
-        # just the history counts.
-        request = model_context.fit_request_budget(request)
-        request_chars = len(json.dumps(request, ensure_ascii=False))
-        t0 = perf.now()
-        value = self.planner.complete(request, object_schema(properties))
-        if self.recorder is not None:
-            # Privacy-safe: the request body and any private decision stay out;
-            # only its serialized size and the observed call duration are kept.
-            self.recorder.model_call(
-                seat=self.seat.pos, task=task,
-                backend=getattr(self.planner, "backend", None),
-                request_chars=request_chars, dur_ms=perf.elapsed_ms(t0))
-        if not isinstance(value, dict) or set(value) != set(properties):
-            raise ModelTurnError("Invalid decision fields; no offline substitution.")
-        for key, spec in properties.items():
-            item = value[key]
-            if "enum" in spec and item not in spec["enum"]:
-                raise ModelTurnError("Illegal model decision; no offline substitution.")
-            kind = spec.get("type")
-            valid = ((kind == "boolean" and type(item) is bool) or
-                     (kind == "string" and isinstance(item, str) and 0 < len(item.strip()) <= spec.get("maxLength", 2000)) or
-                     (isinstance(kind, list) and (item is None or
-                        ("integer" in kind and type(item) is int) or
-                        ("string" in kind and isinstance(item, str)))))
-            if not valid:
-                raise ModelTurnError("Malformed model decision; no offline substitution.")
+        observation = ObservationGateway.for_model(self, task, details)
+        value = ModelController(self.planner, self.recorder).decide(observation, properties)
         self.model_decisions.append({"day": self.engine.day_count, "night": self.engine.night_count,
                                      "task": task, "decision": value})
         return value
