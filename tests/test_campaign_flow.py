@@ -287,7 +287,7 @@ class TerminalResumeTest(unittest.IsolatedAsyncioTestCase):
             finally:
                 cp.CHECKPOINTS_DIR, ca.CAMPAIGN_DIR = old_cp, old_ca
         self.assertEqual(captured["backend"], "command")
-        self.assertEqual(captured["command"], ["codex", "exec"])
+        self.assertEqual(captured["command"], '["codex", "exec"]')
 
     async def test_offline_campaign_is_not_counted(self):
         from unittest.mock import patch

@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from . import config
 from . import checkpoint
 from . import campaign_flow
+from . import driver as driver_mod
 from . import settings as user_settings
 from .campaign import LEVELS
 from .ai.llm import LLMClient, LLMRuntimeConfig
@@ -42,12 +43,20 @@ GAMES: dict[str, "GameSession"] = {}
 _RESTORE_LOCKS: dict[str, asyncio.Lock] = {}
 
 
-def _resolve_llm(body: dict):
-    """Use the request's llm options, or fall back to the saved local settings."""
-    llm = body.get("llm")
-    if llm:
-        return llm
-    return user_settings.load_settings()
+def _driver_select(body: dict):
+    """Non-executable driver/connection selectors the Web may supply.
+
+    The browser may choose WHICH driver / adapter / pre-configured connection to
+    use, but never a ``command``/adapter executable — those come from trusted
+    local config only (``driver.resolve_driver`` never reads a command from the
+    request).
+    """
+    select = {}
+    for key in ("driver", "adapter", "connection"):
+        value = body.get(key)
+        if isinstance(value, str) and value:
+            select[key] = value
+    return select
 
 
 async def restore_game(game_id: str):
@@ -82,7 +91,20 @@ async def restore_game(game_id: str):
             planner = None
             planner_snap = payload.get("planner")
             if planner_snap is not None:
-                planner = create_runtime(backend=planner_snap.get("backend"))
+                # Re-derive the runtime from trusted local config, matching the
+                # save's driver/adapter lock — never from the save.  The save
+                # omits the agent command argv, so a command-adapter game must
+                # re-resolve it from local settings.
+                driver = payload.get("driver")
+                adapter = payload.get("adapter")
+                if driver is None:
+                    driver, adapter = driver_mod.infer_legacy_driver(
+                        planner_snap, payload.get("campaign_counted"))
+                kwargs = driver_mod.restore_runtime_kwargs(
+                    driver, adapter, user_settings.load_settings())
+                if kwargs is None:
+                    return None
+                planner = create_runtime(**kwargs)
             # Construct with a deferred preflight, restore first, then reserve and
             # persist the preflight budget unit *before* running the liveness
             # check.  Ordering matters (§7): validate + restore config and budget,
@@ -141,9 +163,22 @@ async def start(req: Request):
     body = await _json_object(req)
     board_id = body.get("board_id", "classic")
     game_id = secrets.token_urlsafe(18)
-    llm = _resolve_llm(body)
+    resolved = driver_mod.resolve_driver(
+        explicit=body.get("llm"),
+        saved=user_settings.load_settings(),
+        select=_driver_select(body),
+    )
+    if not resolved["configured"]:
+        # Never silently start offline and never blindly default to api: report
+        # the distinct "unconfigured" state so the UI can guide configuration.
+        raise HTTPException(status_code=422, detail=(
+            "No model or offline mode configured. Choose a model connection or "
+            "offline rule simulation first. / 未配置模型或离线模式。请先配置模型连接，或选择离线规则模拟。"))
+    llm = body.get("llm")
+    offline = resolved["driver"] == "offline"
     try:
-        runner = GameSession(board_id, llm, session_id=game_id,
+        runner = GameSession(board_id, {"enabled": False} if offline else llm,
+                             session_id=game_id,
                              locale=body.get("locale", "zh-CN"), names=body.get("names"),
                              personalities=body.get("personalities"),
                              conjecture=body.get("conjecture", False),
@@ -151,15 +186,18 @@ async def start(req: Request):
                              checkpoint_path=checkpoint.checkpoint_path(game_id))
         # Only explicit offline selection bypasses a real-model preflight.
         # Runtime commands come from trusted local configuration, never HTTP.
-        offline = isinstance(llm, dict) and llm.get("enabled") is False
         if not offline:
             if runner.conjecture:
                 raise ValueError("Model-player conjecture tables are not yet integrated; choose normal mode.")
-            planner = create_runtime(**user_settings.runtime_kwargs(llm if isinstance(llm, dict) else None))
+            planner = create_runtime(**resolved["runtime_kwargs"])
             await asyncio.to_thread(planner.preflight)
             if llm:
                 user_settings.save_settings(llm)
             runner.planner = planner
+            # The constructor derived driver/adapter from the (then-None) planner
+            # as "offline"; re-derive from the resolved driver now that the live
+            # runtime is attached so the snapshot/restore lock stays consistent.
+            runner.driver, runner.adapter = resolved["driver"], resolved["adapter"]
             runner.llm = LLMClient(LLMRuntimeConfig.from_request({"enabled": False}))
             runner.host = HostAgent(runner.llm, locale=runner.engine.locale)
     except ModelTurnError:
@@ -186,24 +224,39 @@ async def campaign_start(req: Request):
         raise HTTPException(status_code=422, detail="Unknown campaign role.")
     board_id = level["board"]
     game_id = secrets.token_urlsafe(18)
-    llm = _resolve_llm(body)
-    offline = isinstance(llm, dict) and llm.get("enabled") is False
+    resolved = driver_mod.resolve_driver(
+        explicit=body.get("llm"),
+        saved=user_settings.load_settings(),
+        select=_driver_select(body),
+    )
+    if not resolved["configured"]:
+        raise HTTPException(status_code=422, detail=(
+            "No model or offline mode configured. Choose a model connection or "
+            "offline rule simulation first. / 未配置模型或离线模式。请先配置模型连接，或选择离线规则模拟。"))
+    llm = body.get("llm")
+    offline = resolved["driver"] == "offline"
     try:
         # Offline simulation is an explicit choice and never counts toward
         # campaign progress: no archive registration, no progress hook.
         if not offline:
-            campaign_flow.begin_attempt(profile_id, game_id, role, board_id, config=llm)
-        runner = GameSession(board_id, llm, session_id=game_id,
+            campaign_flow.begin_attempt(profile_id, game_id, role, board_id,
+                config={"driver": resolved["driver"], "adapter": resolved["adapter"],
+                        "backend": resolved["backend"], "model": resolved["model"]})
+        runner = GameSession(board_id, {"enabled": False} if offline else llm,
+                             session_id=game_id,
                              locale=body.get("locale", "zh-CN"),
                              player_role=role, onboarding=True,
                              checkpoint_path=checkpoint.checkpoint_path(game_id))
         runner.campaign_counted = not offline
         if not offline:
-            planner = create_runtime(**user_settings.runtime_kwargs(llm if isinstance(llm, dict) else None))
+            planner = create_runtime(**resolved["runtime_kwargs"])
             await asyncio.to_thread(planner.preflight)
             if llm:
                 user_settings.save_settings(llm)
             runner.planner = planner
+            # Keep the durable driver/adapter lock consistent with the resolved
+            # driver (the constructor saw planner=None and stored "offline").
+            runner.driver, runner.adapter = resolved["driver"], resolved["adapter"]
             runner.llm = LLMClient(LLMRuntimeConfig.from_request({"enabled": False}))
             runner.host = HostAgent(runner.llm, locale=runner.engine.locale)
             runner.campaign_profile = profile_id
@@ -385,6 +438,22 @@ async def host_style():
         with open(config.HOST_STYLE_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
+
+
+@app.get("/api/agent_connections")
+async def agent_connections():
+    """The names of locally pre-configured agent connections (non-secret
+    metadata only).  The browser selects one of these names; it never receives
+    (or supplies) a connection's executable ``command``."""
+    saved = user_settings.load_settings() or {}
+    connections = saved.get("agent_connections")
+    if not isinstance(connections, dict):
+        return {"connections": []}
+    return {"connections": [
+        {"name": name, "adapter": conn.get("adapter"), "model": conn.get("model")}
+        for name, conn in connections.items()
+        if isinstance(conn, dict)
+    ]}
 
 
 app.mount("/", StaticFiles(directory=config.STATIC_DIR, html=True), name="static")

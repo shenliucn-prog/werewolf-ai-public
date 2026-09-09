@@ -308,6 +308,56 @@ function configuredLlmOptions() {
   return options;
 }
 
+function driverSelection() {
+  const mode = $("#driverMode").value;
+  if (mode === "offline") return { driver: "offline" };
+  if (mode === "agent") {
+    const connection = $("#agentConnection").value.trim();
+    return connection ? { driver: "agent", connection } : { driver: "agent" };
+  }
+  if (mode === "api") return { driver: "api" };
+  return {};
+}
+
+function syncDriverUI() {
+  const row = $("#agentConnectionRow");
+  if (row) row.hidden = $("#driverMode").value !== "agent";
+}
+
+async function loadAgentConnections() {
+  const sel = $("#agentConnection");
+  if (!sel) return;
+  try {
+    const response = await fetch("/api/agent_connections");
+    const data = await response.json();
+    const previous = sel.value;
+    sel.innerHTML = "";
+    (data.connections || []).forEach((c) => {
+      const option = document.createElement("option");
+      option.value = c.name;
+      option.textContent = c.adapter ? `${c.name} (${c.adapter})` : c.name;
+      sel.appendChild(option);
+    });
+    if (!(data.connections || []).length) {
+      sel.appendChild(new Option(tr("无可用连接，请先在本地配置 Agent 连接。"), ""));
+    } else if ([...sel.options].some((o) => o.value === previous)) {
+      sel.value = previous;
+    }
+  } catch (_) { /* the connection list is optional */ }
+}
+
+function showSetupGuidance(message) {
+  const el = $("#setupGuidance");
+  if (!el) return;
+  el.textContent = message;
+  el.hidden = false;
+}
+
+function hideSetupGuidance() {
+  const el = $("#setupGuidance");
+  if (el) el.hidden = true;
+}
+
 function setPhase(phase) {
   const b = $("#phase-banner");
   if (phase === "day") {
@@ -746,7 +796,9 @@ async function newGame() {
   const board = $("#board").value;
   const locale = $("#locale").value;
   applyLocale(locale);
+  hideSetupGuidance();
   const llm = configuredLlmOptions();
+  const driver = driverSelection();
   const personalities = Object.fromEntries([...document.querySelectorAll("#castNames select")]
     .map(input => [input.dataset.playerId, input.value]));
   const conjecture = $("#conjectureMode").checked;
@@ -766,14 +818,14 @@ async function newGame() {
   try {
   const start = await fetch("/api/start", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ board_id: board, locale, llm, names, personalities, conjecture, player_role })
+    body: JSON.stringify({ board_id: board, locale, llm, driver: driver.driver, connection: driver.connection, names, personalities, conjecture, player_role })
   });
   // Credentials are scoped to the request/game runner, never retained by UI.
   $("#llmApiKey").value = "";
   const started = await start.json();
   gameId = started.game_id || null;
   if (!gameId) {
-    $("#castError").textContent = tr("开局设置无效，请检查后重试。");
+    showSetupGuidance(started.detail || tr("开局设置无效，请检查后重试。"));
     finishStream(UI[uiLocale].failed);
     return;
   }
@@ -800,7 +852,8 @@ $("#continueGame").onclick = () => restoreSavedGame();
 async function campaignGame() {
   if (gameId && !window.confirm(uiLocale === "en" ? "End this game and start a new one?" : "结束当前对局并重新开局？")) return;
   const llm = configuredLlmOptions();
-  const offline = llm && llm.enabled === false;
+  const driver = driverSelection();
+  const offline = driver.driver === "offline" || (llm && llm.enabled === false);
   // Every confirmation runs BEFORE the abandon request, so a cancel never ends
   // the old game.
   if (offline && !window.confirm(uiLocale === "en"
@@ -814,6 +867,7 @@ async function campaignGame() {
     const status = await (await fetch("/api/campaign/status")).json();
     const locale = $("#locale").value;
     applyLocale(locale);
+    hideSetupGuidance();
     $("#status").textContent = UI[uiLocale].starting;
     panelEl.style.display = "none";
     logEl.innerHTML = "";
@@ -827,12 +881,16 @@ async function campaignGame() {
     $("#reviewMask").style.display = "none";
     const start = await fetch("/api/campaign/start", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile_id: "default", role: status.role, locale, llm })
+      body: JSON.stringify({ profile_id: "default", role: status.role, locale, llm, driver: driver.driver, connection: driver.connection })
     });
     $("#llmApiKey").value = "";
     const started = await start.json();
     gameId = started.game_id || null;
-    if (!gameId) { finishStream(UI[uiLocale].failed); return; }
+    if (!gameId) {
+      showSetupGuidance(started.detail || tr("开局设置无效，请检查后重试。"));
+      finishStream(UI[uiLocale].failed);
+      return;
+    }
     document.body.classList.add("playing");
     $("#gameSetup").open = false;
     lastEventNo = 0; rejoinAttempts = 0; faulted = false;
@@ -863,10 +921,13 @@ $("#board").onchange = loadRoleChoices;
 $("#locale").onchange = () => { applyLocale($("#locale").value); loadBoards(); loadCast(); };
 $("#randomNames").onclick = loadCast;
 $("#askHost").onclick = askHostRule;
+$("#driverMode").onchange = syncDriverUI;
 $("#hostQuestion").addEventListener("keydown", (event) => {
   if (event.key === "Enter") askHostRule();
 });
 loadBoards();
 applyLocale($("#locale").value);
 loadCast();
+loadAgentConnections();
+syncDriverUI();
 restoreSavedGame();

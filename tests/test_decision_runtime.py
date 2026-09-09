@@ -83,8 +83,11 @@ class DecisionRuntimeTest(unittest.IsolatedAsyncioTestCase):
         planner = SimpleNamespace(verified=False, public_status=lambda: {"backend": "api", "mode": "model_decisions"})
         def preflight(): planner.verified = True
         planner.preflight = preflight
-        req = SimpleNamespace(json=AsyncMock(return_value={"board_id": "classic"}))
-        with patch("werewolf_web.run.create_runtime", return_value=planner) as factory:
+        req = SimpleNamespace(json=AsyncMock(return_value={"board_id": "classic",
+                                                          "llm": {"enabled": True, "model": "test"}}))
+        with patch("werewolf_web.run.user_settings.load_settings", return_value=None), \
+             patch("werewolf_web.run.user_settings.save_settings"), \
+             patch("werewolf_web.run.create_runtime", return_value=planner) as factory:
             response = await start(req)
         self.addCleanup(GAMES.pop, response["game_id"], None)
         session = GAMES[response["game_id"]]
@@ -92,12 +95,16 @@ class DecisionRuntimeTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(planner.verified)
         self.assertEqual(response["llm_status"]["backend"], "api")
         self.assertEqual(session.engine.night_count, 0)
+        self.assertEqual(factory.call_args.kwargs["backend"], "api")
 
     async def test_browser_failed_preflight_creates_no_game(self):
         before = set(GAMES)
-        req = SimpleNamespace(json=AsyncMock(return_value={"board_id": "classic"}))
+        req = SimpleNamespace(json=AsyncMock(return_value={"board_id": "classic",
+                                                          "llm": {"enabled": True, "model": "test"}}))
         planner = SimpleNamespace(preflight=Mock(side_effect=ModelTurnError("PRIVATE_KEY_CANARY")))
-        with patch("werewolf_web.run.create_runtime", return_value=planner), self.assertRaises(HTTPException) as error:
+        with patch("werewolf_web.run.user_settings.load_settings", return_value=None), \
+             patch("werewolf_web.run.user_settings.save_settings"), \
+             patch("werewolf_web.run.create_runtime", return_value=planner), self.assertRaises(HTTPException) as error:
             await start(req)
         self.assertEqual(error.exception.status_code, 503)
         self.assertNotIn("PRIVATE_KEY_CANARY", error.exception.detail)
