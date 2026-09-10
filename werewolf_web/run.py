@@ -31,6 +31,7 @@ from .ai.host import HostAgent
 from .i18n import board_display, role_name, role_desc, board_role_name
 from .casting import random_names, persona_options, CAST_IDS, PLAYER_ID
 from .session import GameSession, GameRunner
+from .offline_web import WebOfflineSession
 
 config.ensure_dirs()
 app = FastAPI(title="狼人杀 Web 版")
@@ -89,6 +90,14 @@ async def restore_game(game_id: str):
             # A checkpoint must never be restored under a different key.
             return None
         try:
+            if "offline_choices" in payload:
+                extra = payload["offline_choices"]
+                runner = WebOfflineSession(payload["board_id"], character=extra["character"],
+                    spectator=extra["spectator"], locale=payload["locale"],
+                    session_id=game_id, checkpoint_path=path)
+                runner.restore(payload)
+                GAMES[game_id] = runner
+                return runner
             planner = None
             planner_snap = payload.get("planner")
             if planner_snap is not None:
@@ -200,6 +209,45 @@ async def start(req: Request):
 
 
 # ---------------- 闯关入口 ----------------
+
+
+@app.get("/api/offline/cast")
+async def offline_cast(locale: str = "zh-CN"):
+    from .offline_cast import CHARACTERS
+    from .i18n import cast
+    if locale not in ("zh-CN", "en"):
+        raise HTTPException(status_code=422, detail="Unsupported locale")
+    names = {p["id"]: p["name"] for p in cast(locale)}
+    return {"characters": [{"id": c.id, "name": names[c.id],
+                            "description": c.description[locale == "en"]} for c in CHARACTERS]}
+
+
+@app.post("/api/offline/start")
+async def offline_start(req: Request):
+    body = await _json_object(req)
+    allowed = {"offline_confirmed", "board_id", "character", "spectator", "locale", "player_role", "player_name"}
+    if set(body) - allowed or body.get("offline_confirmed") is not True:
+        raise HTTPException(status_code=422, detail="Explicit offline confirmation required; unknown settings are not accepted")
+    if body.get("locale", "zh-CN") not in ("zh-CN", "en"):
+        raise HTTPException(status_code=422, detail="Unsupported locale")
+    # A spectator cannot choose the hidden role of an ostensibly unknown seat.
+    if body.get("spectator") is True and body.get("player_role") not in (None, "random"):
+        raise HTTPException(status_code=422, detail="Spectator roles must be random")
+    game_id = "offline-" + secrets.token_urlsafe(18)
+    try:
+        runner = WebOfflineSession(body.get("board_id", "classic"),
+            character=body.get("character", "acheng"), spectator=body.get("spectator", False),
+            player_name=body.get("player_name"), player_role=body.get("player_role"),
+            locale=body.get("locale", "zh-CN"), session_id=game_id,
+            checkpoint_path=checkpoint.checkpoint_path(game_id))
+        runner._checkpoint()  # initialized configuration, before registration
+    except (ValueError, KeyError, TypeError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except OSError as error:
+        raise HTTPException(status_code=503, detail="Cannot save the offline game") from error
+    GAMES[game_id] = runner
+    return {"ok": True, "game_id": game_id, "counted": False,
+            "offline_choices": True, "spectator": runner.spectator}
 
 
 @app.post("/api/campaign/start")
@@ -406,6 +454,8 @@ async def action(req: Request):
         return {"ok": False, "error": "no game"}
     body.pop("game_id", None)
     request_id = body.pop("request_id", None)
+    if isinstance(runner, WebOfflineSession):
+        return {"ok": set(body) == {"choice_id"} and runner.submit_choice(body["choice_id"], request_id)}
     return {"ok": runner.submit(body, request_id=request_id, require_request_id=True)}
 
 

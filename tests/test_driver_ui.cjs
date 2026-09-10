@@ -27,6 +27,8 @@ w.fetch = async (url, options = {}) => {
   let response;
   let ok = true;
   if (url === '/api/agent_connections') response = connectionsResponse;
+  else if (url.startsWith('/api/offline/cast')) response = {characters: players.map(p => ({...p, description:'Fixed personality'}))};
+  else if (url === '/api/offline/start') response = {ok:true, game_id:'offline-ui', counted:false};
   else if (url.startsWith('/api/rejoin')) response = rejoinResponse;
   else if (url.startsWith('/api/boards')) response = {
     boards: [{id:'classic',name:'Classic',difficulty:'Intro',roles:['seer','werewolf','werewolf','villager']}],
@@ -130,6 +132,40 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 10));
   assert.equal(recovered.request_id, 'restored-request');
   assert.equal(recovered.answer, '恢复后的答案');
 
+  assert.equal(w.document.querySelector('#offlineCharacter').options.length, 12);
+  w.confirm = () => false;
+  const beforeCancel = requests.length;
+  w.document.querySelector('#offlineGame').click();
+  await flush();
+  assert.equal(requests.length, beforeCancel);
+  w.confirm = () => true;
+  w.document.querySelector('#offlineSpectator').checked = true;
+  w.document.querySelector('#offlineGame').click();
+  await flush();
+  const offlineBody = requests.filter(r => r.url === '/api/offline/start').pop().body;
+  assert.equal(offlineBody.offline_confirmed, true);
+  assert.equal(offlineBody.spectator, true);
+  assert.equal(offlineBody.player_role, 'random');
+  assert.ok(!('llm' in offlineBody));
+  w.eval('showPlayer(null)');
+  assert.match(w.document.querySelector('#playerBody').textContent, /旁观|spectator/);
+  rejoinResponse = {ok:true, view:{finished:false, counted:false, public_events:[], private_events:[],
+    terminal:[], next_event_no:51, pending:{type:'request', kind:'speech', request_id:'offline-restored',
+      event_no:50, choices:[{id:'suspect:2', group:'Opinion', label:'Suspect seat 2'}]}}};
+  await w.eval('rejoin()');
+  const choiceButton = w.document.querySelector('#actionPanel button');
+  assert.equal(choiceButton.textContent, 'Suspect seat 2');
+  choiceButton.click();
+  await flush();
+  const choiceAction = requests.filter(r => r.url === '/api/action').pop().body;
+  assert.equal(choiceAction.choice_id, 'suspect:2');
+  assert.equal(choiceAction.request_id, 'offline-restored');
+  assert.ok(!('text' in choiceAction));
+  w.eval('showAction({kind:"speech",request_id:"next",choices:[]})');
+  const beforeDetached = requests.length;
+  choiceButton.click();
+  await flush();
+  assert.equal(requests.length, beforeDetached);
   assert.deepEqual(errors, []);
   console.log('PASS: driver selector (api/agent/offline), pre-configured connection, unconfigured guidance, and table_answer controls');
   w.close();
