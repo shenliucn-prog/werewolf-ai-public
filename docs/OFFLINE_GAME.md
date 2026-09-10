@@ -74,8 +74,10 @@ saved game concurrently.
 
 This is a complete local rule game, unlike the earlier
 [single-scene discussion lab](OFFLINE_DISCUSSION_LAB.md). It supports the
-terminal and an Agent relaying that terminal; **it is not yet an option editor
-inside the Web interface**. The model-driven interfaces are unchanged.
+terminal, an Agent relaying that terminal, and the Web's separate **Offline
+choice game** panel. Choose the board and role above that panel, then a fixed
+character or public spectating. Confirm offline play explicitly; the normal
+Continue game button restores its choices. Model-driven interfaces are unchanged.
 Conjecture tables and omniscient research viewing are not exposed here.
 
 Automated coverage includes all boards, every playable role, public spectator
@@ -99,5 +101,5 @@ python -m werewolf_web.offline_game --board classic --spectate
 - 输入 `q` 保存退出，按启动时给出的 `--resume` 命令继续；不能中途换视角。
 - `?规则问题`、`/seats`、`/history` 不消耗行动。
 - 完全不调用模型、不计正式闯关成绩。存档只留本地，不要上传。
-- 当前入口是终端／Agent 转述终端，不是网页选项界面；旁观自动推进，没有全知开关。
+- 支持终端／Agent 转述终端，以及网页独立的「离线选项玩法」面板。使用上方板子与身份，选择人物或公开旁观；「继续游戏」可恢复选项。旁观自动推进，没有全知开关。
 - 程序策略和人物台词仍有局限；跑通对局不代表平衡已经认证。

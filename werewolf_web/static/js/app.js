@@ -197,6 +197,11 @@ function escapeHtml(s) {
 
 // ---------- 玩家身份 ----------
 function showPlayer(pv) {
+  if (!pv) {
+    mySeat = null;
+    $("#playerBody").textContent = uiLocale === "en" ? "Public spectator · no private information" : "公开旁观 · 不显示私密信息";
+    return;
+  }
   const el = $("#playerBody");
   let html = `${tr("你是")} <b>${seatText(pv.pos)} ${escapeHtml(pv.name)}</b><br>${tr("身份")}: <span class="role-tag">${escapeHtml(pv.role_cn)}</span>`;
   if (pv.ability) html += pv.ability.length > 180
@@ -215,6 +220,7 @@ function handleEvent(d) {
       applyLocale(d.state.locale);
       $("#locale").disabled = true;
       renderSeats(d.state); showPlayer(d.player);
+      if (d.offline_choices) setModeBadge(uiLocale === "en" ? "Offline choices · not counted" : "离线选项 · 不计闯关成绩");
       showLlmStatus(d.llm_status);
       log(`🎙️ ${escapeHtml(d.host_intro)}`, "narr"); break;
     case "llm_status": showLlmStatus(d.llm_status); break;
@@ -381,7 +387,23 @@ function showAction(d) {
   const kind = d.kind, data = d.data || {};
   panelEl.style.display = "block";
   panelEl.innerHTML = "";
-  if (kind === "model_retry") {
+  if (Array.isArray(d.choices)) {
+    const hint = document.createElement("p");
+    hint.textContent = kind === "ready" ? tr("先阅读本局规则，有疑问可问主持人。确认后才进入第一夜。")
+      : (uiLocale === "en" ? "Choose your action" : "选择你的行动");
+    panelEl.append(hint);
+    let group = null;
+    for (const choice of d.choices) {
+      if (group !== choice.group) {
+        group = choice.group;
+        const title = document.createElement("h3"); title.textContent = group; panelEl.append(title);
+      }
+      const button = document.createElement("button");
+      button.textContent = choice.label;
+      button.onclick = () => submitAction({choice_id: choice.id});
+      panelEl.append(button);
+    }
+  } else if (kind === "model_retry") {
     const hint = document.createElement("p"); hint.textContent = tr("模型连接暂停，不会切换离线玩家。");
     const retry = document.createElement("button"); retry.textContent = tr("重试");
     retry.onclick = () => submitAction({retry: true});
@@ -862,6 +884,57 @@ async function newGame() {
 $("#newGame").onclick = newGame;
 $("#continueGame").onclick = () => restoreSavedGame();
 
+async function loadOfflineCast() {
+  try {
+    const response = await fetch(`/api/offline/cast?locale=${encodeURIComponent(uiLocale)}`);
+    if (!response.ok) return;
+    const data = await response.json();
+    const select = $("#offlineCharacter");
+    const previous = select.value;
+    select.innerHTML = "";
+    for (const c of data.characters) select.add(new Option(c.name, c.id));
+    if (data.characters.some(c => c.id === previous)) select.value = previous;
+    select.onchange = () => {
+      $("#offlineDescription").textContent = data.characters.find(c => c.id === select.value)?.description || "";
+    };
+    select.onchange();
+  } catch (_) { /* The explicit launch reports connection errors. */ }
+}
+
+async function offlineGame() {
+  if (!window.confirm(uiLocale === "en" ? "Start rule-based offline play? No campaign score. The current game, if any, will be abandoned."
+    : "开始程序策略离线对局？不计闯关成绩；如有当前对局，将先放弃。")) return;
+  const button = $("#offlineGame");
+  button.disabled = true;
+  try {
+    if (!(await endCurrentGame())) throw new Error(uiLocale === "en" ? "Could not end current game" : "未能结束当前对局");
+    const spectator = $("#offlineSpectator").checked;
+    const response = await fetch("/api/offline/start", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({offline_confirmed: true, board_id: $("#board").value,
+        locale: uiLocale, character: $("#offlineCharacter").value || "acheng", spectator,
+        player_role: spectator ? "random" : $("#playerRole").value})
+    });
+    const data = await response.json();
+    if (!response.ok || !data.game_id) throw new Error(data.detail || "Could not start game");
+    gameId = data.game_id;
+    lastEventNo = 0; rejoinAttempts = 0; faulted = false;
+    logEl.innerHTML = ""; pendingReq = null; panelEl.style.display = "none";
+    hideCampaignReviewRetry(); hideCampaignTeachingRetry();
+    campaignReviewGameId = null; campaignTeachingGameId = null;
+    $("#reviewMask").style.display = "none";
+    $("#offlineError").textContent = "";
+    $("#gameSetup").open = false;
+    document.body.classList.add("playing"); lockNames(true);
+    setModeBadge(uiLocale === "en" ? "Offline choices · not counted" : "离线选项 · 不计闯关成绩");
+    persistState(); openStream(0);
+  } catch (error) {
+    $("#offlineError").textContent = error.message;
+  } finally { button.disabled = false; }
+}
+$("#offlineGame").onclick = offlineGame;
+loadOfflineCast();
+
 async function campaignGame() {
   if (gameId && !window.confirm(uiLocale === "en" ? "End this game and start a new one?" : "结束当前对局并重新开局？")) return;
   const llm = configuredLlmOptions();
@@ -931,7 +1004,7 @@ $("#copyTextCommand").onclick = async () => {
   }
 };
 $("#board").onchange = loadRoleChoices;
-$("#locale").onchange = () => { applyLocale($("#locale").value); loadBoards(); loadCast(); };
+$("#locale").onchange = () => { applyLocale($("#locale").value); loadBoards(); loadCast(); loadOfflineCast(); };
 $("#randomNames").onclick = loadCast;
 $("#askHost").onclick = askHostRule;
 $("#driverMode").onchange = syncDriverUI;

@@ -68,6 +68,15 @@
     </div>
   <p class="mode-note" data-i18n="当前仅文字驱动。语音与视觉玩法尚无方案、尚未实现；头像仅作装饰。猜想模式要求双表并保留公开历史，不等于完美推理。">当前仅文字驱动。语音与视觉玩法尚无方案、尚未实现；头像仅作装饰。猜想模式要求双表并保留公开历史，不等于完美推理。</p>
 
+  <details id="offlineSetup">
+    <summary>离线选项玩法 / Offline choice game</summary>
+    <p>程序策略模拟，无需模型，不计闯关成绩。使用上方板子与身份；固定人物人格，不使用猜想表。 / Rule-based simulation, no model or campaign score. Uses the board and role above, a fixed cast, and no conjecture tables.</p>
+    <label>人物 / Character <select id="offlineCharacter"></select></label>
+    <p id="offlineDescription"></p>
+    <label><input id="offlineSpectator" type="checkbox">公开旁观（身份随机） / Public spectator (random roles)</label>
+    <button id="offlineGame" type="button">开始离线对局 / Start offline game</button>
+    <p id="offlineError" role="alert"></p>
+  </details>
   <p id="boardDescription" aria-live="polite"></p>
   </details>
   <main class="layout">
