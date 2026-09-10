@@ -1,5 +1,8 @@
 # Game setup and modes
 
+For the separate terminal-first option-driven mode (twelve fixed characters,
+public spectating and no model calls), see [Offline choice games](OFFLINE_GAME.md).
+
 ## Current medium
 
 Both web and terminal conversation are **text-driven**. Voice and visual gameplay
@@ -26,8 +29,8 @@ signals. These future media must be designed and evaluated separately.
 
 The human is not assigned scripted AI behavior. Names and personality choices
 do not alter the role/seat random stream. Host rules chat remains available
-without spending an action. A closed stream ends the session; resume is not
-implemented. This remains a local, single-human-plus-NPC prototype, not an
+without spending an action. Closing a stream does not end the session;
+saved games can be resumed. This remains a local, single-human-plus-NPC game, not an
 online multiplayer account/lobby service.
 
 ## Playable conjecture beta

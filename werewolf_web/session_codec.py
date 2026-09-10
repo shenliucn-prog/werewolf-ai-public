@@ -176,6 +176,8 @@ def restore(session, snapshot: dict) -> None:
     """
     from .recovery import check_version
     check_version(snapshot, "GameSession.snapshot")
+    if snapshot.get("offline_choices") is not None and not getattr(session, "offline_choice_mode", False):
+        raise ValueError("Resume this choice game with offline_game, not a different driver interface")
     snapshot = deepcopy(snapshot)
     questions = QuestionQueue.from_snapshot(snapshot)
     loop_state = _prepare_loop_state(snapshot)

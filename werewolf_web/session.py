@@ -716,7 +716,7 @@ class GameSession:
         # or re-announcing nightfall.
         if not self._step_state.get("night_started"):
             self.emit({"type": "narration", "phase": "night", "text": self.host.narrate("night_start", "")})
-            await asyncio.sleep(0.3)
+            await self._pace(0.3)
             requests = e.start_night()
             self._deliver_grave_result()
             self._step_state["night_started"] = True
@@ -768,7 +768,7 @@ class GameSession:
                                "text": t(self.engine.locale, "sg_result",
                                          n=r["night"], target=r["target"],
                                          name=r["name"], role=r["role_cn"])})
-        await asyncio.sleep(0.4)
+        await self._pace(0.4)
         self._step = "day_start"
 
     async def _step_day_start(self):
@@ -779,7 +779,7 @@ class GameSession:
         self.emit({"type": "narration", "phase": "day", "text": self.host.narrate("day_start", t(self.engine.locale, "day_start", d=e.day_count))})
         if not any(ev.type == "death" for ev in night_events):
             self.emit({"type": "narration", "text": "Host Raven: No one died last night." if e.locale == "en" else "主持人夜鸦：昨夜平安，无人死亡。"})
-        await asyncio.sleep(0.3)
+        await self._pace(0.3)
         if e.day_count == 1:
             self._step = "election"
         elif self.conjecture:
@@ -850,7 +850,7 @@ class GameSession:
                        "phase": "day"}, publish=False)
             self._checkpoint()
             self._flush_publish()
-            await asyncio.sleep(0.3)
+            await self._pace(0.3)
             await self._maybe_table_talk(seat, speech)
             self._checkpoint()
 
@@ -1073,7 +1073,7 @@ class GameSession:
                           publish=False)
             self._checkpoint()
             self._flush_publish()
-            response = await self._npc_call(agent.table_reply, asker) if self.planner is not None else agent.brain.answer_check_question()
+            response = await self._question_reply(agent, asker)
             # Commit the reply and the question bookkeeping atomically: apply the
             # budget/question mutations *before* ``_publish_table_speech``, whose
             # checkpoint persists the spent budget, the answered question and the
@@ -1081,6 +1081,9 @@ class GameSession:
             self.questions.finish(pair, self._step_state)
             await self._publish_table_speech(agent.seat, response, "clarification")
         self.questions.close_window(self._step_state)
+
+    async def _question_reply(self, agent, asker):
+        return await self._npc_call(agent.table_reply, asker) if self.planner is not None else agent.brain.answer_check_question()
 
     async def _answer_human_question(self, pair, asker):
         """Ask the human to answer a public clarification (answer or skip).
@@ -1139,7 +1142,7 @@ class GameSession:
                    "text": speech.text, "table_talk": True, "phase": "table_talk"}, publish=False)
         self._checkpoint()
         self._flush_publish()
-        await asyncio.sleep(0.25)
+        await self._pace(0.25)
 
     def _start_table_intent(self, source, speech, event_no=None):
         self._step_state["table_talk"] = InterruptionIntent.new(
@@ -1542,7 +1545,7 @@ class GameSession:
                            "text": text, "election": True, "phase": "election"}, publish=False)
                 self._checkpoint()
                 self._flush_publish()
-                await asyncio.sleep(0.3)
+                await self._pace(0.3)
             self._step_state.pop("election_cursor", None)
             await self._answer_table_questions()
             self._step_state["election_phase"] = 2
@@ -1790,6 +1793,10 @@ class GameSession:
                       publish=False)
 
     # ---------------- 辅助 ----------------
+    async def _pace(self, seconds):
+        """Presentation delay; fast local simulators can yield without waiting."""
+        await asyncio.sleep(seconds)
+
     def _seats_desc(self) -> str:
         return "\n".join((f"  #{s.pos} {s.name}" if self.engine.locale == "en" else f"  {s.pos}号 {s.name}")
                          for s in self.engine.seats.values())

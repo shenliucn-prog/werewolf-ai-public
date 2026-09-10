@@ -28,6 +28,12 @@ loss reviews use the model and can be retried.
 **Offline simulation must be explicitly selected.** It is a rule-flow test,
 makes no model calls and does not count toward campaign progress.
 
+For an independent **choice-based offline game**, use
+`python -m werewolf_web.offline_game --lang en`. It offers twelve fixed
+personalities, character replacement, public spectating and local saves,
+without free-text interpretation or campaign scoring.
+See [offline play](docs/OFFLINE_GAME.md) for commands and limitations.
+
 **Game driver.** NPC decisions use one of three drivers: `api` (a model API,
 including keyless local servers), `agent` (your own Agent — the `command` or
 `codex` adapter is a second layer), or `offline`. Configuration resolves in the
