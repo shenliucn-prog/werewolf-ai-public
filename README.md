@@ -47,17 +47,9 @@ personalities, character replacement, public spectating and local saves,
 without free-text interpretation or campaign scoring.
 See [offline play](docs/OFFLINE_GAME.md) for commands and limitations.
 
-Current development includes experimental faction inference and public-story
-aids shared with model players. Offline wolves can maintain disguises, vary
-fabricated checks, support others and explain reconsideration from attributed
-statements. Models receive optional aids but choose their own actions. These
-heuristics are not verified identities or a balance/real-model performance
-guarantee. See [scope and limitations](docs/JOINT_BELIEF_PROTOTYPE.md).
-Repeated statements no longer multiply flip-based credit or blame; exile
-accounting uses that day's unique voters. Existing saved scores are preserved
-on restore, not retroactively corrected; evaluate the full change in a new game.
-Publicly revealed Seer statements are retained in a bounded model-context
-section in both languages; the role reveal does not certify every claimed check.
+Experimental reasoning aids are not verified identities or a playing-strength
+guarantee. Details and compatibility notes belong in the
+[limitations](docs/KNOWN_LIMITATIONS.md) and [changelog](CHANGELOG.md).
 
 **Game driver.** NPC decisions use one of three drivers: `api` (a model API,
 including keyless local servers), `agent` (your own Agent — the `command` or
@@ -191,6 +183,12 @@ There is no account system or hardened public multi-user deployment; run locally
 See [security](SECURITY.md).
 
 ## For contributors
+
+Start with [support and verification scope](docs/SUPPORT.md) and the
+[near-term roadmap](docs/ROADMAP.md). Report your version, interface and driver;
+never attach complete saves or credentials. CI success is not proof of balanced
+play or real-model quality. The README describes this checkout, not a promise
+that every proposed feature exists in the latest downloadable release.
 
 | Location | Responsibility |
 | --- | --- |

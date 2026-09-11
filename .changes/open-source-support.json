@@ -1,0 +1,6 @@
+{
+  "summary": {"en": "Simplify README entry material and document honest support, roadmap and private bug-report boundaries.", "zh": "精简 README 入口信息，明确支持范围、近期路线图与私密问题报告边界。"},
+  "docs_impact": "readme", "docs": ["README.md", "README.zh-CN.md", "SECURITY.md", "docs/SUPPORT.md", "docs/ROADMAP.md", ".github/ISSUE_TEMPLATE/bug_report.md"],
+  "reason": "Documentation-only clarification of existing capabilities and verification limits.",
+  "compatibility": {"en": "No runtime, save or configuration changes.", "zh": "无运行、存档或配置变更。"}
+}
