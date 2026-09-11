@@ -5,6 +5,8 @@ on:
     branches: [master]
   pull_request:
   workflow_dispatch:
+  schedule:
+    - cron: '17 8 * * 1'
 
 permissions:
   contents: read
@@ -12,6 +14,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       matrix:
         python-version: ['3.10', '3.12', '3.13']
@@ -45,11 +48,58 @@ jobs:
       - run: git diff --check
 
   dependencies:
+    needs: [platform-smoke, browser-and-coverage]
+    if: always()
     runs-on: ubuntu-latest
     steps:
+      - name: Enforce new verification jobs through the existing required check
+        env:
+          PLATFORM_RESULT: ${{ needs.platform-smoke.result }}
+          BROWSER_RESULT: ${{ needs.browser-and-coverage.result }}
+        run: test "$PLATFORM_RESULT" = success && test "$BROWSER_RESULT" = success
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
       - run: python -m pip install pip-audit
       - run: python -m pip_audit -r werewolf_web/requirements.txt --progress-spinner off
+
+  platform-smoke:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r werewolf_web/requirements.txt
+      - run: python -m unittest tests.test_api_contract tests.test_offline_web -q
+        env:
+          LLM_ENABLED: 'false'
+          LLM_API_KEY: ''
+
+  browser-and-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r werewolf_web/requirements.txt -r requirements-test.txt
+      - run: python -m playwright install --with-deps chromium
+      - run: python tests/browser/player_entry.py
+      - run: python -m coverage run -m unittest discover -s tests -q
+        env:
+          LLM_ENABLED: 'false'
+          LLM_API_KEY: ''
+      - run: python -m coverage report
+      - run: python -m coverage json -o output/coverage.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: branch-coverage
+          path: output/coverage.json
+          retention-days: 7
+          if-no-files-found: error
