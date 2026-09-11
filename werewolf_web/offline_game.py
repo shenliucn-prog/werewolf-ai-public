@@ -176,7 +176,8 @@ class ChoiceAgent(StrategicNPCAgent):
         if chosen and any(ev["text"].endswith(chosen["label"]) for ev in own[-2:]):
             chosen = None
         if chosen is None:
-            chosen = choose_reaction([c for c in options if c.get("topic") != "opening"], own, self.style)
+            recent = [ev for ev in self.session._events if ev.get("type") == "speech"][-12:]
+            chosen = choose_reaction([c for c in options if c.get("topic") != "opening"], own, self.style, recent)
         if chosen is None and not self.is_wolf:
             chosen = next((c for c in options if c["id"].startswith("audit:")
                            and not any(ev["text"].endswith(c["label"]) for ev in own)), None)
@@ -208,7 +209,8 @@ class ChoiceAgent(StrategicNPCAgent):
                     if prefix is None or checked_good:
                         key, prefix = f"ask:{target.pos}", ""
                 chosen = by_id[key]
-                if own and own[-1]["text"].endswith(chosen["label"]):
+                recent = [ev for ev in self.session._events if ev.get("type") == "speech"][-12:]
+                if any(ev["text"].endswith(chosen["label"]) for ev in recent):
                     chosen, prefix = by_id["wait"], ""
             else:
                 chosen = by_id["wait"]
@@ -221,9 +223,8 @@ class ChoiceAgent(StrategicNPCAgent):
 
     def table_reply(self, interrupter):
         own = [ev for ev in self.session._events if ev.get("type") == "speech" and ev.get("name") == self.name]
-        response = choose_reaction(speech_choices(self.session, self.seat, True), own, self.style)
-        if response:
-            return Speech(**deepcopy(response["speech"]))
+        # A reply must close this question, not select a new question about a
+        # different player. Reiterate an attributed position or admit no basis.
         if own:
             ev = own[-1]
             quote = ev["text"]

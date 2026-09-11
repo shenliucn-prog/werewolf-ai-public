@@ -87,9 +87,12 @@ def shortlist(options):
     return selected
 
 
-def choose_reaction(options, own_speeches, style):
+def choose_reaction(options, own_speeches, style, table_speeches=()):
+    # Cross-speaker repetition is still repetition. Only public recent speech
+    # is consulted; the candidate text includes the report reference/target.
     fresh = [c for c in options if c.get("topic") and
-             not any(ev.get("text", "").endswith(c["label"]) for ev in own_speeches)]
+             not any(ev.get("text", "").endswith(c["label"])
+                     for ev in [*own_speeches, *table_speeches])]
     priorities = {"receive_wolf": 5, "receive_good": 4, "accused": 3,
                   "counterclaim": 2 + style.logic, "hear_target": 1 + style.aggression, "opening": 0}
     def score(c):
