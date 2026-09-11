@@ -1,0 +1,6 @@
+{
+  "summary": {"en": "Add real-browser continuation coverage, cross-platform smoke jobs and a branch-coverage baseline.", "zh": "新增真实浏览器续局测试、跨平台冒烟任务和分支覆盖率基线。"},
+  "docs_impact": "docs", "docs": ["docs/TESTING.md"],
+  "reason": "Test tooling only; no new game capability.",
+  "compatibility": {"en": "No save or runtime configuration changes.", "zh": "无存档或运行配置变更。"}
+}
