@@ -65,7 +65,9 @@ class ScreenSession(GameSession):
         if event["type"] == "error": self.errors.append(event["text"])
         super().emit(event, publish=publish)
 
-    async def ask_player(self, kind, data):
+    async def ask_player(self, kind, data, *, action=None):
+        # Research autoplay accepts the session's stable action-slot keyword;
+        # it does not persist or replay human decisions itself.
         e = self.engine; human = self.agents[e.player_seat().name]
         if kind == "conjecture":
             answer = self.conjecture_ledger.npc_drafts({human.name: human})[human.name]

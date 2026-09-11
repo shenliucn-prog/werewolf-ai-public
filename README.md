@@ -2,6 +2,10 @@
 
 English | [简体中文](README.zh-CN.md)
 
+<!-- version: 0.1.0-dev -->
+Development version: **0.1.0-dev** (not a published release).
+See [changes](CHANGELOG.md) and [release process](docs/RELEASING.md).
+
 A local single-player Werewolf game: you play one seat against 11 AI opponents.
 **Normal play requires a model API or a supported connection to your own Agent.**
 Models decide NPC speech and actions; Python enforces rules and saves progress.
@@ -13,6 +17,10 @@ command execution and a persistent interactive process. Relaying the game does
 universal Agent plugin or separate native app yet.
 
 ## Choose a mode
+
+Offline and model players share an [explicit check-claim audit](docs/CHECK_CLAIMS.md):
+it links contradictory Seer reports to public records, without certifying identities.
+Unstructured prose is not automatically audited.
 
 | Entry | What it does |
 | --- | --- |
@@ -33,6 +41,18 @@ For an independent **choice-based offline game**, use
 personalities, character replacement, public spectating and local saves,
 without free-text interpretation or campaign scoring.
 See [offline play](docs/OFFLINE_GAME.md) for commands and limitations.
+
+Current development includes experimental faction inference and public-story
+aids shared with model players. Offline wolves can maintain disguises, vary
+fabricated checks, support others and explain reconsideration from attributed
+statements. Models receive optional aids but choose their own actions. These
+heuristics are not verified identities or a balance/real-model performance
+guarantee. See [scope and limitations](docs/JOINT_BELIEF_PROTOTYPE.md).
+Repeated statements no longer multiply flip-based credit or blame; exile
+accounting uses that day's unique voters. Existing saved scores are preserved
+on restore, not retroactively corrected; evaluate the full change in a new game.
+Publicly revealed Seer statements are retained in a bounded model-context
+section in both languages; the role reveal does not certify every claimed check.
 
 **Game driver.** NPC decisions use one of three drivers: `api` (a model API,
 including keyless local servers), `agent` (your own Agent — the `command` or

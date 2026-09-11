@@ -15,6 +15,7 @@ from .offline_cast import BY_ID, CHARACTERS, cast_settings
 from .i18n import cast, role_name
 from .game.engine import BOARD_MAP, ROLE_META
 from . import checkpoint
+from .check_claims import report_line, audit, finding_text
 
 
 def words(locale, zh, en):
@@ -55,8 +56,15 @@ def speech_choices(session, actor, reply=False):
                     label = words(lang, "好人" if result == "good" else "狼人", result)
                     add(f"report:{seat.pos}:{result}", "报告 / Report", words(lang,
                         f"我声明自己是预言家；第{e.night_count}夜查验{target}为{label}。这是我的报告，尚未公开验证。",
-                        f"I claim seer; my night {e.night_count} report on {target} is {label}. This report is not publicly verified."),
+                        f"I claim seer; my night {e.night_count} report on {target} is {label}. This report is not publicly verified.") + "\n" + report_line(e.night_count, seat.pos, result, lang),
                         claim="seer", **({"defend": seat.name} if result == "good" else {"accuse": seat.name}))
+    alive = {s.pos: s for s in e.alive_seats()}
+    for i, finding in enumerate(audit(session.public_record.entries)["findings"]):
+        reporter = alive.get(finding["report"]["actor"])
+        if finding["kind"] == "compatible_with_flip" or not reporter or reporter.pos == actor.pos:
+            continue
+        add(f"audit:{finding['report']['event_no']}:{i}", "对账 / Audit", finding_text(finding, lang),
+            question_to=reporter.name)
     # A bounded menu of exact recent public sources; any actor can cite one.
     sources = [event for event in session._events if event.get("type") in ("speech", "ballots", "flip", "exile")][-8:]
     for event in sources:
@@ -131,6 +139,11 @@ class ChoiceAgent(StrategicNPCAgent):
         by_id = {c["id"]: c for c in options}
         own = [ev for ev in self.session._events if ev.get("type") == "speech" and ev.get("name") == self.name]
         chosen = None
+        prefix = ""
+        from .ai.public_story import for_brain as public_story
+        from .ai import wolf_dialogue
+        story = public_story(self.brain) if self.is_wolf else None
+        story_weights = {r["target"]: r["pressure_score"] for r in story["targets"]} if story else {}
         # Lawful private check results only for the actual seer; other roles
         # never read this list. Reports remain publicly attributed claims.
         if self.brain.role == "seer":
@@ -138,14 +151,15 @@ class ChoiceAgent(StrategicNPCAgent):
             if records:
                 r = records[-1]
                 chosen = by_id.get(f"report:{r['target']}:{r['result']}")
-        elif self.brain.is_wolf and self.brain.wolf_strategy == "bluff":
+        elif (self.brain.is_wolf and self.brain.wolf_strategy == "bluff"
+              and not any(role != "seer" for role in story["own_claims"])):
             checks = getattr(self.brain, "_bluff_checks", {})
             n = self.engine.night_count
-            if n not in checks:
+            if n > 0 and n not in checks:
                 pool = [s for s in self.engine.alive_seats() if s.name != self.name and s.name not in self.brain.mates()]
-                if pool:
-                    target = self.brain.rng.choice(pool)
-                    checks[n] = {"night": n, "target": target.pos, "name": target.name, "result": "wolf"}
+                report = wolf_dialogue.new_check(self.brain, story, pool, checks)
+                if report:
+                    checks[n] = report
                     self.brain._bluff_checks = checks
             if n in checks:
                 r = checks[n]
@@ -153,21 +167,43 @@ class ChoiceAgent(StrategicNPCAgent):
         # Avoid repeating the same report in the same day/election sequence.
         if chosen and any(ev["text"].endswith(chosen["label"]) for ev in own[-2:]):
             chosen = None
+        if chosen is None and not self.is_wolf:
+            chosen = next((c for c in options if c["id"].startswith("audit:")
+                           and not any(ev["text"].endswith(c["label"]) for ev in own)), None)
+        if chosen is None and self.is_wolf:
+            move = wolf_dialogue.public_move(self.brain, story)
+            candidate = by_id.get(move)
+            if candidate and not (own and own[-1]["text"].endswith(candidate["label"])):
+                chosen = candidate
         if chosen is None:
             candidates = [s for s in self.engine.alive_seats() if s.name != self.name
                           and (not self.is_wolf or s.name not in self.brain.mates())]
             if candidates:
-                target = max(candidates, key=lambda s: (self.brain.suspicion(s.name), -s.pos))
+                from .ai.joint_belief import for_brain
+                weights = for_brain(self.brain)["wolf_weights"]
+                if self.is_wolf:
+                    # Knowing the pack does not tell a wolf whom to persuade
+                    # the table to exile. Keep its public-pressure policy.
+                    weights = {s.name: self.brain.suspicion(s.name) + .3 * story_weights.get(s.pos, 0)
+                               for s in candidates}
+                target = max(candidates, key=lambda s: (weights[s.name], -s.pos))
                 key = f"suspect:{target.pos}"
                 # Cautious personalities prefer a question before a weak accusation.
-                if self.brain.suspicion(target.name) < .55 and self.style.caution > .6:
+                if weights[target.name] < .55 and self.style.caution > .6:
                     key = f"ask:{target.pos}"
+                if self.is_wolf and key.startswith("suspect:"):
+                    prefix = wolf_dialogue.reversal_prefix(story, target.pos, self.engine.locale)
+                    checked_good = any(r["target"] == target.pos and r["result"] == "good"
+                                       for r in getattr(self.brain, "_bluff_checks", {}).values())
+                    if prefix is None or checked_good:
+                        key, prefix = f"ask:{target.pos}", ""
                 chosen = by_id[key]
                 if own and own[-1]["text"].endswith(chosen["label"]):
-                    chosen = by_id["wait"]
+                    chosen, prefix = by_id["wait"], ""
             else:
                 chosen = by_id["wait"]
         speech = Speech(**deepcopy(chosen["speech"]))
+        speech.text = prefix + speech.text
         # Occasional, stable phrasing; no catchphrase on every line.
         if not own:
             speech.text = self.character.phrase[self.engine.locale == "en"] + " " + speech.text

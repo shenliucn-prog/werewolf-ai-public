@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Add independently selectable dialogue ablations before changing good-side inference.", "zh": "新增可独立开关的发言策略实验，在修改好人推断前区分影响来源。"},
+  "docs_impact": "docs",
+  "docs": ["docs/JOINT_BELIEF_PROTOTYPE.md", "CHANGELOG.md"],
+  "reason": "Research tooling only; no additional player-facing behavior beyond the documented strategy update.",
+  "compatibility": {"en": "No game save or driver changes; experiments use new synthetic offline sessions only.", "zh": "不修改存档或驱动；实验只新建虚构离线对局。"}
+}

@@ -198,6 +198,8 @@ class DivineSessionTest(unittest.IsolatedAsyncioTestCase):
         ``emit(event)``; once the base gained ``emit(obj, publish=...)``, a
         ``publish=`` call raised TypeError, which the session layer swallowed as
         an error event, so the screen silently reported ``status: "failed"``.
+        This seed also exercises the table-reply ``ask_player(action=...)``
+        interface after the sheriff-support policy correction.
         """
         from werewolf_web.research.divine_witch_screen import run_one, BOARDS
         sleep = asyncio.sleep

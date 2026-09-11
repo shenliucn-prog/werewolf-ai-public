@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Deduplicate flip evidence and limit exile accounting to the current ballot.", "zh": "翻牌证据按发言人去重，放逐记账仅计当轮投票。"},
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md", "docs/JOINT_BELIEF_PROTOTYPE.md", "CHANGELOG.md"],
+  "reason": "Corrects shared evidence processing and documents the limits of old-save recovery.",
+  "compatibility": {"en": "No new snapshot fields. Existing accumulated scores are preserved on restore, not retroactively recomputed; use a new game to evaluate corrected accounting throughout.", "zh": "不新增存档字段。恢复保留已有累计分，不追溯重算旧偏差；完整评估修复效果应新开一局。"}
+}

@@ -17,6 +17,8 @@ jobs:
         python-version: ['3.10', '3.12', '3.13']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
@@ -34,6 +36,12 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: python scripts/check_release.py
+      - run: python scripts/check_delivery.py
+      - name: Require a new bilingual change record and documentation review
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: python scripts/check_delivery.py --base "$BASE_SHA"
       - run: git diff --check
 
   dependencies:

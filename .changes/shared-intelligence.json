@@ -1,0 +1,13 @@
+{
+  "summary": {
+    "en": "Shared intelligence aids and versioned delivery with mandatory documentation review.",
+    "zh": "共用智能辅助与版本化交付，强制审查文档影响。"
+  },
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md", "docs/RELEASING.md"],
+  "reason": "Changes offline behavior and explains development versus numbered releases.",
+  "compatibility": {
+    "en": "No new checkpoint schema fields; existing restore validation remains in force.",
+    "zh": "不新增存档格式字段；恢复仍遵循现有校验。"
+  }
+}

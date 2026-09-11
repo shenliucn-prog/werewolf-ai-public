@@ -171,7 +171,9 @@ def public_facts(entries):
 def build_public_context(agent):
     """The bounded public context for one model decision."""
     entries = agent.public_record.entries
+    from ..check_claims import audit
     return {
+        "check_claim_audit": audit(entries),
         "recent_public_statements": recent_public_statements(entries),
         "older_statement_summaries": older_statement_summaries(agent.brain, entries),
         "disputed_verbatim": disputed_verbatim(entries, agent.brain),
@@ -186,7 +188,15 @@ def statements_of_flipped_seers(entries, flips):
     Uses only observed public flips and public speech, never engine check results.
     Original excerpts stay attributed; a role reveal does not certify a claim.
     """
-    names = {name for name, role, _wolf in flips if role == "seer"}
+    from ..i18n import SUPPORTED_LOCALES, role_name
+    # Legacy observer snapshots contain display labels, not stable role keys.
+    # Normalize only public flip data, never the world's hidden role registry.
+    labels = {"seer", *(role_name(locale, "seer", "预言家") for locale in SUPPORTED_LOCALES)}
+    names = {name for name, role, wolf in flips if role in labels and wolf is False}
+    names.update(row["event"]["name"] for row in entries
+                 if row["event"].get("type") == "flip"
+                 and row["event"].get("role") == "seer"
+                 and row["event"].get("name"))
     rows = [row for row in _speech_rows(entries) if row["event"].get("name") in names]
     items = []
     for row in rows[-3:]:
@@ -244,6 +254,13 @@ def fit_request_budget(request: dict, max_chars: int = MAX_REQUEST_CHARS) -> dic
     def over_budget() -> bool:
         return _serialized_size(request) > max_chars
 
+    # Optional heuristic aid must never displace source evidence or prevent play.
+    if over_budget():
+        request.pop("public_story", None)
+    if over_budget():
+        request.pop("joint_hypotheses", None)
+    if over_budget():
+        request.get("public_context", {}).pop("check_claim_audit", None)
     while statements and over_budget():
         statements.pop(0)
     while earlier and over_budget():

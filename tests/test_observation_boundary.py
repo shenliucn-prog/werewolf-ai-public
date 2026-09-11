@@ -10,6 +10,7 @@ from dataclasses import asdict, replace
 from unittest.mock import Mock
 
 from werewolf_web.ai import model_context
+from werewolf_web.ai.joint_belief import for_brain
 from werewolf_web.ai.decision_runtime import ModelTurnError, RuntimeBase
 from werewolf_web.ai.model_controller import ModelController
 from werewolf_web.observations import MODEL_INSTRUCTIONS, ObservationGateway
@@ -78,12 +79,12 @@ class ObservationBoundaryTest(unittest.IsolatedAsyncioTestCase):
             session.restore(broken)
         self.assertEqual(session.snapshot(), before)
 
-    async def test_request_is_equal_to_pre_extraction_builder(self):
+    async def test_request_matches_builder_with_optional_joint_aid(self):
+        from werewolf_web.ai.public_story import for_brain as public_story
         session, agent = await self.make_session()
         agent.model_decisions = [{"task": "old", "decision": {"target": None}}]
         details = {"candidates": [{"pos": 0, "name": "Peaceful Day"}]}
-        # Characterization oracle of the pre-R1 request layout, not the new
-        # gateway. Metadata (identity/cutoff) must not alter the model prompt.
+        # Explicit request contract, including the new advisory inference aid.
         info = model_context.bound_information(asdict(agent.information_set()))
         info["rules"] = introduction(agent.engine, False)
         expected = model_context.fit_request_budget({
@@ -94,6 +95,8 @@ class ObservationBoundaryTest(unittest.IsolatedAsyncioTestCase):
             "public_context": model_context.build_public_context(agent),
             "own_previous_decisions": agent.model_decisions[-model_context.DECISION_MEMORY:],
             "details": details, "instructions": MODEL_INSTRUCTIONS,
+            "joint_hypotheses": for_brain(agent.brain),
+            "public_story": public_story(agent.brain),
         })
         observation = ObservationGateway.for_model(agent, "exile vote", details)
         self.assertEqual(observation.to_request(), expected)

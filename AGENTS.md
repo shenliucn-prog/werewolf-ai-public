@@ -31,3 +31,22 @@ For code changes, preserve existing user work. Keep human onboarding enabled
 in both chat and web. Direct research `GameSession` callers skip onboarding by
 default; player-adapter tests must cover the ready gate. Run relevant Python
 tests and browser DOM checks after changing shared contracts.
+
+## Definition of done: code, documentation and version history
+
+Every change must include a NEW `.changes/<unique-name>.json` record with
+English/Chinese summary and save/config compatibility, docs_impact
+(`none`, `docs`, or `readme`), changed document paths and a reason. See
+`docs/RELEASING.md`. Do not reuse a previous PR's record.
+User-facing behavior changes require reviewing affected guides. Changes to
+play modes, setup, entry points or advertised capabilities require both
+README languages in the same PR. Internal-only changes may declare `none`
+with a specific reason. Documentation is part of implementation, not a
+follow-up task requiring another user request. Check statements against code;
+do not turn experimental wins or mocked tests into verified product claims.
+Run `python scripts/check_delivery.py --base HEAD` before committing, in
+addition to the normal gates. Once committed, use the PR base commit instead.
+Merge is not release. A release requires an explicit user request, reviewed
+CHANGELOG, VERSION/README consistency, save compatibility notes and a tested
+tagged candidate. Never publish a tag, GitHub Release or merge automatically
+because implementation is complete.

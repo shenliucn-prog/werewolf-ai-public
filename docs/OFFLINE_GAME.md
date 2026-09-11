@@ -5,6 +5,13 @@ the same `GameSession` and rules engine, but NPCs use local strategies and
 players select structured actions. No model connection or model calls are
 required, and **no campaign attempts, unlocks or scores are recorded**.
 
+Development strategy update: wolves can use stable civilian/hunter/seer claims,
+fabricated good or wolf reports, public support and source-attributed
+reconsideration. Claims do not unlock skills or prove roles. These experimental
+heuristics are not a balance guarantee; see [strategy scope](JOINT_BELIEF_PROTOTYPE.md).
+开发版策略更新：狼人可连贯伪装平民、猎人或预言家，发假金水/查杀、保人并引用
+公开声明解释重新考虑。报身份不解锁技能，也不证明身份；实验策略不构成平衡保证。
+
 ## Start
 
 After installing the normal Python dependencies, run from the repository root:
