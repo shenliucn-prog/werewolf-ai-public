@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Avoid recent cross-speaker offline echoes and close clarification replies instead of asking another question.", "zh": "避免离线桌面近期重复发言，澄清回答不再改问其他问题。"},
+  "docs_impact": "docs",
+  "docs": ["docs/KNOWN_LIMITATIONS.md"],
+  "reason": "Dialogue behavior correction within existing modes, not a new entry or capability.",
+  "compatibility": {"en": "Existing saves remain readable; resumed offline dialogue uses the corrected policy.", "zh": "旧存档仍可读取；续局采用修正后的离线对话策略。"}
+}

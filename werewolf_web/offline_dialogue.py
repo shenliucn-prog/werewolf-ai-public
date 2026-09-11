@@ -16,6 +16,24 @@ def contextual_choices(entries, seats, actor, locale):
                         "label": text, "topic": topic,
                         "speech": asdict(Speech(text=text, **fields))})
     reports = audit(entries)["reports"]
+    # A revealed role is public evidence, but the report remains attributed.
+    # Include dead claimants here; filtering all reports to alive seats loses
+    # exactly the information the table should revisit after a seer dies.
+    for row in reversed(entries):
+        ev = row["event"]
+        if (ev.get("type") != "flip" or type(ev.get("event_no")) is not int
+                or (ev.get("role") or ev.get("role_cn")) not in ("seer", "预言家", "Seer")):
+            continue
+        who = ev.get("seat")
+        for r in reports:
+            if r["actor"] != who or r["target"] not in seats:
+                continue
+            target, ref = r["target"], r["event_no"]
+            result = r["result"] if en else ("好人" if r["result"] == "good" else "狼人")
+            add(f"revealed:{ev['event_no']}:{ref}",
+                f"Record {ev['event_no']} reveals #{who} as Seer. In record {ref}, they called #{target} {result}. That report deserves review, not automatic certainty." if en else
+                f"记录{ev['event_no']}显示{who}号翻牌为预言家；其记录{ref}称{target}号是{result}。应重新考虑这份声明，但不能自动当作查验已证实。",
+                "revealed_report")
     latest = {}
     for report in reports:
         if report["actor"] in seats:
@@ -87,10 +105,13 @@ def shortlist(options):
     return selected
 
 
-def choose_reaction(options, own_speeches, style):
+def choose_reaction(options, own_speeches, style, table_speeches=()):
+    # Cross-speaker repetition is still repetition. Only public recent speech
+    # is consulted; the candidate text includes the report reference/target.
     fresh = [c for c in options if c.get("topic") and
-             not any(ev.get("text", "").endswith(c["label"]) for ev in own_speeches)]
-    priorities = {"receive_wolf": 5, "receive_good": 4, "accused": 3,
+             not any(ev.get("text", "").endswith(c["label"])
+                     for ev in [*own_speeches, *table_speeches])]
+    priorities = {"revealed_report": 6, "receive_wolf": 5, "receive_good": 4, "accused": 3,
                   "counterclaim": 2 + style.logic, "hear_target": 1 + style.aggression, "opening": 0}
     def score(c):
         social = style.loyalty if ":thanks:" in c["id"] else style.caution
