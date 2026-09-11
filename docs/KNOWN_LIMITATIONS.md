@@ -66,7 +66,8 @@ plus targeted selected-role and regression games. It verifies selected behavior
 and termination, not exhaustive legality, competitive balance, production
 security or compatibility with every external provider. See the dated
 [release audit](RELEASE_AUDIT.md) for a reusable verification checklist.
-# Dialogue quality / 对话质量
+
+## Dialogue quality / 对话质量
 
 Offline reactions avoid exact recent cross-speaker echoes and clarification
 replies state an existing position or admit insufficient evidence instead of
