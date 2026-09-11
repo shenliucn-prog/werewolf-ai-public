@@ -69,3 +69,22 @@ alone does not change repository protection settings.
 发布顺序：授权 → 核查编号 → 版本/双语文档/兼容说明 → 完整验收 → 审核合入 →
 对应提交打标签 → 草稿发布核对 → 正式发布。开发完成和合并不等于发布授权。
 本流程当前不自动打标签、不自动发布；检查脚本本身只读。
+
+## Automated candidate / 自动候选包
+
+After this workflow is merged, run **Verified release candidate** on master
+with an existing reviewed tag whose checkout contains the workflow's candidate
+script. Default `draft=false` is a rehearsal: verification and downloadable
+artifacts only. `draft=true` additionally creates a draft Release and provenance
+attestation. It never creates/moves a tag, overwrites an existing Release or
+publishes a draft. Publish manually only after reviewing the exact package.
+
+The gate runs the full Python/DOM suite, dependency audit, release checks, then
+builds and smoke-tests the actual archive. The checksum covers the delivered
+bytes. The attestation identifies this workflow run; the package manifest
+records the tagged source commit. Neither proves gameplay balance or real-model
+quality. Old tags without `scripts/release_candidate.py` are unsupported.
+
+合入后，从 master 手动选择已审核标签，默认只演练。显式选择 draft 才创建
+草稿与来源证明，正式发布仍需人工确认。不覆盖旧版、不移动标签。
+失败修复需新提交／新版本；保留旧下载，勿承诺未经验证的存档向后兼容。
