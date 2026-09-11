@@ -1,0 +1,6 @@
+{
+  "summary": {"en": "Add manually dispatched verification and draft-only release delivery.", "zh": "新增手动触发的发布验证与仅草稿交付流程。"},
+  "docs_impact": "docs", "docs": ["docs/RELEASING.md"],
+  "reason": "Maintainer delivery workflow; no gameplay changes or release publication.",
+  "compatibility": {"en": "Existing versions and saves unchanged; workflow never moves tags.", "zh": "现有版本与存档不变；工作流不移动标签。"}
+}
