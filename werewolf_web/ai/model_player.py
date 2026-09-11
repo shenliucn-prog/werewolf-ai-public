@@ -37,7 +37,9 @@ class ModelNPCAgent(StrategicNPCAgent):
         value = self.decide(task, {
             "text": {"type": "string", "maxLength": 1600},
             "claim": {"type": ["string", "null"], "enum": [None, *ROLE_META]},
-            "accuse": named, "defend": named, "question_to": named,
+            "accuse": named, "defend": named,
+            "question_to": {"type": ["string", "null"], "enum": [None]}
+                           if task == "brief answer to public question" else named,
         }, earlier_this_round=[{"name": n, "text": s.text} for n, s in today], **details)
         if value["accuse"] and value["accuse"] == value["defend"]:
             raise ModelTurnError("Conflicting speech metadata; no offline substitution.")
@@ -47,7 +49,10 @@ class ModelNPCAgent(StrategicNPCAgent):
         return self.speak([], task="brief public interruption", speaker=speaker, statement=speech.text)
 
     def table_reply(self, interrupter):
-        return self.speak([], task="brief answer to public question", asker=interrupter)
+        return self.speak([], task="brief answer to public question", asker=interrupter,
+                          reply_contract="Answer the asker's question using your lawful evidence, "
+                          "or explicitly decline/admit uncertainty. Do not replace the answer "
+                          "with a new question. Address public flips and distinguish claims from facts.")
 
     def save_memory(self):
         # Local heuristic growth is not evidence about model decision quality.

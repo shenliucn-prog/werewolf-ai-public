@@ -1,0 +1,112 @@
+name: Verified release candidate
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing reviewed tag matching VERSION (never created here)
+        required: true
+        type: string
+      draft:
+        description: Create a draft Release after verification (false = rehearsal only)
+        default: false
+        type: boolean
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      commit: ${{ steps.source.outputs.commit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check out only a reviewed ancestor tag
+        id: source
+        env:
+          TAG: ${{ inputs.tag }}
+        shell: bash
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]
+          COMMIT=$(git rev-parse --verify "refs/tags/$TAG^{commit}")
+          git merge-base --is-ancestor "$COMMIT" origin/master
+          git checkout --detach "$COMMIT"
+          echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: python -m pip install -r werewolf_web/requirements.txt pip-audit
+      - run: python -m pip_audit -r werewolf_web/requirements.txt --progress-spinner off
+      - run: python -m unittest discover -s tests -q
+        env:
+          LLM_ENABLED: 'false'
+          LLM_API_KEY: ''
+      - run: npm ci && npm test && npm run check
+      - run: python scripts/check_release.py
+      - run: git diff --check
+      - name: Build immutable candidate
+        env:
+          TAG: ${{ inputs.tag }}
+        run: python -m scripts.release_candidate --tag "$TAG" --output "$RUNNER_TEMP/package/werewolf-ai"
+      - name: Verify and smoke-test the delivered archive
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/package"
+          sha256sum -c werewolf-ai.tar.gz.sha256
+          mkdir extracted
+          tar -xzf werewolf-ai.tar.gz -C extracted
+          cd extracted
+          python -m pip install -r werewolf_web/requirements.txt
+          python scripts/check_release.py
+          python -m unittest tests.test_api_contract tests.test_offline_web -q
+        env:
+          LLM_ENABLED: 'false'
+          LLM_API_KEY: ''
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: verified-release
+          path: |
+            ${{ runner.temp }}/package/werewolf-ai.tar.gz
+            ${{ runner.temp }}/package/werewolf-ai.tar.gz.sha256
+            ${{ runner.temp }}/package/RELEASE_NOTES.md
+          if-no-files-found: error
+          retention-days: 7
+  draft:
+    needs: verify
+    if: inputs.draft
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317
+        with:
+          name: verified-release
+          path: package
+      - name: Reject a tag moved since verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+          VERIFIED_COMMIT: ${{ needs.verify.outputs.commit }}
+        run: test "$(gh api "repos/$GH_REPO/commits/$TAG" --jq .sha)" = "$VERIFIED_COMMIT"
+      - uses: actions/attest-build-provenance@9d57eef8c06cd9d6b433effeeb7a6a77b3ff94ad
+        with:
+          subject-path: package/werewolf-ai.tar.gz
+      - name: Create draft only; existing releases are never overwritten
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: gh release create "$TAG" --verify-tag --draft --title "$TAG" --notes-file package/RELEASE_NOTES.md package/werewolf-ai.tar.gz package/werewolf-ai.tar.gz.sha256
