@@ -2,8 +2,8 @@
 
 English | [简体中文](README.zh-CN.md)
 
-<!-- version: 0.1.0-dev -->
-Development version: **0.1.0-dev** (not a published release).
+<!-- version: 0.1.0 -->
+Version: **0.1.0** — experimental; see the [release](https://github.com/shenliucn-prog/werewolf-ai-public/releases/tag/v0.1.0).
 See [changes](CHANGELOG.md) and [release process](docs/RELEASING.md).
 
 A local single-player Werewolf game: you play one seat against 11 AI opponents.
