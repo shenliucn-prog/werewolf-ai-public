@@ -16,6 +16,9 @@ Existing jsdom tests remain fast UI contract tests, not browser E2E.
 
 CI adds macOS/Windows smoke tests to Linux verification. A green platform job
 is evidence for those tests, not certification of every adapter on that OS.
+The already-required `dependencies` check runs even after upstream failures and
+explicitly requires both new jobs to succeed; skipped jobs cannot silently
+bypass the new gates. This avoids requiring a separate branch-protection edit.
 Never attach real saves, credentials or private transcripts to CI artifacts.
 
 安装运行与测试依赖后，可测量分支覆盖率；暂不设虚假的全覆盖指标。

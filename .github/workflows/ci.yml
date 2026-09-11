@@ -48,8 +48,15 @@ jobs:
       - run: git diff --check
 
   dependencies:
+    needs: [platform-smoke, browser-and-coverage]
+    if: always()
     runs-on: ubuntu-latest
     steps:
+      - name: Enforce new verification jobs through the existing required check
+        env:
+          PLATFORM_RESULT: ${{ needs.platform-smoke.result }}
+          BROWSER_RESULT: ${{ needs.browser-and-coverage.result }}
+        run: test "$PLATFORM_RESULT" = success && test "$BROWSER_RESULT" = success
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
