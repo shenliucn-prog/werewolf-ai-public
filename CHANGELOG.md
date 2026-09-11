@@ -4,6 +4,33 @@
 
 No additional changes yet. / 暂无后续变更。
 
+## 0.2.0
+
+- Offline terminal/Web discussion now starts with contextual responses and
+  neutral listening; the full menu remains available under Other responses.
+- 离线终端/网页默认显示情境回应与中立过麦；完整菜单保留在“其他说法”。
+- Public report/counterclaim reactions depend on personality, without reading
+  hidden roles. Natural authored report lines remain auditable; legacy report
+  lines remain supported. Existing saves regenerate menus on resume.
+- 公开查验/对跳回应受人格影响，不读隐藏身份；自然的固定报告句仍可对账，
+  兼容旧标准句。旧存档恢复后重新生成菜单，选项编号可能变化。
+- Fixed offline onboarding claiming free-language debate and short Chinese
+  listening text being treated as inactivity.
+- 修复离线开场误称自然语言辩论，以及中文“先听听”被当作划水。
+  随机人格和任意语言理解仍未实现。
+
+Compatibility: no save schema migration. Resumed menus are regenerated and
+option numbers may differ; existing mode/credential validation is unchanged.
+Older versions do not interpret the new natural report grammar as audit data.
+兼容性：无存档格式迁移；恢复时重新生成菜单，编号可能改变，模式/凭据校验不变。
+旧版程序不会把新增的自然报告格式解析成对账数据。
+
+Limits: authored offline dialogue, fixed personalities, no arbitrary prose
+understanding, no verified balance gains. No real API/Agent full game was run
+for this release. Offline remains explicit and excluded from campaign scores.
+限制：离线仍为人工编写的对话与固定人格，不理解任意文本，不宣称平衡收益。
+本次发布未跑真实 API/Agent 整局；离线需主动选择且不计正式闯关成绩。
+
 ## 0.1.0
 
 First numbered experimental release: local single-player campaigns and free

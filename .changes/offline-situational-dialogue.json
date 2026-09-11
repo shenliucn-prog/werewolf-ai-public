@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Add contextual offline replies, personality-sensitive reactions and neutral listening across terminal and Web.", "zh": "离线终端和网页加入情境回应、人格化接话及中立过麦。"},
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md", "docs/OFFLINE_GAME.md", "docs/CHECK_CLAIMS.md"],
+  "reason": "Explain the new interaction and exact natural-report grammar without claiming free-language understanding.",
+  "compatibility": {"en": "No save schema change. Old saves derive fresh menus; option positions may change. Old report grammar is retained.", "zh": "无存档格式变更。旧存档恢复生成新菜单，编号可能变化；兼容旧查验声明格式。"}
+}

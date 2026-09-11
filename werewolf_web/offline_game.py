@@ -15,7 +15,8 @@ from .offline_cast import BY_ID, CHARACTERS, cast_settings
 from .i18n import cast, role_name
 from .game.engine import BOARD_MAP, ROLE_META
 from . import checkpoint
-from .check_claims import report_line, audit, finding_text
+from .check_claims import audit, finding_text
+from .offline_dialogue import contextual_choices, shortlist, choose_reaction
 
 
 def words(locale, zh, en):
@@ -36,7 +37,7 @@ def speech_choices(session, actor, reply=False):
         choices.append({"id": key, "group": group.split(" / ")[lang == "en"], "label": text,
                         "speech": asdict(Speech(text=text, **fields))})
 
-    add("wait", "回应 / Respond", words(lang, "目前没有足够的新证据，我先保留判断。", "I have no sufficient new evidence; I reserve judgment."))
+    add("wait", "回应 / Respond", words(lang, "我先听听，暂时不站队。", "I will listen for now, without taking sides."))
     add("admit", "回应 / Respond", words(lang, "我承认之前判断不够扎实，现在保留意见。", "I admit my earlier judgment was not well supported; I am reserving judgment."))
     add("refuse", "回应 / Respond", words(lang, "这次我选择不解释，但这本身不能证明身份。", "I decline to explain this time; that alone does not establish my role."))
     if not reply:
@@ -55,8 +56,8 @@ def speech_choices(session, actor, reply=False):
                 for result in ("good", "wolf"):
                     label = words(lang, "好人" if result == "good" else "狼人", result)
                     add(f"report:{seat.pos}:{result}", "报告 / Report", words(lang,
-                        f"我声明自己是预言家；第{e.night_count}夜查验{target}为{label}。这是我的报告，尚未公开验证。",
-                        f"I claim seer; my night {e.night_count} report on {target} is {label}. This report is not publicly verified.") + "\n" + report_line(e.night_count, seat.pos, result, lang),
+                        f"我是预言家，第{e.night_count}夜验{seat.pos}号，{label}。",
+                        f"I claim seer: night {e.night_count}, seat {seat.pos} is {result}."),
                         claim="seer", **({"defend": seat.name} if result == "good" else {"accuse": seat.name}))
     alive = {s.pos: s for s in e.alive_seats()}
     for i, finding in enumerate(audit(session.public_record.entries)["findings"]):
@@ -82,15 +83,19 @@ def speech_choices(session, actor, reply=False):
             # not automatically accuse its author of being a wolf.
             fields = {k: event.get(k) for k in ("accuse", "defend")} if stance == "agree" else {}
             add(f"cite:{number}:{stance}", "引用 / Cite", text, protected_facts=(quote,), **fields)
-    return choices
+    contextual = contextual_choices(session.public_record.entries,
+                                    {s.pos: s.name for s in e.alive_seats()}, actor.pos, lang)
+    return contextual + choices
 
 
 def action_choices(session, kind, data):
     lang = session.engine.locale
     if kind in ("speech", "table_reply", "table_answer"):
         key = "answer" if kind == "table_answer" else "text"
-        return [{**c, "payload": {key: c["label"], "offline_speech": c["speech"]}}
-                for c in speech_choices(session, session.engine.player_seat(), kind != "speech")]
+        choices = speech_choices(session, session.engine.player_seat(), kind != "speech")
+        suggested = {c["id"] for c in shortlist(choices)}
+        return [{**c, "suggested": c["id"] in suggested,
+                 "payload": {key: c["label"], "offline_speech": c["speech"]}} for c in choices]
     def option(key, label, payload):
         return {"id": key, "group": words(lang, "行动", "Action"), "label": label, "payload": payload}
     if kind == "ready":
@@ -123,7 +128,10 @@ class ChoiceAgent(StrategicNPCAgent):
 
     def observe_speech(self, day, who, speech, event_no=None):
         repeated = any(d == day and w == who and text == speech.text for d, w, text in self.brain.speeches)
+        was_silent = who in self.brain.silent
         super().observe_speech(day, who, speech, event_no)
+        if not was_silent and speech.text == words(self.engine.locale, "我先听听，暂时不站队。", "I will listen for now, without taking sides."):
+            self.brain.silent.discard(who)
         if who == self.name or repeated:
             return
         # Exact authored actions only, not heuristic natural-language parsing.
@@ -167,6 +175,8 @@ class ChoiceAgent(StrategicNPCAgent):
         # Avoid repeating the same report in the same day/election sequence.
         if chosen and any(ev["text"].endswith(chosen["label"]) for ev in own[-2:]):
             chosen = None
+        if chosen is None:
+            chosen = choose_reaction([c for c in options if c.get("topic") != "opening"], own, self.style)
         if chosen is None and not self.is_wolf:
             chosen = next((c for c in options if c["id"].startswith("audit:")
                            and not any(ev["text"].endswith(c["label"]) for ev in own)), None)
@@ -206,19 +216,31 @@ class ChoiceAgent(StrategicNPCAgent):
         speech.text = prefix + speech.text
         # Occasional, stable phrasing; no catchphrase on every line.
         if not own:
-            speech.text = self.character.phrase[self.engine.locale == "en"] + " " + speech.text
+            speech.text = self.character.phrase[self.engine.locale == "en"] + "\n" + speech.text
         return speech
 
     def table_reply(self, interrupter):
         own = [ev for ev in self.session._events if ev.get("type") == "speech" and ev.get("name") == self.name]
+        response = choose_reaction(speech_choices(self.session, self.seat, True), own, self.style)
+        if response:
+            return Speech(**deepcopy(response["speech"]))
         if own:
             ev = own[-1]
-            return Speech(text=words(self.engine.locale, f"回应{interrupter}：我的立场见记录{ev['event_no']}。这仍是判断或声明，不是新增查验；我没有更多公开证据。",
-                f"To {interrupter}: my position is in record {ev['event_no']}. It remains a judgment or claim, not a new check; I have no further public evidence."))
+            quote = ev["text"]
+            if len(quote) <= 300:
+                return Speech(text=words(self.engine.locale, f"{interrupter}，我之前说的是「{quote}」。我没有额外的公开依据，你可以保留判断。",
+                    f"{interrupter}, I previously said: “{quote}”. I have no additional public evidence; you can reserve judgment."),
+                    protected_facts=(quote,))
+            return Speech(text=words(self.engine.locale, f"{interrupter}，我的完整说法在记录{ev['event_no']}。我暂时没有额外依据。",
+                                     f"{interrupter}, my full statement is in record {ev['event_no']}. I have no additional basis yet."))
         return Speech(text=words(self.engine.locale, "我暂时没有公开证据，不把猜测说成事实。", "I have no public evidence yet; my suspicion is not fact."))
 
     def table_interject(self, speaker, speech):
-        return Speech(text=words(self.engine.locale, f"我想提醒{speaker}：身份声明和已经证实的事实要分开。", f"A reminder to {speaker}: distinguish role claims from established facts."))
+        if speech.accuse == self.name:
+            return Speech(text=words(self.engine.locale, f"{speaker}，你怀疑我，具体依据是哪句话或哪一票？",
+                                     f"{speaker}, which statement or ballot supports your suspicion of me?"))
+        return Speech(text=words(self.engine.locale, f"{speaker}，这个判断我先记下，还想听不同意见。",
+                                 f"{speaker}, I have heard your position; I want to hear alternatives."))
 
 
 class OfflineSession(GameSession):
@@ -381,9 +403,10 @@ def public_event(event, spectator):
 
 async def play(session, *, read=input, write=print, automatic=False):
     from .chat_game import _render
+    locale = session.engine.locale
     async def answer():
         value = (await asyncio.to_thread(read, "> ")).strip()
-        if value.startswith("?") or value in ("/history", "/seats", "座次", "公开记录"):
+        if value.startswith("?") or value in ("/history", "/seats", "/checks", "查验声明", "查验对账", "座次", "公开记录"):
             write(session.answer_question(value[1:] if value.startswith("?") else value))
             return ""
         return value if len(value) <= 16 else ""
@@ -408,8 +431,24 @@ async def play(session, *, read=input, write=print, automatic=False):
             else:
                 write(event["data"].get("desc", ""))
                 groups = list(dict.fromkeys(c["group"] for c in options))
+                suggested = [c for c in options if c.get("suggested")]
+                browse = False
                 while True:
                     current = options
+                    if suggested and not browse:
+                        write(words(locale, "接着桌上的话（也可以先听听）：", "Respond to this discussion, or listen:"))
+                        write("\n".join(f"{i+1}. {c['label']}" for i, c in enumerate(suggested)))
+                        write(words(locale, "0. 其他说法", "0. Other responses"))
+                        value = await answer()
+                        if value == "q":
+                            return 0
+                        if value == "0":
+                            browse = True
+                            continue
+                        if value.isascii() and value.isdigit() and 1 <= int(value) <= len(suggested):
+                            selected = suggested[int(value)-1]
+                            break
+                        continue
                     if len(groups) > 1:
                         write("\n".join(f"{i+1}. {g}" for i, g in enumerate(groups)))
                         value = await answer()
@@ -419,9 +458,13 @@ async def play(session, *, read=input, write=print, automatic=False):
                             continue
                         current = [o for o in options if o["group"] == groups[int(value)-1]]
                     write("\n".join(f"{i+1}. {c['label']}" for i, c in enumerate(current)))
+                    write(words(locale, "0. 返回", "0. Back"))
                     value = await answer()
                     if value == "q":
                         return 0
+                    if value == "0":
+                        browse = False
+                        continue
                     if value.isascii() and value.isdigit() and 1 <= int(value) <= len(current):
                         selected = current[int(value)-1]
                         break

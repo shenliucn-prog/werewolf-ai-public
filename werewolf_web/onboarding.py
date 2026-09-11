@@ -6,7 +6,7 @@ from .game.engine import ROLE_META
 from .i18n import board_display, board_role_name, role_desc, witch_rule_text
 
 
-def introduction(engine, conjecture=False):
+def introduction(engine, conjecture=False, *, offline_choices=False):
     en = engine.locale == "en"
     board = board_display(engine.locale, engine.board)
     roles = Counter(engine.board["roles"])
@@ -28,7 +28,11 @@ def introduction(engine, conjecture=False):
         label = board_role_name(engine.locale, engine.board, key, ROLE_META[key]["cn"])
         desc = witch_rule_text(engine.locale, engine.board) if key == "witch" else role_desc(engine.locale, key, ROLE_META[key])
         lines.append(f"{label}: {desc}")
-    lines.append(("Conjecture ON: private beliefs and a separate public debate table; public table history is retained." if conjecture else
+    if offline_choices:
+        lines.append("Offline discussion: choose a contextual response, listen, or open other responses. Free text is not interpreted; personalities are fixed." if en else
+                     "离线讨论：可接话、先听听，或展开其他说法。不解析任意自由文本；本模式目前使用固定人格。")
+    else:
+        lines.append(("Conjecture ON: private beliefs and a separate public debate table; public table history is retained." if conjecture else
                   "Conjecture OFF: debate in natural language.") if en else
                  ("猜想模式已开：私有判断与公开辩论两张表分开，保留公开表历史。" if conjecture else "猜想模式已关：使用自然语言辩论。"))
     lines.append("Any rules questions? Ask the Host; the first night waits for your Ready confirmation." if en else

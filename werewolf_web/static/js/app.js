@@ -390,18 +390,30 @@ function showAction(d) {
   if (Array.isArray(d.choices)) {
     const hint = document.createElement("p");
     hint.textContent = kind === "ready" ? tr("先阅读本局规则，有疑问可问主持人。确认后才进入第一夜。")
-      : (uiLocale === "en" ? "Choose your action" : "选择你的行动");
+      : (uiLocale === "en" ? "Respond, or listen for now" : "接着桌上的话，也可以先听听");
     panelEl.append(hint);
-    let group = null;
-    for (const choice of d.choices) {
-      if (group !== choice.group) {
-        group = choice.group;
-        const title = document.createElement("h3"); title.textContent = group; panelEl.append(title);
+    const suggested = d.choices.filter(c => c.suggested);
+    const renderChoices = (choices, parent) => {
+      let group = null;
+      for (const choice of choices) {
+        if (group !== choice.group) {
+          group = choice.group;
+          const title = document.createElement("h3"); title.textContent = group; parent.append(title);
+        }
+        const button = document.createElement("button");
+        button.textContent = choice.label;
+        button.onclick = () => submitAction({choice_id: choice.id});
+        parent.append(button);
       }
-      const button = document.createElement("button");
-      button.textContent = choice.label;
-      button.onclick = () => submitAction({choice_id: choice.id});
-      panelEl.append(button);
+    };
+    renderChoices(suggested.length ? suggested : d.choices, panelEl);
+    if (suggested.length) {
+      const more = document.createElement("details");
+      const summary = document.createElement("summary");
+      summary.textContent = uiLocale === "en" ? "Other responses" : "其他说法";
+      more.append(summary);
+      renderChoices(d.choices.filter(c => !c.suggested), more);
+      panelEl.append(more);
     }
   } else if (kind === "model_retry") {
     const hint = document.createElement("p"); hint.textContent = tr("模型连接暂停，不会切换离线玩家。");

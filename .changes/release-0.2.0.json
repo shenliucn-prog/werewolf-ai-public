@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Prepare experimental v0.2.0 with situational offline dialogue.", "zh": "发布情境离线讨论实验版本 v0.2.0。"},
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md", "CHANGELOG.md"],
+  "reason": "Match the authorized release number, documentation and compatibility notes.",
+  "compatibility": {"en": "Menus are derived after resume; old readers do not audit the new authored report grammar.", "zh": "恢复时派生菜单；旧版不对新增固定报告句式进行对账。"}
+}

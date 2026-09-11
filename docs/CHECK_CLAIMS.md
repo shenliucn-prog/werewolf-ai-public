@@ -20,7 +20,11 @@ Hidden wolves read good under the current rules. Agreement with a flip does
 not establish a real check; disagreement does not establish the speaker's
 faction. No suspicion score is automatically changed by this aid.
 
-Offline report options append the format automatically. Players can select
+Offline report options now use an exact authored natural form instead:
+`I claim seer: night 1, seat 3 is good.` or
+`我是预言家，第1夜验3号，好人。`. These two forms are also parsed strictly;
+this does not enable arbitrary language interpretation. Legacy trailing report
+blocks still work. Players can select
 public challenge options; good-side NPCs can ask about a recorded discrepancy.
 Models receive a bounded optional audit and choose their own response.
 The public-record query `/checks` (or `查验声明` / `查验对账`) displays it.
@@ -33,6 +37,8 @@ Automated tests cover this protocol, not real-model strength or game balance.
 
 ## 中文说明
 
+离线现在使用一句自然的固定句“我是预言家，第1夜验3号，好人。”，
+不再重复附加机器格式；对账仍保留逐夜结果。旧格式继续支持，不泛化解析任意语言。
 在公开发言末尾单独加一行上面的标准声明，表示**本人声称**在哪一夜验了谁、
 结果为何；也可以故意假报。多条声明须连续放在末尾，不用该格式引用别人。
 离线报告选项自动附加，模型收到同一说明，但不会强制修改模型的决定。
