@@ -38,7 +38,8 @@ class ModelNPCAgent(StrategicNPCAgent):
             "text": {"type": "string", "maxLength": 1600},
             "claim": {"type": ["string", "null"], "enum": [None, *ROLE_META]},
             "accuse": named, "defend": named,
-            "question_to": {"type": "null"} if task == "brief answer to public question" else named,
+            "question_to": {"type": ["string", "null"], "enum": [None]}
+                           if task == "brief answer to public question" else named,
         }, earlier_this_round=[{"name": n, "text": s.text} for n, s in today], **details)
         if value["accuse"] and value["accuse"] == value["defend"]:
             raise ModelTurnError("Conflicting speech metadata; no offline substitution.")

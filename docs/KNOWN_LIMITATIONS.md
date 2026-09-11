@@ -73,6 +73,9 @@ replies state an existing position or admit insufficient evidence instead of
 opening another question. This is bounded template deduplication, not semantic
 understanding. Model replies receive an answer/decline contract; prompt tests
 do not prove real-model compliance or playing strength.
+Offline contextual responses retain explicit reports by publicly flipped Seers,
+including dead speakers. These remain attributed reports, not certified checks.
 
 离线回应避免近期跨人物的模板重复，澄清回答重申立场或承认依据不足，
 不另起追问。这不是语义理解，也不代表模型实测质量或玩法平衡已获证明。
+已翻牌预言家即便死亡，其标准查验声明仍可供情境回应引用，不自动认证查验。
