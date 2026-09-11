@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Prepare the first experimental v0.1.0 release.", "zh": "准备首个实验版本 v0.1.0。"},
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md", "CHANGELOG.md"],
+  "reason": "Align release number, bilingual notes and validation limitations.",
+  "compatibility": {"en": "Metadata-only release preparation; existing save validation is unchanged.", "zh": "仅调整发布元数据，既有存档校验不变。"}
+}

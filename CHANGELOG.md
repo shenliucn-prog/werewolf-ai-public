@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+No additional changes yet. / 暂无后续变更。
+
+## 0.1.0
+
+First numbered experimental release: local single-player campaigns and free
+games, model API/user Agent connections, explicit offline choice play, public
+spectating, recovery and bilingual guidance. No hosted service is included.
+首个编号实验版本：本机单人闯关与自由对局、模型 API/用户 Agent 接入、
+显式离线选项玩法、公开旁观、存档恢复及双语引导；不包含托管服务。
+
 - Added a public-only, source-linked audit of explicitly formatted Seer reports
   for offline menus and model context. Ambiguous prose remains unaudited.
 - 新增离线选项与模型上下文共用的查验声明对账，仅核对标准格式的公开声明；
@@ -31,9 +41,9 @@
   varied fabricated checks, support and attributed reconsideration.
 - 离线与模型玩家共用阵营推断、公开立场辅助；模型仍自主决策。离线狼人新增
   连贯伪装、多样假查验、保人与有来源的转向解释。
-- Introduce version and bilingual documentation-impact checks. No numbered
-  release is created by this change; `0.1.0-dev` identifies development only.
-- 建立版本与双语文档影响检查；本次不创建正式发布，`0.1.0-dev` 仅标记开发状态。
+- Introduce version and bilingual documentation-impact checks, now included
+  in this first numbered release.
+- 建立版本与双语文档影响检查，并纳入首个编号发布。
 
 Compatibility / 兼容性: These derived aids add no checkpoint schema fields.
 Existing checkpoint validation still applies. / 派生辅助信息不新增存档字段，原有校验仍有效。
@@ -41,3 +51,11 @@ Existing checkpoint validation still applies. / 派生辅助信息不新增存�
 Limits / 限制: Heuristics are experimental, not calibrated probabilities or a
 balance guarantee. No real-model improvement has been established.
 启发式仍属实验，并非校准概率或平衡保证；尚无真实模型收益验证。
+
+Release validation uses automated entry/recovery tests and offline fixtures.
+No real API/Agent full game was run for this release. Voice and visual gameplay
+are not implemented. Existing validation can reject incompatible or damaged
+saves; backward reading by older versions is not promised.
+本次发布采用自动化入口/恢复测试及离线虚构样例，未执行真实 API/Agent 完整
+对局验收。语音和视觉玩法未实现；存档仍接受原有兼容与损坏校验，不保证旧版
+程序可读取新版存档。离线模拟不计正式闯关成绩。
