@@ -37,6 +37,11 @@ tests and browser DOM checks after changing shared contracts.
 
 ## Definition of done: code, documentation and version history
 
+Before opening or merging a PR, set its responsible assignee, type and area
+labels, and an agreed version milestone when applicable. Do not invent an
+issue, reviewer, target release or approval merely to fill fields. Explain
+unscheduled/standalone work and actual review limits. See CONTRIBUTING.md.
+
 Every change must include a NEW `.changes/<unique-name>.json` record with
 English/Chinese summary and save/config compatibility, docs_impact
 (`none`, `docs`, or `readme`), changed document paths and a reason. See

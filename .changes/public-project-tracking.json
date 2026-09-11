@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Document honest PR ownership, classification, milestones and review tracking.", "zh": "明确 PR 负责人、分类、里程碑与真实审查记录规范。"},
+  "docs_impact": "docs",
+  "docs": ["CONTRIBUTING.md", "AGENTS.md", ".github/PULL_REQUEST_TEMPLATE.md"],
+  "reason": "Maintainer workflow only; gameplay and advertised release capabilities are unchanged.",
+  "compatibility": {"en": "No runtime, save or configuration changes.", "zh": "无运行逻辑、存档或配置变更。"}
+}
