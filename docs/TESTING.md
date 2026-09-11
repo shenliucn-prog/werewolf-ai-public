@@ -6,9 +6,12 @@ Run `python -m coverage run -m unittest discover -s tests -q`, then
 100% completeness claim or a new blocking threshold.
 
 For real Chromium + local HTTP/SSE: `python -m playwright install chromium`,
-then `python tests/browser/player_entry.py`. This exercises offline spectator
+then `python tests/browser/player_entry.py`. This exercises offline player and spectator
 creation, the ready gate, page reload/continuation and settlement. Persistence
-is disposable. It does not prove campaign, real API/Agent or all browser flows.
+is disposable. A further campaign scenario uses a synthetic Chat Completions
+HTTP fixture, retries failed teaching, resumes and checks exactly-once scoring.
+The test fixture is not a real model and exposes no routes in the product app.
+These tests do not prove real API/Agent quality or all browser flows.
 Existing jsdom tests remain fast UI contract tests, not browser E2E.
 
 CI adds macOS/Windows smoke tests to Linux verification. A green platform job

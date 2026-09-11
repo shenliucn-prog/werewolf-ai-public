@@ -14,6 +14,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       matrix:
         python-version: ['3.10', '3.12', '3.13']
@@ -88,3 +89,10 @@ jobs:
           LLM_ENABLED: 'false'
           LLM_API_KEY: ''
       - run: python -m coverage report
+      - run: python -m coverage json -o output/coverage.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: branch-coverage
+          path: output/coverage.json
+          retention-days: 7
+          if-no-files-found: error
