@@ -39,9 +39,12 @@ it is not a paced replay viewer.
 
 ## Play with options
 
-At each request, choose a category, then a numbered option. Categories include
+During discussion, choose directly from up to three contextual responses and
+neutral listening. “Other responses” opens the complete category menu; 0 returns.
+Night skills and ballots remain explicit choices. Categories include
 role claims, provisional suspicion/support, questions, reports, responses and
-citations of recent public speeches/events. Report options are available to
+citations of recent public speeches/events. Suggestions use public records,
+not hidden roles or a computed correct answer. Report options are available to
 bluffing players too: selecting a report does not certify that it is true.
 Night skills, sheriff candidacy/withdrawal and ballots use the engine's legal
 candidate lists. Witch menus respect potion availability and dual-use rules.
@@ -49,6 +52,12 @@ candidate lists. Witch menus respect potion availability and dual-use rules.
 Use `?` followed by a rules question, `/seats`, or `/history` at a menu without
 spending the action. Ordinary free text is not interpreted as debate. The
 host retains ordered speeches and bounded interruptions/clarification windows.
+
+NPCs react to reports about themselves, competing Seer claims and direct
+suspicions before falling back to general debate. Cautious characters may
+probe a good report while sociable characters acknowledge it without certifying
+the speaker. Each NPC avoids repeating the same contextual sentence already
+spoken. This is an authored response policy, not general reasoning about prose.
 
 NPCs consume the structured claim/accusation/defense fields rather than trying
 to understand arbitrary text. Admissions and refusals have small personality-
@@ -103,7 +112,10 @@ python -m werewolf_web.offline_game --board classic --spectate
 ```
 
 - 12 个固定人格，身份另行分配；可替代其中一个，也可公共视角旁观。
-- 使用「类别 → 编号」发言，不需要输入自然语言。查验报告选项也允许伪装者使用。
+- 默认直接选情境回应或“先听听”；“其他说法”展开类别菜单，0 返回。
+- 收到金水、被查杀、多人对跳会产生不同接话。人格影响回应，不认证身份；
+  同一 NPC 避免反复说同一句情境台词。仍是人工编写的策略，不理解任意语言。
+- 查验报告改用一句自然的固定句，不重复朗读机器格式；伪装者也可选假报告。
 - 发牌、夜间技能、上警退警、投票、死亡技能和胜负共用现有引擎。
 - 输入 `q` 保存退出，按启动时给出的 `--resume` 命令继续；不能中途换视角。
 - `?规则问题`、`/seats`、`/history` 不消耗行动。

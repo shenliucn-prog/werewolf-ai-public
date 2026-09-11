@@ -695,7 +695,7 @@ class GameSession:
         from .onboarding import introduction
         e.phase = "onboarding"
         self.emit({"type": "narration", "phase": "onboarding",
-                   "text": introduction(e, self.conjecture)})
+                   "text": introduction(e, self.conjecture, offline_choices=getattr(self, "offline_choice_mode", False))})
         await self.ask_player("ready", {})
         self._step = "witch_rule"
 

@@ -1,8 +1,11 @@
 # Playing and developing Werewolf AI
 
 When the user asks to play, read `docs/AGENT_PLAY.md`. Work in their local fork.
-Before each new game, ask for the board (or offer confirmed previous settings),
-then role/personality/conjecture choices. Never infer these from "next game".
+Before each new game, confirm interface (Agent conversation/Web), driver
+(model API/user Agent/explicit offline) and campaign/free play, then the board,
+participation, role and supported personality/conjecture choices. Never infer
+these from "next game". Offline choice play currently has fixed personalities
+only and no conjecture tables; do not offer random personalities for that mode.
 Normal play is provider-neutral: API/local model service or a configured Agent
 adapter (Codex is optional). See docs/MODEL_CONNECTIONS.md. All interfaces use
 model decisions, not offline rules or legacy rephrasing. Verify preflight before dealing.

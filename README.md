@@ -2,8 +2,8 @@
 
 English | [简体中文](README.zh-CN.md)
 
-<!-- version: 0.1.0 -->
-Version: **0.1.0** — experimental; see the [release](https://github.com/shenliucn-prog/werewolf-ai-public/releases/tag/v0.1.0).
+<!-- version: 0.2.0 -->
+Version: **0.2.0** — experimental; see the [release](https://github.com/shenliucn-prog/werewolf-ai-public/releases/tag/v0.2.0).
 See [changes](CHANGELOG.md) and [release process](docs/RELEASING.md).
 
 A local single-player Werewolf game: you play one seat against 11 AI opponents.
@@ -17,6 +17,11 @@ command execution and a persistent interactive process. Relaying the game does
 universal Agent plugin or separate native app yet.
 
 ## Choose a mode
+
+In this checkout, offline discussion offers a few contextual replies plus
+“listen” first; “Other responses” retains the full menu. NPCs can respond to
+reports about themselves and competing Seer claims. No model is used, arbitrary
+free text is not understood, and the offline cast still has fixed personalities.
 
 Offline and model players share an [explicit check-claim audit](docs/CHECK_CLAIMS.md):
 it links contradictory Seer reports to public records, without certifying identities.

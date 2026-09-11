@@ -13,6 +13,12 @@ The recommended player experience is conversation with your own Agent. The playe
 
 Before each new game, offer board selection and confirm role, personality and
 conjecture settings. "Next game" alone does not authorize reusing last settings.
+Before board selection, confirm interface, driver and campaign/free play.
+For explicit offline choice play use `offline_game`, not the legacy rephrasing
+adapter. Its cast is fixed (no random personality switch); identity can be
+random. Relay contextual replies directly, with Other responses available.
+An unambiguous user instruction may map to an existing option; do not substitute
+a different statement or claim that offline NPCs understand arbitrary prose.
 Display the backend/model/effort and call limit. A model failure pauses the live game for explicit retry/stop;
 do not invent a continuation. No cross-game model learning is implemented. Disk recovery uses `--resume GAME_ID`.
 
@@ -50,6 +56,10 @@ The terminal parser recognizes a limited action vocabulary; the Agent supplies t
 目前的 `chat_game` 是和网页共用规则与公开记录的终端桥接入口。有本地命令执行能力、能持续保留交互进程的 Agent 可以转接它：按 README 安装并配置模型连接后，运行 `python -u -m werewolf_web.chat_game --lang zh-CN`，跨对话轮次保留同一个输入会话。宿主工具需要时使用 PTY。
 
 每次新局先让玩家选板子，再确认身份、人格和猜想设置；“下一局”不等于沿用旧设置。
+在选板子之前先确认入口、驱动及闯关/自由对局。离线选项玩法走 `offline_game`，
+人物人格目前固定，身份可以随机；不要提供随机人格或猜想表这些不支持的选项。
+直接转述情境回应，保留“其他说法”；用户明确的意图可映射到现有选项，
+但不得改变意思，也不能声称离线 NPC 理解任意自由文本。
 默认通过 API 或 Agent 适配器进行 LLM 决策，发身份前必须通过真实模型预检，并展示模型、推理强度和调用上限。
 `--offline` 仅用于玩家明确选择的规则测试，`--backend legacy` 仅润色本地决策，不能冒充模型玩家。
 模型玩家猜想表尚未接入，不能静默替换为旧策略。模型失败暂停等待重试或结束，不编造续局；暂无模型跨局成长。

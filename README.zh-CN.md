@@ -2,11 +2,14 @@
 
 [English](README.md) | 简体中文
 
-<!-- version: 0.1.0 -->
+<!-- version: 0.2.0 -->
 
 离线与模型玩家共用[查验声明对账](docs/CHECK_CLAIMS.md)：将预言家声明的矛盾
 关联到公开记录，不认证任何人的身份；自由文本不会被自动判定为查验声明。
-当前版本：**0.1.0**（实验版本），参见[发布页](https://github.com/shenliucn-prog/werewolf-ai-public/releases/tag/v0.1.0)。
+当前版本：**0.2.0**（实验版本），参见[发布页](https://github.com/shenliucn-prog/werewolf-ai-public/releases/tag/v0.2.0)。
+本版离线讨论默认呈现几句情境回应与“先听听”，“其他说法”保留完整菜单。
+NPC 会回应涉及自己的查验声明与预言家对跳。不调用模型、不理解任意自由文本；
+离线人物仍是固定人格，尚不支持随机人格。
 参见[更新日志](CHANGELOG.md)与[版本发布流程](docs/RELEASING.md)。
 
 当前开发版加入两种模式共用的实验性阵营推断、公开立场辅助。离线狼人可维持

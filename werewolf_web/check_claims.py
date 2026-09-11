@@ -8,6 +8,8 @@ import re
 
 EN = re.compile(r"Seer report: night ([1-9][0-9]{0,3}), seat ([1-9][0-9]{0,3}), (good|wolf)\.", re.I)
 ZH = re.compile(r"预言家查验声明：第([1-9][0-9]{0,3})夜，([1-9][0-9]{0,3})号，(好人|狼人)。")
+NATURAL_ZH = re.compile(r"我是预言家，第([1-9][0-9]{0,3})夜验([1-9][0-9]{0,3})号，(好人|狼人)。")
+NATURAL_EN = re.compile(r"I claim seer: night ([1-9][0-9]{0,3}), seat ([1-9][0-9]{0,3}) is (good|wolf)\.", re.I)
 
 
 def report_line(night, target, result, locale):
@@ -24,7 +26,7 @@ def parse_reports(text):
     # quotation, code fence or paraphrase embedded in surrounding prose.
     for line in reversed(text.strip().splitlines()):
         line = line.strip()
-        match = EN.fullmatch(line) or ZH.fullmatch(line)
+        match = EN.fullmatch(line) or ZH.fullmatch(line) or NATURAL_EN.fullmatch(line) or NATURAL_ZH.fullmatch(line)
         if not match:
             break
         night, target, result = match.groups()
