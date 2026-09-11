@@ -277,7 +277,7 @@ async def _repl(session: GameSession) -> int:
         while True:
             raw = await asyncio.to_thread(input, _request_prompt(kind, data, locale))
             record_command = re.fullmatch(r"/history|history|公开记录|历史|(?:第\d+天)?(?:发言记录|完整发言|票型|投票记录)|(?:上一轮|最近)(?:的)?票型|(?:day \d+ )?(?:votes|ballots|speeches)|(?:last|latest) (?:votes|ballots)", raw.strip().casefold())
-            if raw.startswith("?") or raw.strip().casefold() in ("/seats", "seats", "座次", "座次表") or record_command:
+            if raw.startswith("?") or raw.strip().casefold() in ("/seats", "seats", "座次", "座次表", "/checks", "check claims", "查验声明", "查验对账") or record_command:
                 print("🎙️ " + session.answer_question(raw[1:] if raw.startswith("?") else raw))
                 continue
             if raw.strip().casefold() in ("/teaching", "教学"):

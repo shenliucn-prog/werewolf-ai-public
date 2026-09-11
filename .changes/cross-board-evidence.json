@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Validate three boards against two inference policies and fix localized public-seer evidence retention.", "zh": "以三种板子、两种推断策略交叉验证，并修复本地化翻牌身份导致的预言家发言保留遗漏。"},
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md", "docs/JOINT_BELIEF_PROTOTYPE.md", "CHANGELOG.md"],
+  "reason": "Player-visible evidence retention changes; document precise limits of the cross-board audit.",
+  "compatibility": {"en": "Public flip events add optional stable role/name fields. Old snapshots using English or Chinese Seer labels remain readable; no private role lookup is used.", "zh": "公开翻牌事件补充可选的稳定角色和姓名字段；兼容旧档中英文预言家标签，不读取未公开身份。"}
+}

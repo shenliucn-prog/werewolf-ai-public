@@ -98,6 +98,8 @@ class BeliefState:
 
     @classmethod
     def from_brain(cls, brain: Any, candidates: list[int]) -> "BeliefState":
+        from .joint_belief import for_brain
+        joint = for_brain(brain)["wolf_weights"]
         engine = brain.engine
         beliefs: dict[str, dict[str, float]] = {}
         mates = set(brain.mates())
@@ -111,7 +113,7 @@ class BeliefState:
                 # On ordinary boards the complete wolf pack knows one another.
                 wolf_probability = 0.0
             else:
-                wolf_probability = max(0.0, min(1.0, brain.suspicion(seat.name)))
+                wolf_probability = joint[seat.name]
             beliefs[seat.name] = {
                 "wolf": wolf_probability,
                 "good": 1.0 - wolf_probability,
@@ -204,7 +206,7 @@ class StrategicVotePlanner:
     def plan(self, candidates: list[int], sheriff: bool = False) -> VotePlan:
         brain = self.brain
         engine = brain.engine
-        pool = [pos for pos in candidates if pos != brain.me.pos]
+        pool = [pos for pos in candidates if sheriff or pos != brain.me.pos]
         if not pool:
             trace = DecisionTrace(
                 actor=brain.name, phase=engine.phase, day=engine.day_count,
@@ -216,16 +218,25 @@ class StrategicVotePlanner:
             return VotePlan(None, trace.rationale, trace)
 
         mates = set(brain.mates())
-        if brain.is_wolf:
+        if brain.is_wolf and not sheriff:
             pool = [pos for pos in pool if engine.seat_at(pos).name not in mates] or pool
 
         belief_state = BeliefState.from_brain(brain, pool)
+        from .public_story import for_brain as public_story
+        story = {r["target"]: r for r in public_story(brain)["targets"]} if brain.is_wolf and not sheriff else {}
         alternatives: list[DecisionAlternative] = []
         for pos in pool:
             seat = engine.seat_at(pos)
             public_plausibility = max(0.0, min(1.0, brain.suspicion(seat.name)))
             components = {"public_plausibility": public_plausibility}
-            if brain.is_wolf:
+            if sheriff:
+                wolf_weight = belief_state.faction_probabilities[seat.name]["wolf"]
+                if brain.is_wolf:
+                    utility = 1.2 if seat.name in mates or seat.name == brain.name else .5 * (1 - public_plausibility)
+                else:
+                    utility = 1 - wolf_weight
+                components['sheriff_support'] = utility
+            elif brain.is_wolf:
                 role_threat = 0.30 if brain.claims.get(seat.name) == "seer" else 0.0
                 pressure_threat = 0.35 if any(
                     who == seat.name and target in mates
@@ -233,7 +244,10 @@ class StrategicVotePlanner:
                 ) else 0.0
                 sheriff_threat = 0.15 if engine.sheriff == pos else 0.0
                 utility = public_plausibility + role_threat + pressure_threat + sheriff_threat
+                story_pressure = story.get(pos, {}).get("pressure_score", 0.0)
+                utility += .3 * story_pressure
                 components.update({
+                    "public_story_pressure": story_pressure,
                     "role_threat": role_threat,
                     "pressure_threat": pressure_threat,
                     "sheriff_threat": sheriff_threat,
@@ -261,7 +275,10 @@ class StrategicVotePlanner:
             else alternatives[0]
         target = selected.target
         target_seat = engine.seat_at(target)
-        if brain.is_wolf:
+        if sheriff:
+            rationale = (f"警长票是授予警徽，不是放逐；当前选择{target}号{target_seat.name}，"
+                         "依据阵营判断与警徽归属利益。")
+        elif brain.is_wolf:
             rationale = (f"推演{depth}层后，{target}号{target_seat.name}既容易形成公开票型，"
                          "又对狼队构成最高综合威胁。")
         else:

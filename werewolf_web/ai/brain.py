@@ -316,15 +316,13 @@ class Brain:
             self._state_event("ally_lost")
         sign = -1 if is_wolf else 1
         # 踩过他的人：踩对了→像好人；踩错了→像狼
-        for day, who, tgt in self.accuse_log:
-            if tgt == nm:
-                self.ensured(who)
-                self.sus[who] += sign * 0.18
+        for who in sorted({who for _day, who, tgt in self.accuse_log if tgt == nm}):
+            self.ensured(who)
+            self.sus[who] += sign * 0.18
         # 保过他的人：保了狼→像狼；保了好人→像好人
-        for day, who, tgt in self.defend_log:
-            if tgt == nm:
-                self.ensured(who)
-                self.sus[who] -= sign * 0.20
+        for who in sorted({who for _day, who, tgt in self.defend_log if tgt == nm}):
+            self.ensured(who)
+            self.sus[who] -= sign * 0.20
         if is_wolf:
             self.sus.pop(nm, None)
 
@@ -369,10 +367,11 @@ class Brain:
             reaction = "correct_read" if is_wolf else "wrong_read"
             self.match_state.react(reaction)
             self._state_event(reaction)
-        for d, who, t, kind in self.vote_log:
-            if t == nm and kind == "exile":
-                self.ensured(who)
-                self.sus[who] += (-0.15 if is_wolf else 0.12)
+        # Resolve this ballot, not every historic vote against this target.
+        for who in sorted({who for d, who, t, kind in self.vote_log
+                           if d == day and t == nm and kind == "exile"}):
+            self.ensured(who)
+            self.sus[who] += (-0.15 if is_wolf else 0.12)
 
     # ================================================== 怀疑度计算
     @staticmethod
@@ -459,12 +458,12 @@ class Brain:
         logit = self._llr(PRIOR)
 
         # —— 直接证据：踩保关系被翻牌证实/证伪（硬事实）——
-        for _d, who, tgt in self.accuse_log:
+        for who, tgt in sorted({(who, tgt) for _d, who, tgt in self.accuse_log}):
             if who == nm:
                 f = self._flipped(tgt)
                 if f:
                     logit += self._llr(0.26) if f[2] else self._llr(0.68)
-        for _d, who, tgt in self.defend_log:
+        for who, tgt in sorted({(who, tgt) for _d, who, tgt in self.defend_log}):
             if who == nm:
                 f = self._flipped(tgt)
                 if f:

@@ -37,6 +37,15 @@ git diff --check
 
 ## Pull requests
 
+Documentation is part of the same change, not deferred until requested.
+Add a new bilingual `.changes/<unique-name>.json` record for each PR, declaring
+documentation impact and save/config compatibility. Update affected guides;
+update both READMEs for modes, setup, entry points or advertised capability
+changes. Pure internal changes may explain `docs_impact: none`.
+Run `python scripts/check_delivery.py --base HEAD` before committing (use the
+PR base after committing). See [versioned delivery](docs/RELEASING.md).
+CI checks declarations and file consistency; reviewers still verify meaning.
+
 Submit issues and pull requests to [werewolf-ai-public](https://github.com/shenliucn-prog/werewolf-ai-public), targeting `master`. The public repository starts with a clean snapshot; do not merge private development history into it. Maintainer updates should be reviewed, sanitized file changes through the same pull-request checks. Required checks apply to the maintainer too; an additional person's approval is not mandatory for this single-maintainer project.
 
 Explain the player-visible problem, the resulting behavior, and how you verified it. Keep unrelated refactors separate. Include the board, language, seed, and offline/online setting for reproducible gameplay reports.

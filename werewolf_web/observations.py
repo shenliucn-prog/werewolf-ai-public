@@ -26,6 +26,21 @@ MODEL_INSTRUCTIONS = (
     "a publicly revealed seer role from that player's still-attributed check statements. "
     "Add new evidence or a changed conclusion instead of repeating earlier arguments. "
     "Answer a player's specific question (including why you withdrew), not a generic demand for logic."
+    " joint_hypotheses, when present, are optional heuristic aids, not calibrated facts or orders. "
+    "Evaluate their assumptions against the source observations; choose your own action. "
+    "Never describe a hypothesis weight as a verified role or leak privately known pack membership."
+    " Your own earlier guess is a commitment to track, not new independent evidence for itself."
+    " public_story is an optional summary of public pressure and your commitments, not other "
+    "players' private beliefs or guaranteed future votes. New evidence may justify a changed stance."
+    " Repeating one claim does not create independent evidence. A flip resolves the target's role, "
+    "not the speaker's role; correct claims and fabricated good checks can both come from wolves. "
+    "When assessing an exile ballot, distinguish that day's votes from earlier votes and sheriff support."
+    " For an explicit public Seer check report, append a standalone final line exactly like "
+    "'Seer report: night 1, seat 3, good.' or '预言家查验声明：第1夜，3号，好人。'. "
+    "Use the night, seat and good/wolf (好人/狼人) result you choose to claim. "
+    "These lines are your public claims, never quote another player in this declaration format. "
+    "check_claim_audit flags only explicit declarations, not all prose; compatibility is not proof, "
+    "and a contradiction is not automatic proof of the speaker's faction."
 )
 
 
@@ -48,6 +63,8 @@ class ObservationGateway:
     def for_model(agent, task, details):
         from .onboarding import introduction
         from .ai import model_context
+        from .ai.joint_belief import for_brain
+        from .ai.public_story import for_brain as public_story
 
         if (agent.participant.participant_id != agent.seat.player_id
                 or agent.participant.seat != agent.seat.pos):
@@ -62,6 +79,8 @@ class ObservationGateway:
             "public_context": model_context.build_public_context(agent),
             "own_previous_decisions": agent.model_decisions[-model_context.DECISION_MEMORY:],
             "details": details, "instructions": MODEL_INSTRUCTIONS,
+            "joint_hypotheses": for_brain(agent.brain),
+            "public_story": public_story(agent.brain),
         }
         # Legacy rows without an event number do not get fabricated IDs.
         cutoff = max((row["event"]["event_no"]

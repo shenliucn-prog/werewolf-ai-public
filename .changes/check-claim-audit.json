@@ -1,0 +1,13 @@
+{
+  "summary": {
+    "en": "Share a public, source-linked explicit Seer-report audit across offline and model play.",
+    "zh": "离线与模型共用公开、带来源的标准预言家查验声明对账。"
+  },
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md", "docs/CHECK_CLAIMS.md"],
+  "reason": "Document the new optional declaration protocol and its public-only limitations.",
+  "compatibility": {
+    "en": "Derived from existing public speech; no save migration or model response schema change.",
+    "zh": "从既有公开发言派生，无存档迁移或模型响应格式变更。"
+  }
+}

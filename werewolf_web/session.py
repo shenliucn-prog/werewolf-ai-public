@@ -1775,6 +1775,7 @@ class GameSession:
                        "phase": ev_data.get("phase")}, publish=False)
         elif et == "flip":
             self.emit({"type": "flip", "seat": ev.seat, "text": ev.text,
+                       "name": ev_data.get("name"), "role": ev_data.get("role"),
                        "role_cn": ev_data.get("role_cn"),
                        "day": ev_data.get("day"), "night": ev_data.get("night"),
                        "phase": ev_data.get("phase")}, publish=False)

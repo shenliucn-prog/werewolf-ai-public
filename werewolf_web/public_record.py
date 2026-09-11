@@ -26,6 +26,9 @@ class PublicRecord:
 
     def query(self, question):
         q = question.strip().casefold()
+        if q in ("/checks", "check claims", "查验声明", "查验对账"):
+            from .check_claims import query_text
+            return query_text(self.entries, self.locale)
         votes = bool(re.search(r"票型|唱票|投票记录|votes|ballots", q))
         speeches = bool(re.search(r"发言记录|完整发言|speeches", q))
         history = q in ("/history", "history", "历史", "公开记录")
