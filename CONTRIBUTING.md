@@ -37,6 +37,36 @@ git diff --check
 
 ## Pull requests
 
+### Tracking and review / 归类与审查
+
+Maintainers triage every PR with a responsible assignee, a type label
+(`bug`, `enhancement`, `documentation`, `refactor`, or `release`) and
+relevant `area:*` labels. Contributors without permission can leave these
+fields to the maintainer; missing metadata is not a reason to reject help.
+
+Assign a version milestone when the target is agreed. Unscheduled work stays
+without a milestone rather than inventing a release promise. Close a version
+milestone after its published scope is complete. Tags and Releases remain the
+source for downloadable versions; a milestone is not itself a release.
+
+Link an issue when one exists; small standalone fixes may explain their scope
+directly. Projects boards are optional and should track real ongoing work, not
+duplicate milestones merely to populate a field.
+
+Record actual review outcomes, outstanding findings and validation limits.
+CI is not independent review. A single-maintainer self-check must be described
+as such; never create approvals under another account to simulate a reviewer.
+Historical metadata backfills must be described as retrospective, not as
+evidence that a review or schedule existed at the time.
+
+维护者为每个 PR 指定负责人、类型标签及相关 `area:*` 标签；外部贡献者没有权限
+时由维护者补齐。版本确定后再关联里程碑，未排期不虚构版本承诺；发布范围完成后
+关闭里程碑，标签和 Release 才是下载版本依据。已有 issue 则关联，小改动可独立说明。
+Projects 看板可选，不为填满字段创建空看板。
+
+审查记录必须反映实际情况：CI 不是独立审查，单维护者自查应如实说明，不借用其他
+账号伪造批准。历史字段补录须标明为回溯归类，不暗示当时已有排期或审查。
+
 Documentation is part of the same change, not deferred until requested.
 Add a new bilingual `.changes/<unique-name>.json` record for each PR, declaring
 documentation impact and save/config compatibility. Update affected guides;
