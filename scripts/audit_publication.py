@@ -11,7 +11,7 @@ import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
-METADATA_CHUNKS = {b"eXIf", b"tEXt", b"zTXt", b"iTXt"}
+METADATA_CHUNKS = {b"eXIf", b"tEXt", b"zTXt", b"iTXt", b"caBX"}
 
 
 def png_metadata(data):

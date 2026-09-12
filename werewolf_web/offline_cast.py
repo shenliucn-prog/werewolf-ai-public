@@ -2,6 +2,8 @@
 from dataclasses import dataclass
 from .ai.brain import Style
 from .i18n import cast
+from .character_expansion import EXPANSION
+import random
 
 
 @dataclass(frozen=True)
@@ -29,16 +31,32 @@ CHARACTERS = (
     Character("alan", ("灵活谈判者，愿意调整立场，但容易显得摇摆。", "A flexible negotiator who can look inconsistent."), ("有新信息，我会改判断。", "New evidence can change my mind."), (.5,.7,.8,.5,.5,.5)),
     Character("aji", ("大胆试探者，制造信息，也可能误伤。", "A bold tester whose probes can backfire."), ("我想试探一下这个说法。", "Let's test that claim."), (.85,.5,.85,.4,.15,.6)),
     Character("amo", ("冷幽默怀疑者，找替代解释，也可能怀疑过头。", "A dry skeptic who explores alternatives, sometimes too many."), ("也有另一种解释。", "There is another explanation."), (.5,.8,.6,.4,.7,.4)),
-)
+)+tuple(Character(c["id"], c["stories"], c["phrases"], c["weights"]) for c in EXPANSION)
 BY_ID = {p.id: p for p in CHARACTERS}
 
 
-def cast_settings(replace, locale, name=None):
+def display_names(locale):
+    return {**{p["id"]: p["name"] for p in cast(locale)},
+            **{c["id"]: c["names"][locale == "en"] for c in EXPANSION}}
+
+
+def legacy_cast_settings(replace, locale):
+    """Reconstruct pre-library offline saves without drawing new characters."""
+    mapping = {p["id"]: p["id"] for p in cast(locale)}
+    if replace not in mapping:
+        raise ValueError("Unknown legacy character")
+    mapping["acheng"], mapping[replace] = mapping[replace], mapping["acheng"]
+    return mapping
+
+
+def cast_settings(replace, locale, name=None, seed=None):
     if replace not in BY_ID:
         raise ValueError("Unknown character")
-    mapping = {p["id"]: p["id"] for p in cast(locale)}
-    mapping["acheng"], mapping[replace] = mapping[replace], mapping["acheng"]
-    display = {p["id"]: p["name"] for p in cast(locale)}
+    rng = random.Random(f"{seed}:cast-library") if seed is not None else random.SystemRandom()
+    others = rng.sample([key for key in BY_ID if key != replace], 11)
+    slots = [p["id"] for p in cast(locale) if p["id"] != "acheng"]
+    mapping = {"acheng": replace, **dict(zip(slots, others))}
+    display = display_names(locale)
     names = {identity: display[character] for identity, character in mapping.items()}
     if name:
         names["acheng"] = name

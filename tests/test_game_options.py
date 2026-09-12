@@ -144,6 +144,7 @@ class PlayableTest(unittest.IsolatedAsyncioTestCase):
                     kind, data = event["kind"], event["data"]
                     if kind == "conjecture":
                         response = {k: data[k] for k in ("private", "public")}
+                    elif kind == "table_answer": response = {"skip": True}
                     elif kind in ("speech", "table_reply"):
                         response = {"text": "暂时没有新的信息。"}
                     elif kind == "election_up":

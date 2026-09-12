@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Guarantee a pre-vote human reply, bind twelve authored characters, and add safe local connection registration and checking.", "zh": "保障投票前真人回应，绑定十二位预设人物，并增加安全的本机连接登记与检查。"},
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md", "docs/MODEL_CONNECTIONS.md", "docs/PLAYER_GUIDE.md"],
+  "reason": "Explain the changed discussion flow, independent character/role selection, and actionable model onboarding.",
+  "compatibility": {"en": "Adds one optional human reply before daytime exile voting. Existing table_answer actions are reused; old saves default to the legacy character mapping. Offline play remains uncounted.", "zh": "白天放逐投票前增加一次可选真人回应，复用 table_answer；旧存档保留原人物映射，离线仍不计成绩。"}
+}

@@ -5,6 +5,15 @@ use the same variant. Browser and terminal chat use the same `GameSession`.
 
 ## Elections, Peaceful Day and public records
 
+After daytime discussion and before exile ballots, a living human participant
+gets one optional final reply, independently of the shared clarification limit.
+Answer or skip closes discussion; NPCs do not start another interruption chain.
+The reply/skip is checkpointed and is not repeated after recovery. Spectators
+and dead players do not receive this turn. Offline play uses contextual choices.
+
+白天讨论结束、放逐投票开始前，存活真人有一次独立于追问额度的完整回应机会。
+回答或跳过后直接进入投票，不再打岔；恢复不会重复发言。旁观者与死亡玩家没有此行动。
+
 Player-facing chat and browser games collect candidacy before first-day
 speeches, announce all candidates, then offer one withdrawal window after the
 speeches. No late entry or re-entry is allowed. All living players, including

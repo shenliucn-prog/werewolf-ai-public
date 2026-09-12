@@ -78,6 +78,15 @@ def load_seat_persona(seat, engine):
     from ..casting import CAST_IDS
     from ..i18n import cast, persona as localized_persona
     slug = seat.persona_id or seat.player_id
+    if getattr(engine, "character_cast", False):
+        from ..characters import catalog
+        character = next((c for c in catalog(engine.locale) if c["id"] == slug), None)
+        if character is None:
+            raise ValueError("unknown character")
+        return {"name": seat.name, "traits": character["description"],
+                "profile": character["story"], "speech_style": character["voice"],
+                "catchphrase": character["phrase"], "catchphrases": [character["phrase"]],
+                "role_habits": {}, "relations": "", "style_weights": character["weights"]}
     if slug not in CAST_IDS:
         raise ValueError("unknown persona")
     canonical = parse_persona(os.path.join(PERSONA_DIR, f"player-{slug}.md"))
@@ -104,7 +113,7 @@ def load_seat_persona(seat, engine):
     localized = localized_persona(engine.locale, slug, seat.name)
     if localized:
         localized["behavior_persona"] = canonical
-        return localized
+        result = localized
     return result
 
 

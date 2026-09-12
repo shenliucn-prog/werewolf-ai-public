@@ -8,8 +8,9 @@ You are one of twelve players. The other eleven are local AI characters; the
 host explains rules and keeps time. This is **one human per game**, not an
 online lobby. Text is the evidence: portraits do not encode tells.
 
-1. Start with **Classic** (Seer · Witch · Hunter · Guard), **Local AI only**,
-   Conjecture **off**, and random NPC personalities. Pick **Seer** to learn an
+1. Connect a model API or a registered local Agent, then choose **Classic**
+   (Seer · Witch · Hunter · Guard), Conjecture **off**, and a character (or random).
+   The character's appearance/personality is separate from the secret role. Pick **Seer** to learn an
    information role, or keep your role random. Read your private role card.
 2. At night, only invited roles act. Choose from the offered targets and
    confirm. In chat use `choose 3`; Witch uses `save 3` or `poison 4`.
@@ -19,8 +20,10 @@ online lobby. Text is the evidence: portraits do not encode tells.
    sheriff's exile vote weighs 1.5. Tied exile tallies eliminate nobody.
 4. During the day, compare claims, checks and votes. Speak when prompted:
    “I am the Seer. I checked #3: good. I suspect #7 because their claim changed.”
-   Say whatever strategy you intend; recognition of claims is heuristic, not
-   complete understanding. Other players may interrupt; the host limits exchanges.
+   Models interpret your speech; structured claim recognition is not complete
+   understanding. Other players may interrupt; the host limits exchanges.
+   Before exile voting you get one final reply or skip, without another interruption.
+   Explicit offline simulation uses contextual choices, not arbitrary free text.
 5. Vote for an offered candidate (`vote 7`). Good wins when all wolves are
    eliminated. Wolves win when **either all special good roles or all ordinary
    villagers are eliminated**; parity alone is not this variant's win rule.
@@ -41,7 +44,8 @@ different from public statements. A player's claimed role is not a certified rol
 | Divine Witch boards | Unlimited total potions; single variant uses one type/night, dual allows one of each/night | Experimental strong-role play, not proven balanced |
 | Research runners | Separate protocols, including seven-seat Codex decisions or all-AI local screens | Developers; not an extra lobby mode |
 
-Conjecture can be combined with any board. Your private table is not broadcast;
+Model-driven conjecture is not integrated; it is restricted to explicit legacy/offline
+research play. Your private table is not broadcast;
 your public table may deliberately differ. Changes of mind are not automatically
 punished. In terminal table editing, row numbers refer to the displayed table
 rows, **not seat numbers**. Voice and behavioral visual signals are not implemented.
@@ -51,9 +55,10 @@ earlier deaths, and Guard + save on the same knife victim is fatal. Only Divine
 Witch **dual** accepts `save 3 poison 4` together. See [full rules](RULE_VARIANT.md).
 
 If an action fails to send, the browser restores the action panel for retry.
-A closed connection or server restart cannot resume a match; start a new one.
-Keep the server on your own machine. Online wording is optional and sends game
-context to your configured provider; do not include sensitive real-world details.
+Use Continue to restore the same saved game after disconnection or a server restart.
+Model faults pause play rather than silently switching to offline simulation.
+Keep the server on your own machine. Model play sends game context to your
+configured provider; do not include sensitive real-world details.
 
 ## 中文——两分钟上手
 
@@ -62,7 +67,8 @@ context to your configured provider; do not include sensitive real-world details
 这是“一位真人 + 十一位 AI + 自动主持人”的十二人对局，不是多人联网大厅。
 头像只是装饰，判断依据来自文字发言、行动、公开翻牌及你合法知道的私密信息。
 
-1. 首局选经典「预女猎守」、只用本地 AI、关闭猜想模式，人格保持每局随机。
+1. 先连接模型 API 或登记本机 Agent，再选经典「预女猎守」、关闭猜想模式，选择预设人物或随机人物。
+   人物的名字、头像与性格绑定，秘密身份独立分配。
    想体验信息型身份可选预言家，也可随机身份；开局后先看自己的私密身份卡。
 2. 夜晚收到提示才行动，网页选目标并确认；聊天输入「选 3」「救 3」「毒 4」。
    可选行动用 `pass` 跳过，平民无需夜间行动。
@@ -70,7 +76,8 @@ context to your configured provider; do not include sensitive real-world details
    警长放逐票重 1.5 票，放逐最高票并列时无人出局。
 4. 白天比较声明、查验和投票，再表达自己的判断。例如「我是预言家，昨晚验 3 号是好人，
    7 号改口没有解释，我怀疑他」。其他人可以打岔，主持人限制拉扯时长。
-   自然语言识别是启发式的，不保证理解每一种表达。
+   投票前有一次完整回应或跳过的机会，不再追加追问。模型负责理解发言，结构化声明识别不保证覆盖所有表达；
+   主动选择的离线模拟只使用情境选项，不理解任意文本。
 5. 收到投票提示后选择候选人（如「投 7」）。全部狼人出局则好人胜；
    全部神职或全部平民任一组出局则狼人胜，不是简单按狼人数达到一半判胜。
    死亡后除合法的即时死亡技能外不再行动，可继续看完对局与复盘。
@@ -79,7 +86,7 @@ context to your configured provider; do not include sensitive real-world details
 主持人只解释规则，不泄露身份，不替你决定投谁。🔒 是自己的私密信息；
 他人跳身份只是声明，不是主持人认证。
 
-普通模式用自然语言辩论。猜想模式是研究取向的测试版：每次整理自己的私有判断表和
+正式模型模式用自然语言辩论。模型与猜想模式尚未接通，猜想限显式离线／legacy 研究路径：整理自己的私有判断表和
 对外的公开辩论表，公开版本保留历史，不等于完美推理，也不会把改口一律判为说谎。
 聊天编辑双表时，数字是显示的表格行号，不是座位号。
 
@@ -87,5 +94,6 @@ context to your configured provider; do not include sensitive real-world details
 两板都仅首夜能自救、不能复活旧死者、守救同一刀口会导致死亡，二十个完整昼夜无胜者平局。
 这是平衡未定的实验板；猜想开关独立于板子，语音和视觉行为玩法尚未实现。
 
-发送失败会恢复操作面板；断线或服务重启不能续局，需要重新开始。
+发送失败会恢复操作面板；断线或服务重启后可通过「继续游戏」恢复原存档。
+模型故障暂停对局，不会自动离线代打。离线模拟需主动选择，不计正式闯关成绩。
 详细设置见[游戏模式](GAME_MODES.md)，完整规则见[本项目规则版本](RULE_VARIANT.md)。

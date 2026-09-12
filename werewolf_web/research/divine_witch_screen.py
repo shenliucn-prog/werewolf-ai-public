@@ -71,6 +71,7 @@ class ScreenSession(GameSession):
         e = self.engine; human = self.agents[e.player_seat().name]
         if kind == "conjecture":
             answer = self.conjecture_ledger.npc_drafts({human.name: human})[human.name]
+        elif kind == "table_answer": answer = {"skip": True}
         elif kind in ("speech", "table_reply"):
             self.last_speech = human.speak(self.speech_events)
             answer = {"text": self.last_speech.text}

@@ -54,6 +54,7 @@ class GameSession:
                  player_role: str | None = None, onboarding: bool = False,
                  planner=None, checkpoint_path: Optional[str] = None,
                  perf_path: Optional[str] = None,
+                 character: Optional[str] = None,
                  _defer_preflight: bool = False):
         if planner is not None and not planner.verified and not _defer_preflight:
             raise ValueError("Model preflight required before opening a game.")
@@ -87,8 +88,13 @@ class GameSession:
         self.conjecture = conjecture
         self.onboarding = onboarding
         self.conjecture_ledger = None
-        self.engine = eng_mod.GameEngine(board_id, seed=seed, locale=locale, names=names,
-                                        personalities=personalities, player_role=player_role)
+        self.engine = eng_mod.GameEngine(board_id, seed=seed, locale=locale,
+                                        names=names if character is None else None,
+                                        personalities=personalities if character is None else None,
+                                        player_role=player_role)
+        if character is not None:
+            from .characters import bind_characters
+            bind_characters(self.engine, character, seed)
         # Freeze provider settings at game start.  No key is persisted in NPC
         # memory, reviews, SSE events, or public state.
         self.llm = LLMClient(LLMRuntimeConfig.from_request({"enabled": False} if planner is not None else llm_options))
@@ -888,6 +894,8 @@ class GameSession:
 
     async def _step_vote(self):
         e = self.engine
+        if not self._step_state.get("vote_settled"):
+            await self._pre_vote_reply()
         await self._vote_phase()
         await self._post_death_triggers()
         # The vote (and its death-trigger chain) is fully settled; drop the
@@ -1081,6 +1089,34 @@ class GameSession:
             self.questions.finish(pair, self._step_state)
             await self._publish_table_speech(agent.seat, response, "clarification")
         self.questions.close_window(self._step_state)
+
+    async def _pre_vote_reply(self):
+        """Reserve the human's last word independently of the shared question cap.
+
+        One optional reply per day, after all discussion and before any ballot.
+        Marker and public reply commit together; a resumed vote never asks twice.
+        This closes discussion rather than creating another interruption chain.
+        """
+        e = self.engine
+        player = e.player_seat()
+        if (not player.alive or getattr(self, "spectator", False)
+                or self._step_state.get("pre_vote_reply_day") == e.day_count):
+            return
+        if not self.speech_events:
+            return
+        response = await self.ask_player("table_answer", {
+            "from": "主持人夜鸦" if e.locale == "zh-CN" else "Host Raven",
+            "final_reply": True,
+        })
+        self._step_state["pre_vote_reply_day"] = e.day_count
+        if response.get("skip"):
+            self._checkpoint()
+            return
+        text = (response.get("answer") or "").strip()
+        if text:
+            await self._publish_table_speech(player, self._player_speech(text), "pre_vote_reply")
+        else:
+            self._checkpoint()
 
     async def _question_reply(self, agent, asker):
         return await self._npc_call(agent.table_reply, asker) if self.planner is not None else agent.brain.answer_check_question()
