@@ -45,7 +45,11 @@ class BrowserEntryTest(unittest.TestCase):
                 page.on("dialog", lambda dialog: dialog.accept())
                 page.goto(url)
                 self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+                artifacts = root / "output" / "playwright"
+                artifacts.mkdir(parents=True, exist_ok=True)
+                page.screenshot(path=str(artifacts / ("entry-desktop.png" if campaign else "entry-mobile.png")), full_page=True)
                 expect(page.locator("#continueGame")).to_be_disabled()
+                page.locator("#entryInterface").select_option("web")
                 if campaign:
                     expect(page.locator("#castNames input")).to_have_count(12)
                     with page.expect_response(lambda r: r.url.endswith("/api/start")) as unconfigured:
@@ -65,16 +69,19 @@ class BrowserEntryTest(unittest.TestCase):
                     expect(page.locator("#characterChoice option")).to_have_count(32)
                     page.locator("#characterChoice").select_option("linque")
                     settings_toggle.click()
+                    page.locator("#entryMode").select_option("campaign")
                     page.locator("#campaignGame").click()
                     expect(page.locator("#retryCampaignTeaching")).to_be_visible(timeout=15000)
                     page.locator("#retryCampaignTeaching").click()
                     expect(page.locator("#retryCampaignTeaching")).to_be_hidden(timeout=15000)
                 else:
+                    page.locator("#driverMode").select_option("offline")
                     page.locator("#offlineSetup").evaluate("el => el.open = true")
                     page.locator("#offlineSpectator").set_checked(spectator)
                     page.locator("#offlineGame").click()
                 expect(page.locator("#actionPanel button").first).to_be_visible(timeout=15000)
                 expect(page.locator("#table .seat")).to_have_count(12)
+                page.screenshot(path=str(artifacts / ("roundtable-desktop.png" if campaign else "roundtable-mobile.png")), full_page=True)
                 if campaign:
                     expect(page.locator("#playerBody")).to_contain_text("林雀")
                 self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
@@ -82,6 +89,8 @@ class BrowserEntryTest(unittest.TestCase):
                 self.assertTrue(game_id)
                 page.reload()
                 page.locator("#gameSetup").evaluate("el => el.open = true")
+                page.locator("#entryInterface").select_option("web")
+                page.locator("#entryMode").select_option("continue")
                 page.locator("#continueGame").click()
                 expect(page.locator("#actionPanel button").first).to_be_visible(timeout=15000)
                 self.assertEqual(page.evaluate("JSON.parse(localStorage.getItem('werewolf.game')).game_id"), game_id)
@@ -100,6 +109,8 @@ class BrowserEntryTest(unittest.TestCase):
                         elif kind == "vote":
                             page.locator("#voteBtns button").first.click()
                             button = page.locator("#sendVote")
+                        elif kind in ("night", "day_skill"):
+                            button = page.locator("#sendNight")
                         elif kind == "model_retry":
                             self.fail("Fixture produced an invalid model decision")
                     with page.expect_response(lambda r: r.url.endswith("/api/action") and r.request.method == "POST") as response:

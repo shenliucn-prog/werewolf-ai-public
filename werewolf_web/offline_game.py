@@ -426,7 +426,7 @@ async def play(session, *, read=input, write=print, automatic=False):
     locale = session.engine.locale
     async def answer():
         value = (await asyncio.to_thread(read, "> ")).strip()
-        if value.startswith("?") or value in ("/history", "/seats", "/checks", "查验声明", "查验对账", "座次", "公开记录"):
+        if value.startswith("?") or value in ("/rules", "rules", "完整规则", "/history", "/seats", "/checks", "查验声明", "查验对账", "座次", "公开记录"):
             write(session.answer_question(value[1:] if value.startswith("?") else value))
             return ""
         return value if len(value) <= 16 else ""

@@ -50,7 +50,7 @@ class ReplyTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(task.done())
         self.assertTrue(s.submit({"answer":"我把理由说完整。"}))
         await task
-        self.assertEqual(s.questions.answered, 2)
+        self.assertEqual(s.questions.answered, s.questions.LIMIT)
         self.assertEqual(s.speech_events[-1][1].text, "我把理由说完整。")
         restored = GameSession("classic", {"enabled":False}, session_id=s.session_id)
         restored.restore(checkpoint.load_checkpoint(self.path))

@@ -29,6 +29,10 @@
   </section>
   <details id="gameSetup" class="game-setup" open>
     <summary data-i18n="网页版 · 开局设置">网页版 · 开局设置</summary>
+    <nav class="entry-path" aria-label="开局步骤 / Setup steps">
+      <label><span data-i18n="在哪里玩？">在哪里玩？</span><select id="entryInterface"><option value="" data-i18n="先选择游玩界面">先选择游玩界面</option><option value="agent" data-i18n="Agent 对话（推荐）">Agent 对话（推荐）</option><option value="web" data-i18n="网页圆桌">网页圆桌</option></select></label>
+      <p id="entryExplanation" class="field-help" data-i18n="界面和智能驱动分开选择；两种界面都可以接模型，也可以主动选择离线。">界面和智能驱动分开选择；两种界面都可以接模型，也可以主动选择离线。</p>
+    </nav>
     <div class="setup-grid">
       <section class="setup-section" aria-labelledby="connectionTitle">
         <h2 id="connectionTitle" data-i18n="谁来扮演其他玩家？">谁来扮演其他玩家？</h2>
@@ -76,10 +80,11 @@
       </section>
       <section class="setup-section" aria-labelledby="tableSettingsTitle">
         <h2 id="tableSettingsTitle" data-i18n="决定这一局">决定这一局</h2>
+        <label><span data-i18n="怎么玩？">怎么玩？</span><select id="entryMode"><option value="free" data-i18n="自由对局">自由对局</option><option value="campaign" data-i18n="角色闯关">角色闯关</option><option value="continue" data-i18n="继续游戏">继续游戏</option></select></label>
         <div class="controls">
           <label><span data-i18n="你想成为哪位人物？">你想成为哪位人物？</span><select id="characterChoice"><option value="random" data-i18n="随机人物（名字、头像、人格绑定）">随机人物（名字、头像、人格绑定）</option><option value="custom" data-i18n="自定义名字与人格">自定义名字与人格</option></select></label>
           <div id="characterPreview" class="character-preview"></div>
-          <details id="characterGallery"><summary data-i18n="认识茶馆的人物">认识茶馆的人物</summary>
+          <details id="characterGallery" open><summary data-i18n="认识茶馆的人物">认识茶馆的人物</summary>
             <label><span data-i18n="搜索名字或性格">搜索名字或性格</span><input id="characterSearch" type="search" maxlength="80"></label>
             <p id="characterCount" class="field-help" role="status" aria-live="polite"></p>
             <div id="characterCards" class="character-cards"></div>
@@ -119,7 +124,10 @@
   <main class="layout" id="gameDesk">
     <section class="roster" aria-labelledby="rosterTitle">
       <div class="roster-heading"><h2 id="rosterTitle" data-i18n="本局玩家">本局玩家</h2><span id="rosterCount" class="field-help" role="status" data-i18n="发牌后显示完整座次">发牌后显示完整座次</span></div>
-      <div class="table" id="table"><span class="moon" id="moon" hidden></span><span class="center-logo" hidden>狼人杀</span></div>
+      <div class="table" id="table"><span class="moon" id="moon" hidden></span><span class="center-logo" hidden>狼人杀</span>
+        <div class="table-center"><strong data-i18n="主持人 · 夜鸦">主持人 · 夜鸦</strong><p id="tablePhase" role="status" data-i18n="等待入座">等待入座</p><img id="speakerPortrait" alt="" hidden><p id="speakerName" data-i18n="十二位人物，围桌而坐">十二位人物，围桌而坐</p><p id="tableTurn" role="status"></p><p id="myRoleQuick"></p></div>
+      </div>
+      <p class="field-help" data-i18n="顺时针座次。轮到选人时可点座位，再确认；人物外貌不代表秘密身份。">顺时针座次。轮到选人时可点座位，再确认；人物外貌不代表秘密身份。</p>
     </section>
     <aside class="game-context" aria-label="身份与规则 / Role and rules">
       <section class="player-card" id="playerCard"><h2 class="pc-title" id="identityTitle">你的身份</h2><div class="pc-body" id="playerBody">尚未入局</div></section>
@@ -149,6 +157,6 @@
       <p class="field-help" data-i18n="回看发言与票型，理解这一局如何走到终点。">回看发言与票型，理解这一局如何走到终点。</p><pre id="reviewText" class="review-text"></pre>
     </section>
   </div>
-  <script src="/js/i18n.js?v=game-desk-2"></script><script src="/js/app.js?v=game-desk-2"></script><script src="/js/setup-ui.js?v=game-desk-2"></script>
+  <script src="/js/i18n.js?v=roundtable-1"></script><script src="/js/app.js?v=roundtable-1"></script><script src="/js/setup-ui.js?v=roundtable-1"></script><script src="/js/roundtable.js?v=roundtable-1"></script>
 </body>
 </html>

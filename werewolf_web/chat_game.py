@@ -119,7 +119,7 @@ def _render(event: dict, locale: str = "zh-CN"):
         print(f"{prefix} {seat_label(event['seat'])} {event['name']}：{event['text']}")
     elif kind == "private":
         print(f"🔒 {event['text']}")
-    elif kind in ("narration", "death", "flip", "exile", "gameover", "ballots"):
+    elif kind in ("narration", "death", "flip", "exile", "gameover", "ballots", "discussion_closed", "badge"):
         print(f"🎙️ {event.get('text') or event.get('reason', '')}")
     elif kind == "vote_result":
         from .public_record import target_label
@@ -182,10 +182,13 @@ def _ordinary_request_prompt(kind: str, data: dict, locale: str = "zh-CN") -> st
         return (f"\n{data.get('from', 'Someone')} interrupted: {data.get('text', '')}\nReply briefly, or press Enter to pass:\n> " if en
                 else f"\n{data.get('from', '有人')} 打断你：{data.get('text', '')}\n简短回应，或直接回车暂不回应：\n> ")
     if kind == "table_answer":
+        if data.get("last_words"):
+            return "\nYour last words, or type skip:\n> " if en else "\n请留下遗言，或输入 跳过：\n> "
         if data.get("final_reply"):
             return ("\nBefore voting: one final reply. Explain your position, or type skip. No further interruptions.\n> " if en
                     else "\n投票前，留给你一次完整回应：可集中解释质疑，或输入 跳过。之后不再追加追问。\n> ")
-        return (f"\nAnswer {data.get('from', 'the questioner')}'s question, or type skip to pass:\n> " if en
+        quotes = "\n".join(f"{q['from']}: {q['text']}" for q in data.get("questions", []))
+        return quotes + (f"\nAnswer {data.get('from', 'the questioner')}'s question, or type skip to pass:\n> " if en
                 else f"\n请简短回答 {data.get('from', '提问者')} 的追问；输入 跳过 或直接回车暂不回答：\n> ")
     if kind == "election_up":
         return "\nRun for sheriff? Type yes or no:\n> " if en else "\n是否上警？输入 上警 / 不上警：\n> "
@@ -280,7 +283,7 @@ async def _repl(session: GameSession) -> int:
         while True:
             raw = await asyncio.to_thread(input, _request_prompt(kind, data, locale))
             record_command = re.fullmatch(r"/history|history|公开记录|历史|(?:第\d+天)?(?:发言记录|完整发言|票型|投票记录)|(?:上一轮|最近)(?:的)?票型|(?:day \d+ )?(?:votes|ballots|speeches)|(?:last|latest) (?:votes|ballots)", raw.strip().casefold())
-            if raw.startswith("?") or raw.strip().casefold() in ("/seats", "seats", "座次", "座次表", "/checks", "check claims", "查验声明", "查验对账") or record_command:
+            if raw.startswith("?") or raw.strip().casefold() in ("/rules", "rules", "完整规则", "/seats", "seats", "座次", "座次表", "/checks", "check claims", "查验声明", "查验对账") or record_command:
                 print("🎙️ " + session.answer_question(raw[1:] if raw.startswith("?") else raw))
                 continue
             if raw.strip().casefold() in ("/teaching", "教学"):

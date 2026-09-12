@@ -87,6 +87,7 @@ class GameSession:
             raise ValueError("Conjecture mode must be true or false.")
         self.conjecture = conjecture
         self.onboarding = onboarding
+        self.dialogue_version = 1
         self.conjecture_ledger = None
         self.engine = eng_mod.GameEngine(board_id, seed=seed, locale=locale,
                                         names=names if character is None else None,
@@ -206,6 +207,8 @@ class GameSession:
         published event is always already on disk."""
         self._event_no += 1
         obj["event_no"] = self._event_no
+        obj.setdefault("day", self.engine.day_count)
+        obj.setdefault("night", self.engine.night_count)
         if obj.get("type") == "init":
             self._init_event = obj
         if obj.get("type") == "request":
@@ -224,6 +227,9 @@ class GameSession:
             self._published_upto += 1
 
     def answer_question(self, question):
+        if question.strip().casefold() in ("/rules", "rules", "完整规则", "规则"):
+            from .onboarding import introduction
+            return introduction(self.engine, self.conjecture, offline_choices=getattr(self, "offline_choice_mode", False))
         if question.strip().casefold() in ("座次", "座次表", "/seats", "seats"):
             from .onboarding import seating_text
             return seating_text(self.engine.public_state())
@@ -700,8 +706,11 @@ class GameSession:
         e = self.engine
         from .onboarding import introduction
         e.phase = "onboarding"
-        self.emit({"type": "narration", "phase": "onboarding",
-                   "text": introduction(e, self.conjecture, offline_choices=getattr(self, "offline_choice_mode", False))})
+        rules = introduction(e, self.conjecture, offline_choices=getattr(self, "offline_choice_mode", False))
+        self.emit({"type": "narration", "phase": "onboarding", "full_rules": rules,
+                   "text": "\n".join(rules.splitlines()[:2] + [rules.splitlines()[3]]) + "\n" + (
+                       "Find your seat and private role. Night actions are private; daytime is discussion, clarification and a ballot. Ask Raven about rules at any time. Press Ready when you are ready."
+                       if e.locale == "en" else "先找到你的座位与私密身份。夜晚按提示行动，白天发言、澄清、投票。不懂随时问夜鸦，准备好再开始。")})
         await self.ask_player("ready", {})
         self._step = "witch_rule"
 
@@ -721,7 +730,7 @@ class GameSession:
         # a mid-step resume re-enters gather without re-incrementing night_count
         # or re-announcing nightfall.
         if not self._step_state.get("night_started"):
-            self.emit({"type": "narration", "phase": "night", "text": self.host.narrate("night_start", "")})
+            self.emit({"type": "narration", "phase": "night", "night": e.night_count + 1, "day": e.day_count, "text": self.host.narrate("night_start", "")})
             await self._pace(0.3)
             requests = e.start_night()
             self._deliver_grave_result()
@@ -795,6 +804,11 @@ class GameSession:
 
     async def _step_election(self):
         await self._election()
+        # Election and daytime discussion are independent floors. Persisted
+        # empty election windows must not swallow the whole daytime queue.
+        self.questions.reset(self._step_state)
+        self._step_state.pop("question_sources", None)
+        self._step_state.pop("question_closure", None)
         self.engine.phase = "day"
         if self.conjecture:
             self._step = "conjecture_pre"
@@ -853,6 +867,9 @@ class GameSession:
             # and a resume re-enters at the next seat instead of re-emitting.
             self.emit({"type": "speech", "seat": pos, "name": seat.name, "text": text,
                        "claim": speech.claim, "accuse": speech.accuse, "defend": speech.defend,
+                       "turn": i + 1, "turn_total": len(order),
+                       "remaining_before_you": (sum(e.seat_at(p).alive for p in order[i + 1:order.index(e.player_seat().pos)])
+                            if e.player_seat().alive and e.player_seat().pos in order[i + 1:] else None),
                        "phase": "day"}, publish=False)
             self._checkpoint()
             self._flush_publish()
@@ -975,10 +992,9 @@ class GameSession:
         # No model is allowed to rewrite or manufacture the human's statement.
         if self.planner is not None:
             for clause in re.split(r"[。！？!?；;]|另外|also", text, flags=re.I):
-                if not re.search(r"怎么|为什么|凭什么|为何|请问|解释|why|how|explain", clause, re.I):
+                if not re.search(r"怎么|为什么|凭什么|为何|请问|解释|讲讲|说说|回答|why|how|explain|tell|answer", clause, re.I):
                     continue
-                match = re.search(r"(?<!\d)(\d+)\s*号|#\s*(\d+)\b|(?:seat|player)\s+(\d+)\b", clause, re.I)
-                if match:
+                for match in re.finditer(r"(?<!\d)(\d+)\s*号|#\s*(\d+)\b|(?:seat|player)\s+(\d+)\b", clause, re.I):
                     pos = int(next(g for g in match.groups() if g is not None))
                     target = next((s for s in self.engine.alive_seats() if s.pos == pos and not s.is_player), None)
                     if target:
@@ -1030,8 +1046,13 @@ class GameSession:
         # Queue the question whether it targets an NPC or the human player, as an
         # order-preserving [target, asker] pair.  Distinct askers of one target are
         # both kept (never silently overwritten); a duplicate pair is idempotent.
-        if speech.question_to:
+        if speech.question_to and any(s.name == speech.question_to for s in self.engine.alive_seats()):
             self.questions.enqueue(speech.question_to, seat.name)
+        sources = self._step_state.setdefault("question_sources", {})
+        for target, asker in self.questions.pending:
+            if asker == seat.name:
+                sources.setdefault(f"{target}\n{asker}", {
+                    "from": asker, "text": speech.text, "event_no": self._event_no + 1})
         # Every call site emits the speech immediately after this broadcast, so
         # ``event_no + 1`` is the event number that speech will receive; pass it
         # so a dispute can reference the *exact* statement by ledger number.
@@ -1056,6 +1077,8 @@ class GameSession:
         """
         player_name = self.engine.player_seat().name
         for pair in self.questions.window(self._step_state):
+            if pair not in self.questions.pending:
+                continue  # answered together with another question to this seat
             target, asker = pair
             if self.questions.answered >= self.questions.LIMIT:
                 # Budget spent: drop the rest durably and move on.
@@ -1086,9 +1109,32 @@ class GameSession:
             # budget/question mutations *before* ``_publish_table_speech``, whose
             # checkpoint persists the spent budget, the answered question and the
             # reply together, then publishes once.
-            self.questions.finish(pair, self._step_state)
+            self._finish_question_group(pair)
             await self._publish_table_speech(agent.seat, response, "clarification")
         self.questions.close_window(self._step_state)
+        # Replies cannot extend this bounded window. Make any deferred follow-up
+        # visible instead of silently pretending everybody received an answer.
+        if not self._step_state.get("question_closure"):
+            remaining = list(self.questions.pending)
+            self.emit({"type": "discussion_closed", "deferred": [
+                {"target": target, "from": asker} for target, asker in remaining],
+                "text": (("Raven: Clarifications complete. Follow-up questions are deferred; the closing statement does not open a new round."
+                          if self.engine.locale == "en" else
+                          "夜鸦：本轮澄清结束。追加追问暂缓，最后陈述不再开启新一轮问答。"))}, publish=False)
+            self._step_state["question_closure"] = True
+            self._commit_batch()
+
+    def _question_context(self, target):
+        sources = self._step_state.get("question_sources", {})
+        return [deepcopy(sources.get(f"{t}\n{asker}", {"from": asker, "text": "", "event_no": None}))
+                for t, asker in self._step_state.get("question_window", self.questions.pending) if t == target]
+
+    def _finish_question_group(self, pair):
+        self._step_state["last_answered_sources"] = self._question_context(pair[0])
+        self.questions.finish(pair, self._step_state)
+        for other in list(self._step_state.get("question_window", [])):
+            if other[0] == pair[0]:
+                self.questions.finish(other, self._step_state, consume=False)
 
     async def _pre_vote_reply(self):
         """Reserve the human's last word independently of the shared question cap.
@@ -1114,12 +1160,16 @@ class GameSession:
             return
         text = (response.get("answer") or "").strip()
         if text:
-            await self._publish_table_speech(player, self._player_speech(text), "pre_vote_reply")
+            before = deepcopy(self.questions.pending)
+            speech = self._player_speech(text)
+            self.questions.pending = before
+            speech.question_to = None
+            await self._publish_table_speech(player, speech, "pre_vote_reply")
         else:
             self._checkpoint()
 
     async def _question_reply(self, agent, asker):
-        return await self._npc_call(agent.table_reply, asker) if self.planner is not None else agent.brain.answer_check_question()
+        return await self._npc_call(agent.table_reply, asker, questions=self._question_context(agent.name)) if self.planner is not None else agent.brain.answer_check_question()
 
     async def _answer_human_question(self, pair, asker):
         """Ask the human to answer a public clarification (answer or skip).
@@ -1141,10 +1191,11 @@ class GameSession:
                 publish=False)
         self._checkpoint()
         self._flush_publish()
-        response = await self.ask_player("table_answer", {"from": asker})
-        self.questions.finish(pair, self._step_state)
+        response = await self.ask_player("table_answer", {"from": asker, "questions": self._question_context(target)})
+        self._finish_question_group(pair)
         if response.get("skip"):
-            self._checkpoint()
+            self.emit({"type": "narration", "text": (f"{player.name} declined to answer." if self.engine.locale == "en" else f"{player.name} 选择跳过本轮追问。")}, publish=False)
+            self._commit_batch()
             return
         text = (response.get("answer") or "").strip()
         if not text:
@@ -1159,6 +1210,8 @@ class GameSession:
         self._table_extra_by_name = {}
         self._table_pairs = set()
         self.questions.reset(self._step_state)
+        self._step_state.pop("question_sources", None)
+        self._step_state.pop("question_closure", None)
         self._table_cooldown = False
 
     async def _publish_table_speech(self, seat, speech: Speech, kind: str):
@@ -1175,7 +1228,8 @@ class GameSession:
         # before the event reaches the live queue.
         self.emit({"type": "speech", "seat": seat.pos, "name": seat.name,
                    "claim": speech.claim, "accuse": speech.accuse, "defend": speech.defend,
-                   "text": speech.text, "table_talk": True, "phase": "table_talk"}, publish=False)
+                   "text": speech.text, "table_talk": True, "phase": "table_talk", "talk_kind": kind,
+                   "reply_to": deepcopy(self._step_state.get("last_answered_sources", [])) if kind == "clarification" else []}, publish=False)
         self._checkpoint()
         self._flush_publish()
         await self._pace(0.25)
@@ -1775,6 +1829,61 @@ class GameSession:
             else:
                 self._triggered.add(s.pos)
                 self._checkpoint()
+        if self.onboarding and self.dialogue_version >= 1:
+            await self._farewell_floor()
+
+    async def _farewell_floor(self):
+        """Player-facing house rule: guns, badge, then eligible last words.
+
+        Durable per-seat markers commit with the associated public result.
+        Research sessions (onboarding=False) keep their existing silent loop.
+        Only first-night victims and daytime exiles receive last words. Other
+        deaths are explicitly acknowledged without opening another speech.
+        """
+        e = self.engine
+        done = self._step_state.setdefault("farewells", [])
+        for seat in sorted(e.seats.values(), key=lambda s: s.pos):
+            if seat.alive or seat.pos in done:
+                continue
+            if e.sheriff == seat.pos:
+                candidates = [{"pos": s.pos, "name": s.name} for s in e.alive_seats()]
+                if seat.is_player:
+                    answer = await self.ask_player("night", {
+                        "role_key": "badge", "role": ("Sheriff badge" if e.locale == "en" else "警徽交接"),
+                        "desc": ("Choose a successor, or skip to destroy the badge." if e.locale == "en" else "选择一名存活玩家接警徽，或跳过撕毁警徽。"),
+                        "candidates": candidates}, action="badge_transfer")
+                    target = answer.get("target")
+                elif candidates:
+                    target = await self._npc_call(self.agents[seat.name].vote, candidates, sheriff=True,
+                                                  action="badge_transfer")
+                else:
+                    target = None
+                e.sheriff = target
+                self.emit({"type": "badge", "from": seat.pos, "target": target, "text": (
+                    f"{seat.name}: badge → #{target}." if target is not None else f"{seat.name}: badge destroyed.")
+                    if e.locale == "en" else (f"{seat.name} 将警徽交给 {target} 号。" if target is not None else f"{seat.name} 撕毁了警徽。")}, publish=False)
+                self._commit_batch()
+            eligible = seat.death_cause == "exile" or (e.night_count == 1 and e.phase in ("night", "dawn"))
+            if eligible:
+                if seat.is_player:
+                    answer = await self.ask_player("table_answer", {"from": "Raven" if e.locale == "en" else "夜鸦", "last_words": True}, action="last_words")
+                    speech = Speech(text=answer.get("answer", ""))
+                elif self.planner is not None:
+                    speech = await self._npc_call(self.agents[seat.name].speak, [], task="last words",
+                        action="last_words", instruction="You are out. Leave a brief farewell using only your own knowledge. No questions or new actions; preserve your character's voice.")
+                    speech = Speech(text=speech.text)
+                else:
+                    # Use the dead player's own lawful brain, never other roles.
+                    speech = self.agents[seat.name].brain.answer_check_question()
+                done.append(seat.pos)
+                if speech.text.strip():
+                    await self._publish_table_speech(seat, speech, "last_words")
+                    continue
+            else:
+                done.append(seat.pos)
+            self.emit({"type": "narration", "text": (
+                f"{seat.name}: no last words." if e.locale == "en" else f"{seat.name}：遗言结束（跳过或本次死亡无遗言资格）。")}, publish=False)
+            self._commit_batch()
 
     async def _gun_target(self, shooter, role_cn) -> Optional[int]:
         e = self.engine

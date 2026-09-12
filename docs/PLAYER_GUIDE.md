@@ -27,8 +27,20 @@ online lobby. Text is the evidence: portraits do not encode tells.
 5. Vote for an offered candidate (`vote 7`). Good wins when all wolves are
    eliminated. Wolves win when **either all special good roles or all ordinary
    villagers are eliminated**; parity alone is not this variant's win rule.
-   Dead players stop acting, apart from eligible immediate death abilities,
-   and can watch the rest of the game and review.
+   New player games resolve death abilities, then transfer/destroy a dead sheriff's
+   badge. First-night victims and daytime exiles receive optional last words;
+   other deaths do not. They can then watch the rest of the game and review.
+
+Clarifications are separate for election and daytime. Multiple questions to one
+person are shown together with their source quotes and receive one answer (or
+explicit skip). The host announces deferred follow-ups before the closing
+statement; a closing statement is not another question round. The browser table
+retains portraits, current speaker and a separate action area. Full rules are
+collapsible during onboarding and available from the Host with `/rules`.
+
+本轮规则补充：警上与白天的澄清机会分开，每名被问者合并回答（或跳过），并能看到问题原句。
+主持人收口后不再承诺后续回答。新对局死亡先处理技能，再交接／撕毁警徽；首夜死者与白天
+被放逐者有可跳过的遗言，其他死亡无遗言。旧存档不补发已经过去的遗言。
 
 Use **Ask the Host** or `?How does the Guard work?` whenever waiting for an
 action. This is private and does not spend that action. The host does not

@@ -66,6 +66,7 @@ def snapshot(session) -> dict:
         "campaign_review_state": session.campaign_review_state,
         "conjecture": session.conjecture,
         "onboarding": session.onboarding,
+        "dialogue_version": session.dialogue_version,
         "engine": session.engine.snapshot(),
         "agents": {name: agent.snapshot() for name, agent in session.agents.items()},
         "planner": planner.snapshot() if planner is not None and hasattr(planner, "snapshot") else None,
@@ -145,6 +146,10 @@ def _prepare_loop_state(data):
         for key, dest in (("conjecture", "conjecture"), ("onboarding", "onboarding"),
                           ("finished", "finished"), ("table_cooldown", "_table_cooldown")):
             state[dest] = typed(key, bool, False)
+        version = typed("dialogue_version", int, 0)
+        if version not in (0, 1):
+            raise ValueError("Unsupported dialogue version")
+        state["dialogue_version"] = version
         for key, dest in (("step", "_step"), ("current_step", "_current_step")):
             value = data.get(key)
             if value is not None and not isinstance(value, str):

@@ -88,7 +88,7 @@ function renderCharacterPreview() {
   const character = characterCatalog.find(c => c.id === choice);
   document.querySelector(".cast-settings").hidden = choice !== "custom";
   $("#characterPreview").innerHTML = character
-    ? `<img src="${character.portrait}" alt="${escapeHtml(character.name)}"><div><h3>${escapeHtml(character.name)} · ${escapeHtml(character.title)}</h3><p>${escapeHtml(character.story)}</p><blockquote>${escapeHtml(character.phrase)}</blockquote><details><summary>${setupText("说话方式", "Speaking style")}</summary><p>${escapeHtml(character.voice || character.description)}</p></details></div>`
+    ? `<img src="${character.portrait}" alt="${escapeHtml(character.name)}"><div><h3>${escapeHtml(character.name)} · ${escapeHtml(character.title)}</h3><p>${escapeHtml(character.story)}</p><blockquote>${escapeHtml(character.voice_sample || character.phrase)}</blockquote><p class="field-help">${escapeHtml(character.motive_and_blind_spot || "")}</p><p class="field-help">${setupText("受压时：", "Under pressure: ")}${escapeHtml(character.under_pressure || character.voice || character.description)}</p></div>`
     : `<p>${choice === "custom" ? setupText("在下方分别设置名字和人格。", "Customize names and personalities below.") : setupText(`从 ${characterCatalog.length} 位人物中随机成为一位，每局再抽取 11 位不同的同桌。名字、肖像与性格绑定，秘密身份独立。`, `Become one of ${characterCatalog.length} characters; draw 11 distinct tablemates each game. Names, portraits and personalities stay together, independently of secret roles.`)}</p>`;
   document.querySelectorAll("#characterCards button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.character === choice)));
   if (choice !== "custom") $("#offlineCharacter").value = choice;
@@ -121,7 +121,7 @@ async function loadCharacterCards() {
       $("#characterChoice").add(new Option(`${c.name} · ${c.title}`, c.id));
       const button = document.createElement("button");
       button.type = "button"; button.dataset.character = c.id;
-      button.innerHTML = `<img src="${c.portrait}" alt="" loading="lazy"><strong>${escapeHtml(c.name)}</strong><span>${escapeHtml(c.title)}</span>`;
+      button.innerHTML = `<img src="${c.portrait}" alt="" loading="lazy"><strong>${escapeHtml(c.name)}</strong><span>${escapeHtml(c.title)}</span><span>${escapeHtml(c.motive_and_blind_spot || c.description)}</span>`;
       button.setAttribute("aria-label", setupText("选择人物：", "Choose character: ") + c.name);
       button.onclick = () => { $("#characterChoice").value = c.id; renderCharacterPreview(); };
       $("#characterCards").appendChild(button);

@@ -141,12 +141,19 @@ function lockNames(locked) {
 
 // ---------- 座位渲染 ----------
 function renderSeats(state) {
+  document.body.classList.add("has-table");
   // 清掉旧座位（保留 moon/center）
   Object.values(seats).forEach((s) => s.el.remove());
   seats = {};
   const list = state.seats;
   list.forEach((s) => {
-    const el = document.createElement("div");
+    const el = document.createElement("button");
+    el.type = "button";
+    el.dataset.seat = s.pos;
+    const angle = (s.pos - 1) * Math.PI / 6 - Math.PI / 2;
+    el.style.setProperty("--seat-x", `${50 + 40 * Math.cos(angle)}%`);
+    el.style.setProperty("--seat-y", `${50 + 42 * Math.sin(angle)}%`);
+    el.onclick = () => document.querySelector(`#actionPanel button[data-target="${s.pos}"]`)?.click();
     el.className = "seat";
     const file = typeof s.character_id === "string" && /^[a-z][a-z0-9_]{0,31}$/.test(s.character_id)
       ? s.character_id : PORTRAITS[s.player_id] || PORTRAITS[s.name] || "";
@@ -161,6 +168,10 @@ function renderSeats(state) {
     seats[s.pos] = { el, data: s };
     if (s.is_player) { mySeat = s.pos; el.classList.add("mine"); }
     if (s.alive === false) el.classList.add("dead");
+    if (s.alive === false && s.role_cn) {
+      el.querySelector(".role-badge").textContent = s.role_cn;
+      el.querySelector(".role-badge").style.display = "inline-block";
+    }
   });
   if (state.sheriff) markSheriff(state.sheriff);
   updateSeatLabels();
@@ -202,7 +213,7 @@ function highlightSpeaker(pos) {
   Object.values(seats).forEach((s) => s.el.classList.remove("speaking"));
   if (seats[pos]) seats[pos].el.classList.add("speaking");
   updateSeatLabels();
-  setTimeout(() => { if (seats[pos]) seats[pos].el.classList.remove("speaking"); updateSeatLabels(); }, 2500);
+  // A speech remains current until the next speaker/phase, not for 2.5 seconds.
 }
 
 // ---------- 日志 ----------
@@ -219,11 +230,12 @@ function log(text, cls = "") {
 function narr(text) { log(escapeHtml(text), "narr"); }
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
 // ---------- 玩家身份 ----------
 function showPlayer(pv) {
+  $("#myRoleQuick").textContent = pv ? `${uiLocale === "en" ? "Your private role" : "你的私密身份"} · ${pv.role_cn}` : (uiLocale === "en" ? "Public spectator" : "公开旁观");
   if (!pv) {
     mySeat = null;
     $("#playerBody").textContent = uiLocale === "en" ? "Public spectator · no private information" : "公开旁观 · 不显示私密信息";
@@ -242,7 +254,14 @@ function showPlayer(pv) {
 
 // ---------- 事件分发 ----------
 function handleEvent(d) {
+  if (typeof updateRoundtable === "function") updateRoundtable(d);
   switch (d.type) {
+    case "badge": narr(d.text); markSheriff(d.target); break;
+    case "state": renderSeats(d.state); break;
+    case "discussion_closed":
+      narr(d.text);
+      for (const q of d.deferred || []) narr(`${q.from} → ${q.target} · ${uiLocale === "en" ? "deferred" : "暂缓"}`);
+      break;
     case "init":
       applyLocale(d.state.locale);
       $("#locale").disabled = true;
@@ -251,11 +270,15 @@ function handleEvent(d) {
       showLlmStatus(d.llm_status);
       log(`🎙️ ${escapeHtml(d.host_intro)}`, "narr"); break;
     case "llm_status": showLlmStatus(d.llm_status); break;
-    case "narration": narr(d.text); setPhase(d.phase); if (d.sheriff) markSheriff(d.sheriff); break;
+    case "narration":
+      narr(d.text);
+      if (d.full_rules) log(`<details><summary>${uiLocale === "en" ? "Full rules for this table" : "本局完整规则"}</summary>${escapeHtml(d.full_rules).replace(/\n/g, "<br>")}</details>`, "narr");
+      setPhase(d.phase); if (d.sheriff) markSheriff(d.sheriff); break;
     case "private": log(`🔒 ${escapeHtml(d.text)}`, "private"); break;
     case "speech":
       highlightSpeaker(d.seat);
-      log(`<b>${d.seat ? seatText(d.seat) + " · " : ""}${escapeHtml(d.name)}</b>：${escapeHtml(d.text)}`, "speech"); break;
+      if (d.reply_to?.length) log(`<details><summary>${uiLocale === "en" ? "Replying to" : "回应的追问"}</summary>${d.reply_to.map(q => `<p>${escapeHtml(q.from)}：${escapeHtml(q.text)}</p>`).join("")}</details>`, "narr");
+      log(`<b>${d.seat ? seatText(d.seat) + " · " : ""}${escapeHtml(d.name)}</b>${d.talk_kind === "last_words" ? (uiLocale === "en" ? " · Last words" : " · 遗言") : ""}：${escapeHtml(d.text)}`, "speech"); break;
     case "death": log(`💀 ${escapeHtml(d.text)}`, "death"); markDead(d.seat); break;
     case "flip": log(`🂠 ${escapeHtml(d.text)}`, "flip"); revealRole(d.seat, d.role_cn); break;
     case "exile": log(`⚖️ ${escapeHtml(d.text)}`, "exile"); markDead(d.seat); break;
@@ -433,7 +456,7 @@ function showAction(d) {
   panelEl.innerHTML = "";
   if (Array.isArray(d.choices)) {
     const hint = document.createElement("p");
-    hint.textContent = data.final_reply ? tr("投票前，留给你一次完整回应") + "。" + tr("可以集中解释刚才的质疑，也可以跳过。提交后进入投票，不再追加追问。")
+    hint.textContent = data.last_words ? (uiLocale === "en" ? "Your last words. Choose a statement or skip." : "你的遗言：选择一句话，或跳过。") : data.final_reply ? tr("投票前，留给你一次完整回应") + "。" + tr("可以集中解释刚才的质疑，也可以跳过。提交后进入投票，不再追加追问。")
       : kind === "ready" ? tr("先阅读本局规则，有疑问可问主持人。确认后才进入第一夜。")
       : (uiLocale === "en" ? "Respond, or listen for now" : "接着桌上的话，也可以先听听");
     panelEl.append(hint);
@@ -520,7 +543,8 @@ function showAction(d) {
     $("#skipTableReply").onclick = () => submitAction({ text: "" });
     $("#sendTableReply").onclick = () => submitAction({ text: $("#tableReplyInput").value.trim() });
   } else if (kind === "table_answer") {
-    panelEl.innerHTML = `<h4>${data.final_reply ? tr("投票前，留给你一次完整回应") : `${escapeHtml(data.from || tr("有人"))} ${tr("在追问你")}`}</h4>
+    panelEl.innerHTML = `<h4>${data.last_words ? (uiLocale === "en" ? "Your last words" : "请留下遗言") : data.final_reply ? tr("投票前，留给你一次完整回应") : `${escapeHtml(data.from || tr("有人"))} ${tr("在追问你")}`}</h4>
+      ${(data.questions || []).map(q => `<blockquote class="talk-quote"><b>${escapeHtml(q.from)}</b> · ${q.event_no ? `#${Number(q.event_no)}` : ""}<br>${escapeHtml(q.text)}</blockquote>`).join("")}
       ${data.final_reply ? `<p>${tr("可以集中解释刚才的质疑，也可以跳过。提交后进入投票，不再追加追问。")}</p>` : ""}
       <textarea id="tableAnswerInput" maxlength="4000" aria-label="${tr("回答")}" placeholder="${tr("简短回应，或让主持人继续推进...")}"></textarea>
       <div class="btn-row"><button class="cand-btn" id="skipTableAnswer">${tr("跳过")}</button>
@@ -547,12 +571,14 @@ function showAction(d) {
     cands.forEach((c) => {
       const b = document.createElement("button");
       b.className = "cand-btn";
+      b.dataset.target = c.pos;
       b.textContent = c.pos === 0 ? tr("平安日") : `${seatText(c.pos)} ${c.name}${c.note ? " (" + c.note + ")" : ""}`;
       b.onclick = () => {
         sel = c.pos;
         [...btns.children].forEach((x) => x.classList.remove("sel"));
         b.classList.add("sel");
         $("#sendVote").disabled = false;
+        $("#sendVote").textContent = `${tr("确认投票")} → ${c.pos === 0 ? tr("平安日") : seatText(c.pos) + " " + c.name}`;
       };
       btns.appendChild(b);
     });
@@ -569,19 +595,21 @@ function showAction(d) {
     } else {
       html += `<div class="btn-row" id="nightBtns"></div>`;
     }
-    html += `<button class="send-btn" id="sendNight">${tr("确认")}</button>`;
+    html += `<button class="send-btn" id="sendNight">${isWitch ? tr("确认") : data.role_key === "badge" ? (uiLocale === "en" ? "Destroy badge" : "撕毁警徽") : tr("跳过")}</button>`;
     panelEl.innerHTML = html;
     if (!isWitch) {
       const btns = $("#nightBtns"); let sel = null;
       cands.forEach((c) => {
         const b = document.createElement("button");
         b.className = "cand-btn";
+        b.dataset.target = c.pos;
         b.textContent = `${seatText(c.pos)} ${c.name}${c.note || ""}`;
         if (c.note) b.classList.add("self-knife");
         b.onclick = () => {
           sel = c.pos;
           [...btns.children].forEach((x) => x.classList.remove("sel"));
           b.classList.add("sel");
+          $("#sendNight").textContent = `${tr("确认")} → ${seatText(c.pos)} ${c.name}`;
         };
         btns.appendChild(b);
       });
