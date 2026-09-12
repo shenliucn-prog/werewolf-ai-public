@@ -2,9 +2,9 @@
 
 [English](README.md) | 简体中文
 
-<!-- version: 0.2.0 -->
+<!-- version: 0.3.0 -->
 
-当前版本：**0.2.0**（实验版本），参见[发布页](https://github.com/shenliucn-prog/werewolf-ai-public/releases/tag/v0.2.0)。
+当前版本：**0.3.0**（实验版本），参见[发布页](https://github.com/shenliucn-prog/werewolf-ai-public/releases/tag/v0.3.0)。
 参见[更新日志](CHANGELOG.md)与[版本发布流程](docs/RELEASING.md)。
 
 本机运行的单人狼人杀：你占一个座位，与 11 个 AI 对手对局。
