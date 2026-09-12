@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Prepare v0.3.0 with consolidated bilingual release notes and matching version markers.", "zh": "准备 v0.3.0，整理双语发布说明并同步版本标记。"},
+  "compatibility": {"en": "No additional runtime changes; preserved casts and new-character save limitations are documented. Back up local saves before upgrading.", "zh": "不新增运行逻辑；记录人物映射恢复与新人物存档限制，升级前备份本地存档。"},
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md", "CHANGELOG.md"],
+  "reason": "Explicitly authorized numbered release; document all changes since v0.2.0 and honest verification limits."
+}
