@@ -16,18 +16,23 @@ const w = dom.window;
 const players = ['acheng','dashan','amo','alan','xiaoman','yexiao','xiaolu','aman','tiandou','xicao','laomai','aji']
   .map((id, i) => ({id, name: `Player ${i}`, is_player: i === 0}));
 const requests = [];
+const library = [...players, ...Array.from({length:18}, (_,i) => ({id:`guest${i}`,name:`Guest ${i}`}))];
 const connectionsResponse = {connections: [
   {name: 'local-codex', adapter: 'codex', model: 'gpt-x'},
 ]};
 let startResponse = {ok: true, game_id: 'ui-test'};
 let rejoinResponse = null;
+let checkFails = false;
 w.fetch = async (url, options = {}) => {
   const body = options.body ? JSON.parse(options.body) : null;
   requests.push({url, body});
   let response;
   let ok = true;
   if (url === '/api/agent_connections') response = connectionsResponse;
-  else if (url.startsWith('/api/offline/cast')) response = {characters: players.map(p => ({...p, description:'Fixed personality'}))};
+  else if (url === '/api/connection/setup') response = {token:'test-token', codex_installed:true};
+  else if (url === '/api/connection/register') { connectionsResponse.connections.push({name:body.name,adapter:'codex',model:body.model,effort:body.effort,max_calls:body.max_calls}); response = {ok:true, verified:false}; }
+  else if (url === '/api/connection/check') { ok = !checkFails; response = checkFails ? {detail:'Connection failed; retry'} : {ok:true,summary:{driver:'agent',adapter:'codex',model:'gpt-x',effort:'medium',max_calls:240}}; }
+  else if (url.startsWith('/api/offline/cast')) response = {characters: library.map(p => ({...p, description:'Fixed personality', title:'Authored character', story:'Independent of hidden role', phrase:'Let us talk',portrait:`/img/portraits/${p.id}.png`}))};
   else if (url === '/api/offline/start') response = {ok:true, game_id:'offline-ui', counted:false};
   else if (url.startsWith('/api/rejoin')) response = rejoinResponse;
   else if (url.startsWith('/api/boards')) response = {
@@ -43,6 +48,7 @@ w.EventSource = class { close(){} constructor(){} };
 w.confirm = () => true;
 vm.runInContext(fs.readFileSync(path.join(root, 'js', 'i18n.js'), 'utf8'), dom.getInternalVMContext());
 vm.runInContext(fs.readFileSync(path.join(root, 'js', 'app.js'), 'utf8'), dom.getInternalVMContext());
+vm.runInContext(fs.readFileSync(path.join(root, 'js', 'setup-ui.js'), 'utf8'), dom.getInternalVMContext());
 const flush = () => new Promise(resolve => setTimeout(resolve, 10));
 (async () => {
   await flush();
@@ -52,6 +58,17 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 10));
   assert.ok(driverMode);
   assert.equal(driverMode.value, '');                       // server default
   assert.equal(connectionRow.hidden, true);                 // hidden unless agent
+  assert.equal(w.document.querySelectorAll('#characterCards button').length, 30);
+  const search = w.document.querySelector('#characterSearch');
+  search.value = 'Guest 17'; search.dispatchEvent(new w.Event('input'));
+  assert.equal(w.document.querySelectorAll('#characterCards button:not([hidden])').length, 1);
+  search.value = 'not-a-person'; search.dispatchEvent(new w.Event('input'));
+  assert.match(w.document.querySelector('#characterCount').textContent, /没有|No matching/);
+  search.value = ''; search.dispatchEvent(new w.Event('input'));
+  assert.equal(w.document.querySelectorAll('#characterCards button:not([hidden])').length, 30);
+  w.document.querySelector('#characterCards button[data-character="amo"]').click();
+  assert.equal(w.document.querySelector('#characterChoice').value, 'amo');
+  assert.match(w.document.querySelector('#characterPreview').textContent, /Independent/);
 
   // ---- agent driver: select a pre-configured connection (never a command) ----
   driverMode.value = 'agent';
@@ -66,6 +83,7 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 10));
   assert.equal(agentStart.driver, 'agent');
   assert.equal(agentStart.connection, 'local-codex');
   assert.ok(!('command' in agentStart));                    // never an executable
+  assert.equal(agentStart.character, 'amo');
 
   w.eval('gameId = null');
 
@@ -132,7 +150,7 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 10));
   assert.equal(recovered.request_id, 'restored-request');
   assert.equal(recovered.answer, '恢复后的答案');
 
-  assert.equal(w.document.querySelector('#offlineCharacter').options.length, 12);
+  assert.equal(w.document.querySelector('#offlineCharacter').options.length, 31);
   w.confirm = () => false;
   const beforeCancel = requests.length;
   w.document.querySelector('#offlineGame').click();
@@ -176,6 +194,25 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 10));
   more.querySelector('button').click();
   await flush();
   assert.equal(requests.filter(r => r.url === '/api/action').pop().body.choice_id, 'claim:seer');
+  // New local registration is explicit, does not start a game or run a check.
+  driverMode.value = 'agent'; driverMode.dispatchEvent(new w.Event('change'));
+  const beforeRegistration = requests.filter(r => ['/api/start','/api/connection/check'].includes(r.url)).length;
+  w.document.querySelector('#connectionName').value = 'New local';
+  w.document.querySelector('#registerCodex').click(); await flush();
+  assert.equal(requests.filter(r => ['/api/start','/api/connection/check'].includes(r.url)).length, beforeRegistration);
+  assert.equal(connectionSel.value, 'New local');
+  assert.match(w.document.querySelector('#connectionFeedback').textContent, /尚未验证|not yet verified/);
+  assert.equal(requests.filter(r => r.url === '/api/connection/register').pop().body.command, undefined);
+  checkFails = true;
+  w.document.querySelector('#checkConnection').click(); await flush();
+  assert.match(w.document.querySelector('#connectionFeedback').textContent, /failed/);
+  checkFails = false;
+  w.document.querySelector('#checkConnection').click(); await flush();
+  assert.match(w.document.querySelector('#connectionFeedback').textContent, /240/);
+  w.eval('showAction({kind:"table_answer",request_id:"last-reply",data:{final_reply:true,from:"Host"}})');
+  assert.match(panel.textContent, /完整回应|final reply/);
+  await flush();
+  assert.equal(w.document.querySelector('#actionJump').hidden, false);
   assert.deepEqual(errors, []);
   console.log('PASS: driver selector (api/agent/offline), pre-configured connection, unconfigured guidance, and table_answer controls');
   w.close();

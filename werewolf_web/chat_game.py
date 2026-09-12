@@ -182,6 +182,9 @@ def _ordinary_request_prompt(kind: str, data: dict, locale: str = "zh-CN") -> st
         return (f"\n{data.get('from', 'Someone')} interrupted: {data.get('text', '')}\nReply briefly, or press Enter to pass:\n> " if en
                 else f"\n{data.get('from', '有人')} 打断你：{data.get('text', '')}\n简短回应，或直接回车暂不回应：\n> ")
     if kind == "table_answer":
+        if data.get("final_reply"):
+            return ("\nBefore voting: one final reply. Explain your position, or type skip. No further interruptions.\n> " if en
+                    else "\n投票前，留给你一次完整回应：可集中解释质疑，或输入 跳过。之后不再追加追问。\n> ")
         return (f"\nAnswer {data.get('from', 'the questioner')}'s question, or type skip to pass:\n> " if en
                 else f"\n请简短回答 {data.get('from', '提问者')} 的追问；输入 跳过 或直接回车暂不回答：\n> ")
     if kind == "election_up":
@@ -302,7 +305,7 @@ async def _repl(session: GameSession) -> int:
 async def play(board_id: str, seed: int | None, offline: bool, locale: str, names=None,
                personalities=None, conjecture=False, player_role=None, backend=None,
                model=None, effort=None, max_calls=None, agent_command=None,
-               resume_game_id=None):
+               resume_game_id=None, character=None):
     from . import driver as driver_mod
     from .ai.decision_runtime import create_runtime, ModelTurnError
     from . import checkpoint, campaign_flow, settings as user_settings
@@ -400,6 +403,7 @@ async def play(board_id: str, seed: int | None, offline: bool, locale: str, name
                           seed=seed, locale=locale, names=names,
                           personalities=personalities, conjecture=conjecture, player_role=player_role,
                           onboarding=True, planner=planner,
+                          character=character,
                           checkpoint_path=checkpoint.checkpoint_path(session_id))
     session.driver, session.adapter = resolved["driver"], resolved["adapter"]
     print("Text only; voice and visual gameplay are not designed or implemented." if locale == "en" else
@@ -506,6 +510,7 @@ def main():
     parser = argparse.ArgumentParser(description="对话式狼人杀")
     parser.add_argument("--board", help="板子 ID；省略时先选择 / select before dealing")
     parser.add_argument("--role", default="random", help="Your role ID, or random (default); see --list-roles")
+    parser.add_argument("--character", help="Authored character ID or random; separate from secret game role")
     parser.add_argument("--list-roles", action="store_true", help="List roles available on the selected board")
     parser.add_argument("--seed", type=int, help="可复现随机种子")
     parser.add_argument("--offline", action="store_true", help="只使用本地表达")
@@ -606,7 +611,7 @@ def main():
         parser.error(str(error))
     result = asyncio.run(play(args.board, args.seed, args.offline, args.lang, names, personalities,
                               args.conjecture, args.role, args.backend, args.model, args.effort, args.max_model_calls,
-                              args.agent_command))
+                              args.agent_command, character=args.character))
     if result == 1:
         raise SystemExit(1)
 

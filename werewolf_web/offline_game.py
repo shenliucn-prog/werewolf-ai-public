@@ -94,8 +94,14 @@ def action_choices(session, kind, data):
         key = "answer" if kind == "table_answer" else "text"
         choices = speech_choices(session, session.engine.player_seat(), kind != "speech")
         suggested = {c["id"] for c in shortlist(choices)}
-        return [{**c, "suggested": c["id"] in suggested,
-                 "payload": {key: c["label"], "offline_speech": c["speech"]}} for c in choices]
+        result = [{**c, "suggested": c["id"] in suggested,
+                   "payload": {key: c["label"], "offline_speech": c["speech"]}} for c in choices]
+        if kind == "table_answer":
+            result.insert(0, {"id": "skip", "group": words(lang, "回应", "Respond"),
+                "label": words(lang, "不再补充，进入投票。" if data.get("final_reply") else "暂不回答。",
+                               "No further reply; proceed to voting." if data.get("final_reply") else "Skip this reply."),
+                "suggested": True, "payload": {"skip": True}})
+        return result
     def option(key, label, payload):
         return {"id": key, "group": words(lang, "行动", "Action"), "label": label, "payload": payload}
     if kind == "ready":
@@ -258,11 +264,17 @@ class OfflineSession(GameSession):
         if type(spectator) is not bool:
             raise ValueError("spectator must be boolean")
         locale = kwargs.get("locale", "zh-CN")
-        self.character_map, names = cast_settings(character, locale, player_name)
+        if character == "random":
+            seed = kwargs.get("seed")
+            rng = random.Random(f"{seed}:character") if seed is not None else random.SystemRandom()
+            character = rng.choice(tuple(BY_ID))
+        self.character_map, names = cast_settings(character, locale, player_name, seed=kwargs.get("seed"))
         self.character = character
         self.spectator = spectator
         self.proxy = None
         super().__init__(board_id, {"enabled": False}, names=names, onboarding=True, **kwargs)
+        self.engine.cast_personas = self.character_map.copy()
+        self.engine.character_cast = True
         self.campaign_counted = False
 
     def _install_agents(self):
@@ -382,11 +394,18 @@ class OfflineSession(GameSession):
         # Validate the proxy on a throwaway engine before applying base state.
         probe = deepcopy(self.engine)
         probe.restore(data["engine"])
+        if probe.character_cast and probe.cast_personas.get("acheng") != self.character:
+            raise ValueError("Offline character does not match saved cast")
         if probe.seats:
             if not isinstance(extra.get("proxy"), dict) or extra["proxy"].get("name") != probe.player_seat().name:
                 raise ValueError("Missing or mismatched offline proxy")
             ChoiceAgent.restore_agent(extra["proxy"], probe, self.llm, self.memory_dir)
         super().restore(data)
+        if self.engine.character_cast:
+            self.character_map = self.engine.cast_personas.copy()
+        else:
+            from .offline_cast import legacy_cast_settings
+            self.character_map = legacy_cast_settings(self.character, self.engine.locale)
         self._install_agents()
         self.proxy = (ChoiceAgent.restore_agent(extra["proxy"], self.engine, self.llm, self.memory_dir).bind(self)
                       if extra.get("proxy") else None)
@@ -487,17 +506,18 @@ async def play(session, *, read=input, write=print, automatic=False):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--board", choices=tuple(BOARD_MAP), default="classic")
-    parser.add_argument("--character", choices=tuple(BY_ID), default="acheng")
+    parser.add_argument("--character", choices=("random", *BY_ID), default="random")
     parser.add_argument("--role", default="random")
     parser.add_argument("--name")
     parser.add_argument("--spectate", action="store_true")
     parser.add_argument("--lang", choices=("zh-CN", "en"), default="zh-CN")
     parser.add_argument("--seed", type=int)
     parser.add_argument("--resume")
-    parser.add_argument("--cast", action="store_true", help="List the twelve fixed characters")
+    parser.add_argument("--cast", action="store_true", help="List the character library (twelve are drawn per game)")
     args = parser.parse_args(argv)
     if args.cast:
-        names = {p["id"]: p["name"] for p in cast(args.lang)}
+        from .offline_cast import display_names
+        names = display_names(args.lang)
         for c in CHARACTERS:
             print(f"{c.id}: {names[c.id]} — {c.description[args.lang == 'en']}")
         return 0

@@ -97,6 +97,7 @@ class PublicPlayTest(unittest.IsolatedAsyncioTestCase):
                     elif kind == "election_withdraw":
                         self.assertFalse(s.submit({"withdraw": "yes"}))
                         answer = {"withdraw": True}; withdrawn = True
+                    elif kind == "table_answer": answer = {"skip": True}
                     elif kind in ("speech", "table_reply"): answer = {"text": ""}
                     else:
                         if kind == "vote" and data.get("sheriff"):

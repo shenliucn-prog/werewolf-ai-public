@@ -18,6 +18,20 @@ universal Agent plugin or separate native app yet.
 
 ## Choose a mode
 
+The setup offers 30 authored characters, or a random character: portrait,
+name and personality travel together. Each game seats 12 distinct characters:
+your choice plus 11 sampled companions. This is separate from your secret role.
+Search names or personality descriptions in the gallery. Saved games keep their cast.
+See the [character library and artwork notes](docs/CHARACTERS.md).
+Custom names/personality settings remain available. Before each daytime exile
+vote, a living human gets one optional final reply, even after repeated questions.
+Offline play uses contextual choices instead of understanding arbitrary text.
+
+For a local Agent, open **Add local Agent connection** in web setup. Registering
+the built-in Codex adapter makes no model call; **Check connection** makes one
+separate verification call and does not start a game. Other Agents use a trusted
+local wrapper; see [connection setup](docs/MODEL_CONNECTIONS.md).
+
 In this checkout, offline discussion offers a few contextual replies plus
 “listen” first; “Other responses” retains the full menu. NPCs can respond to
 reports about themselves and competing Seer claims. No model is used, arbitrary
@@ -121,6 +135,12 @@ can reuse non-secret saved model settings; keep credentials in trusted local
 configuration for recovery.
 
 For the optional browser interface:
+
+The web desk groups setup into connection, board/role, and start controls.
+During play, all twelve seats sit above the conversation; your identity and
+private rules chat stay separate. Reading older speech does not force-scroll
+you to new messages: use “Latest speech” to catch up. The review can be closed
+and reopened from the table. Layout and labels support mobile and Chinese/English.
 
 ```bash
 python -m uvicorn werewolf_web.run:app --host 127.0.0.1 --port 8000

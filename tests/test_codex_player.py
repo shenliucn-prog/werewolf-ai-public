@@ -268,6 +268,7 @@ class CodexPlayerTest(unittest.IsolatedAsyncioTestCase):
                             action = {"ready": True}
                         elif kind == "election_up":
                             action = {"up": False}
+                        elif kind == "table_answer": action = {"skip": True}
                         elif kind in ("speech", "table_reply"):
                             action = {"text": "I am listening."}
                         else:

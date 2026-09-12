@@ -86,6 +86,10 @@ def redact_exif(data):
 
 def redact_portrait(data):
     metadata = png_metadata(data)
+    # New imagegen originals carry a provenance manifest, not legacy AIGC EXIF.
+    # Preserve the entire original, including provenance and pixel bytes.
+    if [item["type"] for item in metadata] == ["caBX"]:
+        return data, []
     if [item["type"] for item in metadata] != ["eXIf"]:
         raise ValueError("Unreviewed PNG metadata chunks")
     result, offset, removed = bytearray(PNG_SIGNATURE), 8, []
@@ -170,8 +174,8 @@ def prepare(output, root=ROOT):
         entries.append({"path": name, "source_sha256": hashlib.sha256(original).hexdigest(),
                         "sha256": hashlib.sha256(data).hexdigest(), "redacted_fields": removed})
         payloads.append((name, data))
-    if sum(name.startswith(PORTRAITS) and name.endswith(".png") for name, _ in payloads) != 12:
-        raise ValueError("Expected the reviewed twelve portraits")
+    if sum(name.startswith(PORTRAITS) and name.endswith(".png") for name, _ in payloads) != 30:
+        raise ValueError("Expected the reviewed thirty portraits")
     manifest = {"format": 1, "git_history_included": False,
                 "source_commit": source_commit,
                 "source_state": "working candidate including uncommitted release work; per-file hashes are authoritative",

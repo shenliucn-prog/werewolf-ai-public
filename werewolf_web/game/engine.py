@@ -53,6 +53,7 @@ class GameEngine:
         self.locale = normalize_locale(locale)
         self.cast_names = random_names(self.locale, seed, names)
         self.cast_personas = assign_personas(seed, personalities)
+        self.character_cast = False
         self.rng = random.Random(seed)
         self.seats: dict[int, Seat] = {}
         self.history: list[GameEvent] = []
@@ -518,7 +519,8 @@ class GameEngine:
             "day": self.day_count,
             "night": self.night_count,
             "sheriff": self.sheriff,
-            "seats": [s.to_public() for s in self.seats.values()],
+            "seats": [{**s.to_public(), **({"character_id": s.persona_id} if self.character_cast else {})}
+                      for s in self.seats.values()],
             "alive_count": len(self.alive_seats()),
             "winner": self.winner,
             "end_reason": self.end_reason,
@@ -555,6 +557,7 @@ class GameEngine:
             "player_role": self.player_role,
             "cast_names": self.cast_names,
             "cast_personas": self.cast_personas,
+            "character_cast": self.character_cast,
             "seats": [seat.to_dict() for seat in self.seats.values()],
             "phase": self.phase,
             "day_count": self.day_count,
@@ -603,6 +606,17 @@ class GameEngine:
             raise ValueError(f"{where}: unknown player_role {player_role!r}")
         cast_names = require_dict(data, "cast_names", where)
         cast_personas = require_dict(data, "cast_personas", where)
+        character_cast = data.get("character_cast", False)
+        if type(character_cast) is not bool:
+            raise ValueError("character_cast must be boolean")
+        if character_cast:
+            from ..casting import CAST_IDS
+            from ..offline_cast import BY_ID
+            if (not all(isinstance(v, str) for v in cast_personas.values())
+                    or set(cast_personas) != set(CAST_IDS)
+                    or len(set(cast_personas.values())) != 12
+                    or not set(cast_personas.values()) <= set(BY_ID)):
+                raise ValueError("Character cast must contain each character once")
         phase = require_str(data, "phase", where)
         if phase not in PHASES:
             raise ValueError(f"{where}: unknown phase {phase!r}")
@@ -650,6 +664,8 @@ class GameEngine:
             if not isinstance(entry, dict):
                 raise ValueError(f"{where}: seats entries must be objects")
             seat = Seat.from_dict(entry)
+            if character_cast and (seat.player_id not in cast_personas or seat.persona_id != cast_personas[seat.player_id]):
+                raise ValueError("Seat character contradicts the saved character cast")
             if type(seat.pos) is not int or isinstance(seat.pos, bool):
                 raise ValueError(f"{where}: seat pos must be an integer")
             if seat.pos < 1 or seat.pos > 12:
@@ -729,6 +745,7 @@ class GameEngine:
         self.locale = locale
         self.cast_names = cast_names
         self.cast_personas = cast_personas
+        self.character_cast = character_cast
         self.seats = seats
         self.history = history
         self.phase = phase

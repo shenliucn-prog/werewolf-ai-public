@@ -57,11 +57,15 @@ class ReleaseCandidateTest(unittest.TestCase):
 
     def test_all_portraits_preserve_pixels_and_provenance_without_old_ids(self):
         paths = sorted((ROOT / "werewolf_web/static/img/portraits").glob("*.png"))
-        self.assertEqual(len(paths), 12)
+        self.assertEqual(len(paths), 30)
         for path in paths:
             original = path.read_bytes()
             result, removed = redact_portrait(original)
             before, after = chunks(original), chunks(result)
+            if any(c[0] == b"caBX" for c in before):
+                self.assertEqual(result, original)
+                self.assertEqual(removed, [])
+                continue
             self.assertEqual([c for c in before if c[0] != b"eXIf"], [c for c in after if c[0] != b"eXIf"])
             old_fields, old_envelope = description_and_provenance(next(c[1] for c in before if c[0] == b"eXIf"))
             fields, envelope = description_and_provenance(next(c[1] for c in after if c[0] == b"eXIf"))

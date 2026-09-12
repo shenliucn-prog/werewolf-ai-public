@@ -78,6 +78,7 @@ class RoleSessionTest(unittest.IsolatedAsyncioTestCase):
                         if event["type"] != "request": continue
                         kind, data = event["kind"], event["data"]
                         if kind == "conjecture": answer = {k: data[k] for k in ("private", "public")}
+                        elif kind == "table_answer": answer = {"skip": True}
                         elif kind in ("speech", "table_reply"): answer = {"text": "暂无新信息。"}
                         elif kind == "election_up": answer = {"up": False}
                         elif kind == "night" and data.get("role_key") == "witch": answer = {"save": None, "poison": None}

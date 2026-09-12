@@ -3,127 +3,152 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#14121e" />
   <title>狼人杀 · 暗夜茶馆</title>
-  <link rel="stylesheet" href="/css/style.css?v=conversation-2" />
+  <link rel="stylesheet" href="/css/style.css?v=game-desk-2" />
 </head>
 <body>
+  <a class="skip-link" href="#actionPanel" data-i18n="跳到当前行动">跳到当前行动</a>
   <header class="topbar">
-    <div class="brand" id="brand">🐺 暗夜茶馆 · 狼人杀</div>
-    <span id="modeBadge" class="mode-badge" hidden></span>
-    <span id="status" class="status" role="status"></span>
-    <select id="locale" title="Language"><option value="zh-CN">中文</option><option value="en">English</option></select>
+    <div class="brand" id="brand">暗夜茶馆 · 狼人杀</div>
+    <div class="session-status"><span id="modeBadge" class="mode-badge" hidden></span><span id="status" class="status" role="status"></span></div>
+    <select id="locale" title="Language" aria-label="Language"><option value="zh-CN">中文</option><option value="en">English</option></select>
   </header>
-  <section class="play-intro" aria-labelledby="playTitle">
-    <div>
-      <h1 id="playTitle" data-i18n="推荐：在自己的 Agent 里玩">推荐：在自己的 Agent 里玩</h1>
-      <p data-i18n="你在 Agent 对话里发言和行动，由 Agent 连接游戏。网页版是可选界面，不是核心体验。">你在 Agent 对话里发言和行动，由 Agent 连接游戏。网页版是可选界面，不是核心体验。</p>
+  <section class="play-intro" aria-labelledby="welcomeTitle">
+    <div class="welcome-copy"><h1 id="welcomeTitle" data-i18n="入座，听每个人怎么说。">入座，听每个人怎么说。</h1><p data-i18n="十二个座位，一场关于信任的游戏。选择连接和板子，让主持人带你开局。">十二个座位，一场关于信任的游戏。选择连接和板子，让主持人带你开局。</p></div>
+    <div class="agent-entry">
+      <h2 id="playTitle" data-i18n="推荐：在自己的 Agent 里玩">推荐：在自己的 Agent 里玩</h2>
+      <details id="textGuide">
+        <summary data-i18n="给 Agent 的开局说明">给 Agent 的开局说明</summary>
+        <p data-i18n="你在 Agent 对话里发言和行动，由 Agent 连接游戏。网页版是可选界面，不是核心体验。">你在 Agent 对话里发言和行动，由 Agent 连接游戏。网页版是可选界面，不是核心体验。</p>
+        <p data-i18n="当前可由支持本地终端和持续交互进程的 Agent 转接；尚无通用 Agent 插件或 MCP 接入。不会迁移当前网页对局。">当前可由支持本地终端和持续交互进程的 Agent 转接；尚无通用 Agent 插件或 MCP 接入。不会迁移当前网页对局。</p>
+        <code id="textCommand"></code><button type="button" id="copyTextCommand" data-i18n="复制给 Agent">复制给 Agent</button><span id="copyStatus" role="status"></span>
+        <a href="https://github.com/shenliucn-prog/werewolf-ai-public#quick-start" target="_blank" rel="noopener noreferrer" data-i18n="安装说明">安装说明</a>
+      </details>
     </div>
-    <details id="textGuide">
-      <summary data-i18n="给 Agent 的开局说明">给 Agent 的开局说明</summary>
-      <p data-i18n="当前可由支持本地终端和持续交互进程的 Agent 转接；尚无通用 Agent 插件或 MCP 接入。不会迁移当前网页对局。">当前可由支持本地终端和持续交互进程的 Agent 转接；尚无通用 Agent 插件或 MCP 接入。不会迁移当前网页对局。</p>
-      <code id="textCommand"></code>
-      <button type="button" id="copyTextCommand" data-i18n="复制给 Agent">复制给 Agent</button>
-      <span id="copyStatus" role="status"></span>
-      <a href="https://github.com/shenliucn-prog/werewolf-ai-public#quick-start" target="_blank" rel="noopener noreferrer" data-i18n="安装说明">安装说明</a>
-    </details>
   </section>
   <details id="gameSetup" class="game-setup" open>
     <summary data-i18n="网页版 · 开局设置">网页版 · 开局设置</summary>
-    <p class="setup-guidance" data-i18n="所有正式入口共用 LLM 决策玩家，不限定 Agent 品牌。先配置模型连接、选择板子；模型预检通过后再发身份。离线仅供规则测试。">所有正式入口共用 LLM 决策玩家，不限定 Agent 品牌。先配置模型连接、选择板子；模型预检通过后再发身份。离线仅供规则测试。</p>
-    <div class="controls">
-      <select id="board" title="选择板子"></select>
-      <label><span data-i18n="你的角色">你的角色</span> <select id="playerRole" aria-label="你的角色"><option value="random" data-i18n="随机身份">随机身份</option></select></label>
-      <label><input id="conjectureMode" type="checkbox"><span data-i18n="猜想模式（测试版）">猜想模式（测试版）</span></label>
-      <details class="llm-settings">
-        <summary data-i18n="名字与人格">名字与人格</summary>
-        <div class="llm-settings-body" style="max-height:70vh;overflow:auto">
-          <p data-i18n="每位NPC可选每局随机或固定人格；开局后锁定。">每位NPC可选每局随机或固定人格；开局后锁定。</p>
-          <button id="randomNames" type="button" data-i18n="随机名字">随机名字</button>
-          <div id="castNames"></div>
-          <p id="castError" role="alert"></p>
+    <div class="setup-grid">
+      <section class="setup-section" aria-labelledby="connectionTitle">
+        <h2 id="connectionTitle" data-i18n="谁来扮演其他玩家？">谁来扮演其他玩家？</h2>
+        <p class="field-help" data-i18n="正式对局需要模型或本机 Agent。连接检查通过后才会发牌。">正式对局需要模型或本机 Agent。连接检查通过后才会发牌。</p>
+        <details class="llm-settings" id="modelSettings" open><summary data-i18n="模型设置">模型设置</summary>
+          <div class="llm-settings-body">
+            <label><span data-i18n="驱动">驱动</span><select id="driverMode">
+              <option value="" data-i18n="使用服务器默认">使用服务器默认</option><option value="api" data-i18n="模型 API（含本地服务）">模型 API（含本地服务）</option><option value="agent" data-i18n="本机 Agent 连接">本机 Agent 连接</option><option value="offline" data-i18n="离线规则测试">离线规则测试</option>
+            </select></label>
+            <p id="driverHint" class="field-help"></p>
+            <label id="agentConnectionRow" hidden><span data-i18n="预配置连接">预配置连接</span><select id="agentConnection"></select></label>
+            <div id="apiFields" hidden>
+              <label><span data-i18n="接口地址">接口地址</span><input id="llmBaseUrl" placeholder="https://…/v1" autocomplete="off"></label>
+              <label><span data-i18n="模型名">模型名</span><input id="llmModel" placeholder="填写服务提供的模型名" autocomplete="off"></label>
+              <label>API Key<input id="llmApiKey" type="password" placeholder="仅用于本局，不保存" autocomplete="off"></label>
+              <details class="advanced-settings"><summary data-i18n="高级推理选项">高级推理选项</summary>
+                <label><span data-i18n="推理强度">推理强度</span><input id="llmReasoningEffort" placeholder="可选，如 medium" autocomplete="off"></label>
+                <label><span data-i18n="推理字段">推理字段</span><input id="llmReasoningParam" placeholder="可选，如 reasoning_effort" autocomplete="off"></label>
+              </details>
+            </div>
+            <select id="llmMode" hidden aria-hidden="true" tabindex="-1"><option value=""></option><option value="local"></option><option value="custom"></option></select>
+          </div>
+        </details>
+        <div id="connectionTools">
+          <p id="connectionSummary" class="field-help" role="status"></p>
+          <button type="button" id="checkConnection" data-i18n="检查连接">检查连接</button>
+          <p class="field-help" data-i18n="检查会调用一次模型，单独消耗额度；不发牌。开局仍会再次预检。">检查会调用一次模型，单独消耗额度；不发牌。开局仍会再次预检。</p>
+          <p id="connectionFeedback" role="status" aria-live="polite"></p>
+          <details id="registerConnection">
+            <summary data-i18n="添加本机 Agent 连接">添加本机 Agent 连接</summary>
+            <p class="field-help" data-i18n="内置 Codex 适配器可在这里登记。其他 Agent 使用下方本地登记工具；不会把当前聊天自动当成 NPC。">内置 Codex 适配器可在这里登记。其他 Agent 使用下方本地登记工具；不会把当前聊天自动当成 NPC。</p>
+            <p id="codexAvailability" class="field-help"></p>
+            <label><span data-i18n="连接名称">连接名称</span><input id="connectionName" value="Local Codex" maxlength="48"></label>
+            <label><span data-i18n="模型名称">模型名称</span><input id="connectionModel" value="gpt-5.6-terra" maxlength="120"></label>
+            <label><span data-i18n="推理强度">推理强度</span><select id="connectionEffort"><option>low</option><option selected>medium</option><option>high</option></select></label>
+            <label><span data-i18n="每局调用上限">每局调用上限</span><input type="number" id="connectionBudget" value="240" min="1" max="2000"></label>
+            <button id="registerCodex" type="button" data-i18n="登记本机 Codex（不调用模型）">登记本机 Codex（不调用模型）</button>
+            <details><summary data-i18n="其他 Agent 怎么接？">其他 Agent 怎么接？</summary>
+              <p class="field-help" data-i18n="在项目目录运行本地登记工具，并提供符合决策协议的 wrapper。网页不接受可执行命令。">在项目目录运行本地登记工具，并提供符合决策协议的 wrapper。网页不接受可执行命令。</p>
+              <code>python -m werewolf_web.connection_setup --help</code>
+              <a href="https://github.com/shenliucn-prog/werewolf-ai-public/blob/master/docs/MODEL_CONNECTIONS.md" target="_blank" rel="noopener noreferrer" data-i18n="适配器协议">适配器协议</a>
+            </details>
+          </details>
         </div>
-      </details>
-      <details class="llm-settings">
-        <summary data-i18n="模型设置">模型设置</summary>
-        <div class="llm-settings-body">
-          <label><span data-i18n="驱动">驱动</span> <select id="driverMode">
-            <option value="" data-i18n="使用服务器默认">使用服务器默认</option>
-            <option value="api" data-i18n="模型 API（含本地服务）">模型 API（含本地服务）</option>
-            <option value="agent" data-i18n="本机 Agent 连接">本机 Agent 连接</option>
-            <option value="offline" data-i18n="离线规则测试">离线规则测试</option>
-          </select></label>
-          <label id="agentConnectionRow" hidden><span data-i18n="预配置连接">预配置连接</span> <select id="agentConnection"></select></label>
-          <p id="setupGuidance" class="setup-guidance" role="alert" hidden></p>
-          <label><span data-i18n="模式">模式</span> <select id="llmMode"><option value="" data-i18n="使用服务器默认">使用服务器默认</option><option value="local" data-i18n="离线规则测试（非 LLM 对局）">离线规则测试（非 LLM 对局）</option><option value="custom" data-i18n="本局模型连接（API 或本地服务）">本局模型连接（API 或本地服务）</option></select></label>
-          <label><span data-i18n="接口地址">接口地址</span> <input id="llmBaseUrl" placeholder="https://.../v1" autocomplete="off"></label>
-          <label><span data-i18n="模型名">模型名</span> <input id="llmModel" placeholder="例如 gpt-4o-mini" autocomplete="off"></label>
-          <label>API Key <input id="llmApiKey" type="password" placeholder="仅用于本局，不保存" autocomplete="off"></label>
-          <label><span data-i18n="推理强度">推理强度</span> <input id="llmReasoningEffort" placeholder="可选，如 medium" autocomplete="off"></label>
-          <label><span data-i18n="推理字段">推理字段</span> <input id="llmReasoningParam" placeholder="可选，如 reasoning_effort" autocomplete="off"></label>
+      </section>
+      <section class="setup-section" aria-labelledby="tableSettingsTitle">
+        <h2 id="tableSettingsTitle" data-i18n="决定这一局">决定这一局</h2>
+        <div class="controls">
+          <label><span data-i18n="你想成为哪位人物？">你想成为哪位人物？</span><select id="characterChoice"><option value="random" data-i18n="随机人物（名字、头像、人格绑定）">随机人物（名字、头像、人格绑定）</option><option value="custom" data-i18n="自定义名字与人格">自定义名字与人格</option></select></label>
+          <div id="characterPreview" class="character-preview"></div>
+          <details id="characterGallery"><summary data-i18n="认识茶馆的人物">认识茶馆的人物</summary>
+            <label><span data-i18n="搜索名字或性格">搜索名字或性格</span><input id="characterSearch" type="search" maxlength="80"></label>
+            <p id="characterCount" class="field-help" role="status" aria-live="polite"></p>
+            <div id="characterCards" class="character-cards"></div>
+          </details>
+          <p class="field-help" data-i18n="人物决定外貌与性格，不决定阵营。狼人杀身份单独发牌；你可以自由扮演所选人物。">人物决定外貌与性格，不决定阵营。狼人杀身份单独发牌；你可以自由扮演所选人物。</p>
+          <label><span data-i18n="选择板子">选择板子</span><select id="board" title="选择板子"></select></label>
+          <p id="boardDescription" class="field-help" aria-live="polite"></p>
+          <label><span data-i18n="你的角色">你的角色</span><select id="playerRole" aria-label="你的角色"><option value="random" data-i18n="随机身份">随机身份</option></select></label>
+          <details class="llm-settings cast-settings"><summary data-i18n="名字与人格">名字与人格</summary><div class="llm-settings-body">
+            <p class="field-help" data-i18n="每位NPC可选每局随机或固定人格；开局后锁定。">每位NPC可选每局随机或固定人格；开局后锁定。</p>
+            <button id="randomNames" type="button" data-i18n="随机名字">随机名字</button><div id="castNames"></div>
+          </div></details>
+          <label class="check-label"><input id="conjectureMode" type="checkbox"><span data-i18n="猜想模式（测试版）">猜想模式（测试版）</span></label>
+          <p id="conjectureHint" class="field-help" data-i18n="模型对局暂不支持猜想表；仅离线规则研究可用。">模型对局暂不支持猜想表；仅离线规则研究可用。</p>
         </div>
-      </details>
-      <button id="newGame">开始新游戏</button>
-      <button id="campaignGame" type="button" data-i18n="开始闯关">开始闯关</button>
-      <button id="continueGame" type="button" data-i18n="继续游戏">继续游戏</button>
+      </section>
+      <section class="setup-section launch-section" aria-labelledby="launchTitle">
+        <h2 id="launchTitle" data-i18n="准备入座">准备入座</h2>
+        <p class="field-help" data-i18n="先认识本局规则和所有座位。你确认准备好，第一夜才开始。">先认识本局规则和所有座位。你确认准备好，第一夜才开始。</p>
+        <button id="newGame" class="primary">开始新游戏</button><span class="field-help" data-i18n="自由对局 · 使用所选板子与角色">自由对局 · 使用所选板子与角色</span>
+        <button id="campaignGame" type="button" data-i18n="开始闯关">开始闯关</button><span class="field-help" data-i18n="从平民起步，阵营获胜解锁下一角色；关卡固定板子。">从平民起步，阵营获胜解锁下一角色；关卡固定板子。</span>
+        <button id="continueGame" type="button" data-i18n="继续游戏">继续游戏</button><span id="continueHint" class="field-help"></span>
+      </section>
     </div>
-  <p class="mode-note" data-i18n="当前仅文字驱动。语音与视觉玩法尚无方案、尚未实现；头像仅作装饰。猜想模式要求双表并保留公开历史，不等于完美推理。">当前仅文字驱动。语音与视觉玩法尚无方案、尚未实现；头像仅作装饰。猜想模式要求双表并保留公开历史，不等于完美推理。</p>
-
-  <details id="offlineSetup">
-    <summary>离线选项玩法 / Offline choice game</summary>
-    <p>程序策略模拟，无需模型，不计闯关成绩。使用上方板子与身份；固定人物人格，不使用猜想表。 / Rule-based simulation, no model or campaign score. Uses the board and role above, a fixed cast, and no conjecture tables.</p>
-    <label>人物 / Character <select id="offlineCharacter"></select></label>
-    <p id="offlineDescription"></p>
-    <label><input id="offlineSpectator" type="checkbox">公开旁观（身份随机） / Public spectator (random roles)</label>
-    <button id="offlineGame" type="button">开始离线对局 / Start offline game</button>
-    <p id="offlineError" role="alert"></p>
+    <p id="setupGuidance" class="setup-guidance error-message" role="alert" hidden></p><p id="castError" class="error-message" role="alert"></p>
+    <details id="offlineSetup" class="offline-setup">
+      <summary data-i18n="不接模型？试试离线选项玩法">不接模型？试试离线选项玩法</summary>
+      <p class="field-help" data-i18n="程序策略模拟，不理解自由文本，不计闯关成绩。使用上方板子与身份，固定人物人格，不使用猜想表。">程序策略模拟，不理解自由文本，不计闯关成绩。使用上方板子与身份，固定人物人格，不使用猜想表。</p>
+      <div class="offline-fields">
+        <label><span data-i18n="替代一位人物">替代一位人物</span><select id="offlineCharacter"></select></label>
+        <label class="check-label"><input id="offlineSpectator" type="checkbox"><span data-i18n="公开旁观（身份随机）">公开旁观（身份随机）</span></label>
+        <button id="offlineGame" type="button" data-i18n="开始离线对局">开始离线对局</button>
+      </div><p id="offlineDescription" class="field-help"></p><p id="offlineError" class="error-message" role="alert"></p>
+    </details>
+    <p class="mode-note" data-i18n="当前仅文字驱动。语音与视觉玩法尚无方案、尚未实现；头像仅作装饰。猜想模式要求双表并保留公开历史，不等于完美推理。">当前仅文字驱动。语音与视觉玩法尚无方案、尚未实现；头像仅作装饰。猜想模式要求双表并保留公开历史，不等于完美推理。</p>
   </details>
-  <p id="boardDescription" aria-live="polite"></p>
-  </details>
-  <main class="layout">
-    <section class="conversation" aria-labelledby="conversationTitle">
-      <div class="conversation-heading"><h2 id="conversationTitle" data-i18n="对局对话">对局对话</h2><div id="phase-banner" class="phase-banner" role="status"></div></div>
-      <div class="log" id="log" role="log" aria-live="polite" aria-relevant="additions"><p class="empty-log" data-i18n="选择上方的设置并开始网页版对局。发言记录会显示在这里；轮到你时，在下方回应。">选择上方的设置并开始网页版对局。发言记录会显示在这里；轮到你时，在下方回应。</p></div>
-      <button id="retryCampaignReview" type="button" class="retry-review" hidden data-i18n="重新生成短复盘">重新生成短复盘</button>
-      <button id="retryCampaignTeaching" type="button" class="retry-review" hidden data-i18n="重新生成角色教学">重新生成角色教学</button>
-      <div class="action-panel" id="actionPanel" role="region" aria-label="当前行动 / Current action" style="display:none"></div>
+  <main class="layout" id="gameDesk">
+    <section class="roster" aria-labelledby="rosterTitle">
+      <div class="roster-heading"><h2 id="rosterTitle" data-i18n="本局玩家">本局玩家</h2><span id="rosterCount" class="field-help" role="status" data-i18n="发牌后显示完整座次">发牌后显示完整座次</span></div>
+      <div class="table" id="table"><span class="moon" id="moon" hidden></span><span class="center-logo" hidden>狼人杀</span></div>
     </section>
-    <aside class="game-context" aria-label="身份与玩家 / Role and players">
-      <div class="player-card" id="playerCard">
-        <div class="pc-title" id="identityTitle">你的身份</div>
-        <div class="pc-body" id="playerBody">尚未入局</div>
-      </div>
-      <details class="host-chat">
-        <summary class="pc-title" id="hostChatTitle">🎙️ 问主持人（规则单聊）</summary>
+    <aside class="game-context" aria-label="身份与规则 / Role and rules">
+      <section class="player-card" id="playerCard"><h2 class="pc-title" id="identityTitle">你的身份</h2><div class="pc-body" id="playerBody">尚未入局</div></section>
+      <details class="host-chat"><summary class="pc-title" id="hostChatTitle">问主持人（规则单聊）</summary>
         <div class="host-chat-log" id="hostChatLog">我只解释规则和公开流程，不会泄露身份或替你决策。</div>
-        <p data-i18n="也可查询：上一轮票型、第2天发言记录、座次。查询不消耗行动。">也可查询：上一轮票型、第2天发言记录、座次。查询不消耗行动。</p>
-        <div class="host-chat-entry">
-          <input id="hostQuestion" aria-labelledby="hostChatTitle" placeholder="例如：女巫怎么用药？" maxlength="320">
-          <button id="askHost" data-i18n="提问">提问</button>
-        </div>
+        <p class="field-help" data-i18n="也可查询：上一轮票型、第2天发言记录、座次。查询不消耗行动。">也可查询：上一轮票型、第2天发言记录、座次。查询不消耗行动。</p>
+        <div class="host-chat-entry"><input id="hostQuestion" aria-labelledby="hostChatTitle" placeholder="例如：女巫怎么用药？" maxlength="320"><button id="askHost" data-i18n="提问">提问</button></div>
       </details>
-      <details class="roster" open>
-        <summary data-i18n="本局玩家">本局玩家</summary>
-        <div class="table" id="table"><span class="moon" id="moon" hidden>🌕</span><span class="center-logo" hidden>狼人杀</span></div>
+      <details class="quick-help"><summary data-i18n="第一次玩？两分钟规则">第一次玩？两分钟规则</summary>
+        <p data-i18n="先连接模型、选择板子、关闭猜想模式。夜晚按私密提示行动；白天发言、比较声明、投票放逐。">先连接模型、选择板子、关闭猜想模式。夜晚按私密提示行动；白天发言、比较声明、投票放逐。</p>
+        <p data-i18n="全部狼人出局则好人胜；全部神职或全部平民出局则狼人胜。死者公开翻牌，警长放逐票重1.5票，平票无人出局。">全部狼人出局则好人胜；全部神职或全部平民出局则狼人胜。死者公开翻牌，警长放逐票重1.5票，平票无人出局。</p>
+        <p data-i18n="不懂就问主持人，不消耗行动。女巫用药以本局规则为准。断线后可继续同一局；存档缺失或损坏时不保证恢复。">不懂就问主持人，不消耗行动。女巫用药以本局规则为准。断线后可继续同一局；存档缺失或损坏时不保证恢复。</p>
       </details>
-  <details class="quick-help">
-    <summary data-i18n="第一次玩？两分钟规则">第一次玩？两分钟规则</summary>
-    <p data-i18n="先连接模型、选择板子、关闭猜想模式。夜晚按私密提示行动；白天发言、比较声明、投票放逐。">先连接模型、选择板子、关闭猜想模式。夜晚按私密提示行动；白天发言、比较声明、投票放逐。</p>
-    <p data-i18n="全部狼人出局则好人胜；全部神职或全部平民出局则狼人胜。死者公开翻牌，警长放逐票重1.5票，平票无人出局。">全部狼人出局则好人胜；全部神职或全部平民出局则狼人胜。死者公开翻牌，警长放逐票重1.5票，平票无人出局。</p>
-    <p data-i18n="不懂就问主持人，不消耗行动。原有女巫每局两瓶药，每夜择一；神女巫看本局规则。断线不能续局。">不懂就问主持人，不消耗行动。原有女巫每局两瓶药，每夜择一；神女巫看本局规则。断线不能续局。</p>
-  </details>
     </aside>
+    <section class="conversation" aria-labelledby="conversationTitle">
+      <div class="conversation-heading"><h2 id="conversationTitle" data-i18n="对局对话">对局对话</h2><div id="phase-banner" class="phase-banner" role="status"></div><button id="openReview" type="button" hidden data-i18n="查看复盘">查看复盘</button></div>
+      <div class="log" id="log" role="log" aria-live="polite" aria-relevant="additions"><div class="empty-log"><h3 data-i18n="好戏，从第一句发言开始。">好戏，从第一句发言开始。</h3><p data-i18n="选择上方的设置并开始网页版对局。发言记录会显示在这里；轮到你时，在下方回应。">选择上方的设置并开始网页版对局。发言记录会显示在这里；轮到你时，在下方回应。</p></div></div>
+      <button id="latestSpeech" type="button" hidden data-i18n="回到最新发言">回到最新发言</button>
+      <button id="retryCampaignReview" type="button" class="retry-review" hidden data-i18n="重新生成短复盘">重新生成短复盘</button><button id="retryCampaignTeaching" type="button" class="retry-review" hidden data-i18n="重新生成角色教学">重新生成角色教学</button>
+      <div class="action-panel" id="actionPanel" tabindex="-1" role="region" aria-label="当前行动 / Current action" style="display:none"></div>
+    </section>
   </main>
-
-  <!-- 复盘弹窗 -->
+  <button id="actionJump" class="action-jump" type="button" hidden data-i18n="轮到你了 · 去回应">轮到你了 · 去回应</button>
   <div class="modal-mask" id="reviewMask" style="display:none">
-    <div class="modal">
-      <h2 data-i18n="📊 本局复盘">📊 本局复盘</h2>
-      <pre id="reviewText" class="review-text"></pre>
-      <button id="closeReview" data-i18n="关闭">关闭</button>
-    </div>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="reviewTitle" tabindex="-1">
+      <div class="review-heading"><h2 id="reviewTitle" data-i18n="本局复盘">本局复盘</h2><button id="closeReview" data-i18n="返回牌桌">返回牌桌</button></div>
+      <p class="field-help" data-i18n="回看发言与票型，理解这一局如何走到终点。">回看发言与票型，理解这一局如何走到终点。</p><pre id="reviewText" class="review-text"></pre>
+    </section>
   </div>
-
-  <script src="/js/i18n.js?v=public-play-1"></script>
-  <script src="/js/app.js?v=public-play-1"></script>
+  <script src="/js/i18n.js?v=game-desk-2"></script><script src="/js/app.js?v=game-desk-2"></script><script src="/js/setup-ui.js?v=game-desk-2"></script>
 </body>
 </html>

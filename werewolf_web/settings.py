@@ -60,6 +60,13 @@ def _digest(data) -> str:
 def save_settings(config_dict, trusted=False) -> None:
     """Persist a sanitized config snapshot atomically (0700 dir / 0600 file)."""
     payload = sanitize(config_dict, trusted=trusted)
+    # Saving API fields from the browser must not erase trusted local adapters.
+    # Never accept those keys FROM the browser; retain only our existing store.
+    if not trusted and isinstance(payload, dict):
+        previous = load_settings() or {}
+        for key in TRUSTED_KEYS:
+            if key in previous:
+                payload[key] = deepcopy(previous[key])
     envelope = {
         "schema_version": SETTINGS_SCHEMA_VERSION,
         "checksum": _digest(payload) if payload is not None else "",
