@@ -19,7 +19,7 @@ class PublicRecord:
     def observe(self, event, day, night=None, phase=None):
         # An explicit allowlist excludes role prompts, private results, init
         # payloads, research tables and internal NPC state.
-        if event.get("type") not in {"speech", "narration", "ballots", "death", "flip", "exile"}:
+        if event.get("type") not in {"speech", "narration", "ballots", "death", "flip", "exile", "badge", "discussion_closed"}:
             return
         self.entries.append({"day": day, "night": night, "phase": phase,
                              "event": copy.deepcopy(event)})

@@ -188,6 +188,11 @@ h2 { font-size: 17px; margin: 0 0 var(--s3); }
 }
 
 /* Setup is a real workflow: public characters, local registration, then play. */
+.entry-path { padding-block: 24px; border-bottom: 1px solid var(--line); }
+.entry-path label { max-width: 400px; }
+.setup-grid { grid-template-columns: minmax(240px, .8fr) minmax(0, 2fr); }
+.launch-section { grid-column: 1 / -1; border-left: 0 !important; padding-left: 0 !important; }
+.launch-section button[hidden], .setup-section[hidden], #offlineSetup[hidden] { display: none; }
 #connectionTools { display: grid; gap: 12px; margin-top: 16px; }
 #connectionTools p { margin: 0; }
 #registerConnection label { margin-block: 12px; }
@@ -217,4 +222,54 @@ button.action-jump:hover:not(:disabled), button.action-jump:active:not(:disabled
   .playing .seat .name { font-size: 12px; }
   .playing .seat .seat-status { grid-column: 1; }
   .playing .topbar { min-height: 52px; }
+}
+
+/* The table is spatial, not a dashboard roster. All twelve fixed seats remain
+   visible clockwise. The middle belongs to the host and current speaker. */
+body:not(.has-table) #gameDesk { display: none; }
+.layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.roster { grid-column: 1; grid-row: 1; }
+.game-context { grid-column: 1; grid-row: 2; }
+.conversation { grid-column: 2; grid-row: 1 / 3; height: 850px; max-height: none; }
+.table, .playing .table { display: block; position: relative; height: 590px; min-width: 0; padding: 0; isolation: isolate; }
+.table::before { content: ""; position: absolute; inset: 13% 12%; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); z-index: -1; }
+.table .seat, .playing .table .seat { position: absolute; left: var(--seat-x); top: var(--seat-y); transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; width: 92px; padding: 5px; gap: 3px; background: var(--bg); border: 1px solid transparent; border-radius: 12px; text-align: center; }
+.table .seat .avatar, .playing .table .seat .avatar { display: block; width: 52px; height: 62px; border-radius: 9px; overflow: hidden; flex: none; }
+.table .seat .avatar img { width: 100%; height: 100%; object-fit: cover; }
+.table .seat .name { font-size: 12px; white-space: normal; line-height: 1.25; overflow-wrap: anywhere; }
+.table .seat .seat-status { font-size: 10px; line-height: 1.2; }
+.table .seat.mine { border-color: var(--accent); }
+.table .seat.speaking { border-color: var(--gold); background: var(--surface); }
+.table .seat.eligible { border-color: var(--accent); cursor: pointer; }
+.table .seat.targeted { outline: 3px solid var(--gold); outline-offset: 2px; }
+.table .seat.dead { opacity: .7; }
+.table .seat.dead img { filter: grayscale(1); }
+.table .seat:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.table-center { position: absolute; inset: 28% 28%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: none; }
+.table-center strong { font-size: 15px; color: var(--gold); }
+.table-center p { margin: 5px 0; font-size: 12px; }
+#speakerPortrait { width: 100px; height: 128px; object-fit: cover; border-radius: 12px; }
+#tableTurn { color: var(--accent); }
+.talk-quote { white-space: pre-wrap; padding: 12px; margin: 12px 0; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+.action-panel { max-height: none; overflow: visible; }
+.conversation { overflow: visible; }
+.conversation .log { min-height: 180px; }
+.action-jump { position: static; margin-left: 8px; max-width: calc(100vw - 24px); box-shadow: none; }
+.character-cards { max-height: 620px; overflow: auto; scroll-padding: 8px; }
+.character-cards button { min-width: 0; }
+.character-cards [hidden] { display: none; }
+@media (max-width: 960px) {
+  .layout, .playing .layout { display: flex; flex-direction: column; }
+  .roster, .conversation, .game-context { width: 100%; }
+  .table, .playing .table { height: 540px; }
+  .conversation, .playing .conversation { height: auto; min-height: 500px; }
+  .conversation .log { height: 50dvh; flex: auto; }
+  .table .seat, .playing .table .seat { width: 74px; }
+  .table .seat .avatar, .playing .table .seat .avatar { width: 42px; height: 50px; }
+  .table-center { inset: 29% 28%; }
+  #speakerPortrait { width: 76px; height: 100px; }
+  .setup-grid { grid-template-columns: 1fr; }
+  .character-preview > img { width: 104px; height: 150px; }
+  .character-cards { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .table .role-badge { font-size: 10px; padding: 2px; }
 }

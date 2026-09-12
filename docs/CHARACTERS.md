@@ -10,6 +10,21 @@ the exact cast. The original twelve-character saves remain supported.
 
 ## Personality, not decoration
 
+The expanded gallery is open by default. Each character now has a bilingual
+voice audition, a motive/blind spot, and a specific reaction under pressure in
+`character_playbooks.py`. These are supplied to model characters as acting
+directions, not fabricated match events. They encourage different priorities,
+humor, warmth, impatience and concessions rather than a mandatory analytical
+template. A synthetic test can verify that these inputs arrive; it cannot prove
+that every provider will enact them convincingly. Offline output remains bounded
+by its structured response library. Public spectating is currently the offline
+choice mode, not an unimplemented model-spectator claim.
+
+人物选择区默认展开；三十人均有双语试读台词、动机与盲点、受压反应。
+模型会收到这些表演指引，但试读台词不是对局事实，也不要求每轮重复口头禅。
+真人可自由扮演所选人物，不强制照台词行动。模型表现仍需实际对局体验验证；
+离线输出受选项库限制。公开旁观目前使用离线选项模式，不宣称已支持模型旁观。
+
 Every profile has a strength, a blind spot and a speaking style. Six weights
 (aggression, logic, bluff, loyalty, caution, verbosity) feed offline style and
 model persona construction. Models receive the character description and voice;

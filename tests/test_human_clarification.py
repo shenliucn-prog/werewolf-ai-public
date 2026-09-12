@@ -132,7 +132,8 @@ class HumanClarificationRecoveryTest(unittest.IsolatedAsyncioTestCase):
             events = restored.recovery_view()["public_events"]
             answers = [e for e in events if e.get("text") == "已落盘的回答"]
             self.assertEqual(len(answers), 1)
-            self.assertEqual(restored.recovery_view(answers[0]["event_no"])["public_events"], [])
+            after = restored.recovery_view(answers[0]["event_no"])["public_events"]
+            self.assertEqual([event["type"] for event in after], ["discussion_closed"])
 
     async def _drain_request(self, session):
         while True:

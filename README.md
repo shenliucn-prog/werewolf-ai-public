@@ -18,6 +18,21 @@ universal Agent plugin or separate native app yet.
 
 ## Choose a mode
 
+Start with **Agent conversation or browser**, then **model / registered Agent or
+explicit offline**, then campaign / free game / continue. Interface and NPC
+intelligence are separate choices. The browser presents a clockwise twelve-seat
+table with Raven as host; portraits remain visible on mobile. Selecting a seat
+does not submit an action: confirm the named target below.
+
+New player games separate election and daytime clarifications. Each addressed
+player answers a combined set of questions with source quotes; follow-ups are
+explicitly deferred when Raven closes discussion. The final statement does not
+open another question round. After death abilities, the sheriff passes or
+destroys the badge. First-night victims and daytime exiles may give last words
+or skip; other deaths have no last words. These are this project's house rules,
+not a claim of universal Werewolf rules. Older saves keep their old farewell
+policy. Full rules remain available via the Host (`/rules`).
+
 The setup offers 30 authored characters, or a random character: portrait,
 name and personality travel together. Each game seats 12 distinct characters:
 your choice plus 11 sampled companions. This is separate from your secret role.
@@ -56,8 +71,8 @@ loss reviews use the model and can be retried.
 makes no model calls and does not count toward campaign progress.
 
 For an independent **choice-based offline game**, use
-`python -m werewolf_web.offline_game --lang en`. It offers twelve fixed
-personalities, character replacement, public spectating and local saves,
+`python -m werewolf_web.offline_game --lang en`. It draws twelve fixed
+personalities from thirty characters, with character replacement, public spectating and local saves,
 without free-text interpretation or campaign scoring.
 See [offline play](docs/OFFLINE_GAME.md) for commands and limitations.
 

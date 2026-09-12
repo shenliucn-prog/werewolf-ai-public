@@ -84,6 +84,7 @@ def load_seat_persona(seat, engine):
         if character is None:
             raise ValueError("unknown character")
         return {"name": seat.name, "traits": character["description"],
+                "acting": {key: character[key] for key in ("motive_and_blind_spot", "under_pressure", "voice_sample")},
                 "profile": character["story"], "speech_style": character["voice"],
                 "catchphrase": character["phrase"], "catchphrases": [character["phrase"]],
                 "role_habits": {}, "relations": "", "style_weights": character["weights"]}

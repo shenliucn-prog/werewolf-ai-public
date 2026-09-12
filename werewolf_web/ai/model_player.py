@@ -48,8 +48,9 @@ class ModelNPCAgent(StrategicNPCAgent):
     def table_interject(self, speaker, speech):
         return self.speak([], task="brief public interruption", speaker=speaker, statement=speech.text)
 
-    def table_reply(self, interrupter):
+    def table_reply(self, interrupter, questions=None):
         return self.speak([], task="brief answer to public question", asker=interrupter,
+                          questions=questions or [],
                           reply_contract="Answer the asker's question using your lawful evidence, "
                           "or explicitly decline/admit uncertainty. Do not replace the answer "
                           "with a new question. Address public flips and distinguish claims from facts.")

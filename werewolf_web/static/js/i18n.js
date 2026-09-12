@@ -1,5 +1,17 @@
 // Presentation only: actions and roles always use stable keys from the session.
 const EN = {
+"在哪里玩？": "Where do you want to play?",
+"先选择游玩界面": "Choose an interface first",
+"Agent 对话（推荐）": "Agent conversation (recommended)",
+"网页圆桌": "Browser round table",
+"界面和智能驱动分开选择；两种界面都可以接模型，也可以主动选择离线。": "Choose interface and intelligence separately. Either interface supports a model or explicit offline play.",
+"怎么玩？": "Which mode?",
+"自由对局": "Free game",
+"角色闯关": "Role campaign",
+"主持人 · 夜鸦": "Host · Raven",
+"等待入座": "Waiting for the table",
+"十二位人物，围桌而坐": "Twelve characters around one table",
+"顺时针座次。轮到选人时可点座位，再确认；人物外貌不代表秘密身份。": "Seats run clockwise. Select an eligible seat, then confirm your action. Appearance is not evidence of a secret role.",
 "谁来扮演其他玩家？": "Who plays the other seats?",
 "检查连接": "Check connection",
 "检查会调用一次模型，单独消耗额度；不发牌。开局仍会再次预检。": "Checking makes one separately charged model call; no cards are dealt. Starting a game checks again.",

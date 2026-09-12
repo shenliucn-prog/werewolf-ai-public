@@ -4,6 +4,7 @@ from .offline_cast import CHARACTERS, BY_ID, cast_settings
 from .i18n import cast
 from .character_expansion import EXPANSION_BY_ID
 from .offline_cast import display_names
+from .character_playbooks import playbook
 
 # Existing, project-owned portraits are reused as complete character identities.
 PROFILES = {
@@ -29,6 +30,7 @@ def catalog(locale):
     for c in CHARACTERS:
         extra = EXPANSION_BY_ID.get(c.id)
         result.append({"id": c.id, "name": names[c.id],
+            **playbook(c.id, locale),
             "title": extra["titles"][en] if extra else PROFILES[c.id][en],
             "story": extra["stories"][en] if extra else PROFILES[c.id][2 + en],
             "description": c.description[en], "phrase": c.phrase[en],
