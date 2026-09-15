@@ -1,0 +1,13 @@
+{
+  "summary": {
+    "en": "Upgrade the runtime OpenAI Python SDK from 3.11.0 to 3.13.0.",
+    "zh": "将运行时 OpenAI Python SDK 从 3.11.0 升级至 3.13.0。"
+  },
+  "compatibility": {
+    "en": "No game rules, save schema, endpoint configuration or trusted Agent command protocol changes. This dependency update does not enable new model capabilities or certify live provider behavior.",
+    "zh": "不修改游戏规则、存档格式、端点配置或可信 Agent 命令协议。本次依赖升级不代表启用新模型能力，也不代表已验证真实服务商行为。"
+  },
+  "docs_impact": "none",
+  "docs": [],
+  "reason": "Reviewed both READMEs and docs/MODEL_CONNECTIONS.md: installation uses the same pinned requirements, and API/Agent configuration and documented gameplay remain unchanged."
+}
