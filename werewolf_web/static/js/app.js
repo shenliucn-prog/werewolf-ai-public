@@ -22,7 +22,8 @@ let pendingReq = null;
 let uiLocale = "zh-CN";
 let castRequest = 0;
 let boardData = {boards: [], roles: {}};
-const UI = {"zh-CN": {brand:"🐺 暗夜茶馆 · 狼人杀", start:"开始新游戏", identity:"你的身份", host:"🎙️ 问主持人（规则单聊）", hint:"我只解释规则和公开流程，不会泄露身份或替你决策。", starting:"开局中...", failed:"开局失败"}, en: {brand:"🐺 Night Table · Werewolf", start:"Start game", identity:"Your role", host:"🎙️ Ask the Host (rules)", hint:"I explain rules and public flow only. I never reveal identities or choose for you.", starting:"Starting...", failed:"Could not start game"}};
+let reviewFocus = null;
+const UI = {"zh-CN": {brand:"暗夜茶馆 · 狼人杀", start:"开始自由对局", identity:"你的身份", host:"问主持人（规则单聊）", hint:"我只解释规则和公开流程，不会泄露身份或替你决策。", starting:"开局中...", failed:"开局失败"}, en: {brand:"Night Table · Werewolf", start:"Start free game", identity:"Your role", host:"Ask the Host (rules)", hint:"I explain rules and public flow only. I never reveal identities or choose for you.", starting:"Starting...", failed:"Could not start game"}};
 
 const $ = (s) => document.querySelector(s);
 const logEl = $("#log");
@@ -50,6 +51,8 @@ function applyLocale(value) {
     ? `Help me play Werewolf here in our conversation. Repository: https://github.com/shenliucn-prog/werewolf-ai-public\nRead README.md and docs/AGENT_PLAY.md, prepare the local environment, then keep this interactive process alive:\n${command}\nRelay the game's statements and my private prompts. Wait for my decisions; do not autoplay, invent game events or inspect hidden roles. If you cannot maintain an interactive process, tell me rather than simulating a game.`
     : `请让我在当前 Agent 对话里玩狼人杀。仓库：https://github.com/shenliucn-prog/werewolf-ai-public\n阅读 README.md 和 docs/AGENT_PLAY.md，准备本地环境，并持续保留以下交互进程：\n${command}\n转述游戏发言和属于我的私密提示，等待我的决定，不代打、不编造事件、不读取其他人的隐藏身份。如果无法保持交互进程，请说明限制，不要模拟一局冒充真实游戏。`;
   $("#copyStatus").textContent = "";
+  updateDriverHint();
+  updateContinueUI();
 }
 
 // ---------- 板子选择 ----------
@@ -138,34 +141,64 @@ function lockNames(locked) {
 
 // ---------- 座位渲染 ----------
 function renderSeats(state) {
+  document.body.classList.add("has-table");
   // 清掉旧座位（保留 moon/center）
   Object.values(seats).forEach((s) => s.el.remove());
   seats = {};
   const list = state.seats;
   list.forEach((s) => {
-    const el = document.createElement("div");
+    const el = document.createElement("button");
+    el.type = "button";
+    el.dataset.seat = s.pos;
+    const angle = (s.pos - 1) * Math.PI / 6 - Math.PI / 2;
+    el.style.setProperty("--seat-x", `${50 + 40 * Math.cos(angle)}%`);
+    el.style.setProperty("--seat-y", `${50 + 42 * Math.sin(angle)}%`);
+    el.onclick = () => document.querySelector(`#actionPanel button[data-target="${s.pos}"]`)?.click();
     el.className = "seat";
-    const file = PORTRAITS[s.player_id] || PORTRAITS[s.name] || "";
+    const file = typeof s.character_id === "string" && /^[a-z][a-z0-9_]{0,31}$/.test(s.character_id)
+      ? s.character_id : PORTRAITS[s.player_id] || PORTRAITS[s.name] || "";
     const initial = s.name.slice(0, 1);
     el.innerHTML = `
       <div class="avatar">${escapeHtml(initial)}
         ${file ? `<img src="/img/portraits/${file}.png" alt="" onerror="this.remove()">` : ""}
       </div>
       <div class="name">${seatText(s.pos)} ${escapeHtml(s.name)}</div>
-      <div class="role-badge"></div>`;
+      <div class="seat-status"></div><div class="role-badge"></div>`;
     tableEl.appendChild(el);
     seats[s.pos] = { el, data: s };
-    if (s.is_player) mySeat = s.pos;
+    if (s.is_player) { mySeat = s.pos; el.classList.add("mine"); }
+    if (s.alive === false) el.classList.add("dead");
+    if (s.alive === false && s.role_cn) {
+      el.querySelector(".role-badge").textContent = s.role_cn;
+      el.querySelector(".role-badge").style.display = "inline-block";
+    }
   });
   if (state.sheriff) markSheriff(state.sheriff);
+  updateSeatLabels();
+}
+
+function updateSeatLabels() {
+  const list = Object.values(seats);
+  list.forEach(({el, data}) => {
+    const flags = [];
+    if (data.is_player) flags.push(tr("你"));
+    if (el.classList.contains("sheriff")) flags.push(tr("警长"));
+    flags.push(el.classList.contains("dead") ? tr("已出局") : tr("在场"));
+    if (el.classList.contains("speaking")) flags.push(tr("发言中"));
+    el.querySelector(".seat-status").textContent = flags.join(" · ");
+  });
+  const alive = list.filter(s => !s.el.classList.contains("dead")).length;
+  $("#rosterCount").textContent = list.length ? `${alive} / ${list.length} ${tr("在场")}` : tr("发牌后显示完整座次");
 }
 
 function markSheriff(pos) {
   Object.values(seats).forEach((s) => s.el.classList.remove("sheriff"));
   if (seats[pos]) seats[pos].el.classList.add("sheriff");
+  updateSeatLabels();
 }
 function markDead(pos) {
   if (seats[pos]) seats[pos].el.classList.add("dead");
+  updateSeatLabels();
 }
 function revealRole(pos, roleCn) {
   const s = seats[pos];
@@ -174,29 +207,35 @@ function revealRole(pos, roleCn) {
   const badge = s.el.querySelector(".role-badge");
   badge.style.display = "inline-block";
   badge.textContent = roleCn;
+  updateSeatLabels();
 }
 function highlightSpeaker(pos) {
   Object.values(seats).forEach((s) => s.el.classList.remove("speaking"));
   if (seats[pos]) seats[pos].el.classList.add("speaking");
-  setTimeout(() => { if (seats[pos]) seats[pos].el.classList.remove("speaking"); }, 2500);
+  updateSeatLabels();
+  // A speech remains current until the next speaker/phase, not for 2.5 seconds.
 }
 
 // ---------- 日志 ----------
 function log(text, cls = "") {
+  const follow = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 60;
+  logEl.querySelector(".empty-log")?.remove();
   const row = document.createElement("div");
   row.className = "row " + cls;
   row.innerHTML = text;
   logEl.appendChild(row);
-  logEl.scrollTop = logEl.scrollHeight;
+  if (follow) logEl.scrollTop = logEl.scrollHeight;
+  else $("#latestSpeech").hidden = false;
 }
 function narr(text) { log(escapeHtml(text), "narr"); }
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
 // ---------- 玩家身份 ----------
 function showPlayer(pv) {
+  $("#myRoleQuick").textContent = pv ? `${uiLocale === "en" ? "Your private role" : "你的私密身份"} · ${pv.role_cn}` : (uiLocale === "en" ? "Public spectator" : "公开旁观");
   if (!pv) {
     mySeat = null;
     $("#playerBody").textContent = uiLocale === "en" ? "Public spectator · no private information" : "公开旁观 · 不显示私密信息";
@@ -215,7 +254,14 @@ function showPlayer(pv) {
 
 // ---------- 事件分发 ----------
 function handleEvent(d) {
+  if (typeof updateRoundtable === "function") updateRoundtable(d);
   switch (d.type) {
+    case "badge": narr(d.text); markSheriff(d.target); break;
+    case "state": renderSeats(d.state); break;
+    case "discussion_closed":
+      narr(d.text);
+      for (const q of d.deferred || []) narr(`${q.from} → ${q.target} · ${uiLocale === "en" ? "deferred" : "暂缓"}`);
+      break;
     case "init":
       applyLocale(d.state.locale);
       $("#locale").disabled = true;
@@ -224,11 +270,15 @@ function handleEvent(d) {
       showLlmStatus(d.llm_status);
       log(`🎙️ ${escapeHtml(d.host_intro)}`, "narr"); break;
     case "llm_status": showLlmStatus(d.llm_status); break;
-    case "narration": narr(d.text); setPhase(d.phase); if (d.sheriff) markSheriff(d.sheriff); break;
+    case "narration":
+      narr(d.text);
+      if (d.full_rules) log(`<details><summary>${uiLocale === "en" ? "Full rules for this table" : "本局完整规则"}</summary>${escapeHtml(d.full_rules).replace(/\n/g, "<br>")}</details>`, "narr");
+      setPhase(d.phase); if (d.sheriff) markSheriff(d.sheriff); break;
     case "private": log(`🔒 ${escapeHtml(d.text)}`, "private"); break;
     case "speech":
       highlightSpeaker(d.seat);
-      log(`<b>${escapeHtml(d.name)}</b>：${escapeHtml(d.text)}`, "speech"); break;
+      if (d.reply_to?.length) log(`<details><summary>${uiLocale === "en" ? "Replying to" : "回应的追问"}</summary>${d.reply_to.map(q => `<p>${escapeHtml(q.from)}：${escapeHtml(q.text)}</p>`).join("")}</details>`, "narr");
+      log(`<b>${d.seat ? seatText(d.seat) + " · " : ""}${escapeHtml(d.name)}</b>${d.talk_kind === "last_words" ? (uiLocale === "en" ? " · Last words" : " · 遗言") : ""}：${escapeHtml(d.text)}`, "speech"); break;
     case "death": log(`💀 ${escapeHtml(d.text)}`, "death"); markDead(d.seat); break;
     case "flip": log(`🂠 ${escapeHtml(d.text)}`, "flip"); revealRole(d.seat, d.role_cn); break;
     case "exile": log(`⚖️ ${escapeHtml(d.text)}`, "exile"); markDead(d.seat); break;
@@ -326,8 +376,24 @@ function driverSelection() {
 }
 
 function syncDriverUI() {
+  const mode = $("#driverMode").value;
   const row = $("#agentConnectionRow");
-  if (row) row.hidden = $("#driverMode").value !== "agent";
+  if (row) row.hidden = mode !== "agent";
+  $("#apiFields").hidden = mode !== "api";
+  // One visible selector; the legacy field remains only as an internal bridge.
+  $("#llmMode").value = mode === "api" ? "custom" : mode === "offline" ? "local" : "";
+  if (mode !== "api") $("#llmApiKey").value = "";
+  updateDriverHint();
+}
+
+function updateDriverHint() {
+  const hints = {
+    "": "使用本地已保存的连接。未配置时会提示设置，不会自动转为离线。",
+    api: "支持兼容接口与本地模型服务。密钥只用于本局，不写入设置。",
+    agent: "只使用本机预配置连接；网页不接收可执行命令。",
+    offline: "程序策略规则测试，不调用模型、不计闯关成绩。选项玩法见下方独立入口。"
+  };
+  $("#driverHint").textContent = tr(hints[$("#driverMode").value] || hints[""]);
 }
 
 async function loadAgentConnections() {
@@ -357,6 +423,7 @@ function showSetupGuidance(message) {
   if (!el) return;
   el.textContent = message;
   el.hidden = false;
+  $("#gameSetup").open = true;
 }
 
 function hideSetupGuidance() {
@@ -389,7 +456,8 @@ function showAction(d) {
   panelEl.innerHTML = "";
   if (Array.isArray(d.choices)) {
     const hint = document.createElement("p");
-    hint.textContent = kind === "ready" ? tr("先阅读本局规则，有疑问可问主持人。确认后才进入第一夜。")
+    hint.textContent = data.last_words ? (uiLocale === "en" ? "Your last words. Choose a statement or skip." : "你的遗言：选择一句话，或跳过。") : data.final_reply ? tr("投票前，留给你一次完整回应") + "。" + tr("可以集中解释刚才的质疑，也可以跳过。提交后进入投票，不再追加追问。")
+      : kind === "ready" ? tr("先阅读本局规则，有疑问可问主持人。确认后才进入第一夜。")
       : (uiLocale === "en" ? "Respond, or listen for now" : "接着桌上的话，也可以先听听");
     panelEl.append(hint);
     const suggested = d.choices.filter(c => c.suggested);
@@ -475,7 +543,9 @@ function showAction(d) {
     $("#skipTableReply").onclick = () => submitAction({ text: "" });
     $("#sendTableReply").onclick = () => submitAction({ text: $("#tableReplyInput").value.trim() });
   } else if (kind === "table_answer") {
-    panelEl.innerHTML = `<h4>${escapeHtml(data.from || tr("有人"))} ${tr("在追问你")}</h4>
+    panelEl.innerHTML = `<h4>${data.last_words ? (uiLocale === "en" ? "Your last words" : "请留下遗言") : data.final_reply ? tr("投票前，留给你一次完整回应") : `${escapeHtml(data.from || tr("有人"))} ${tr("在追问你")}`}</h4>
+      ${(data.questions || []).map(q => `<blockquote class="talk-quote"><b>${escapeHtml(q.from)}</b> · ${q.event_no ? `#${Number(q.event_no)}` : ""}<br>${escapeHtml(q.text)}</blockquote>`).join("")}
+      ${data.final_reply ? `<p>${tr("可以集中解释刚才的质疑，也可以跳过。提交后进入投票，不再追加追问。")}</p>` : ""}
       <textarea id="tableAnswerInput" maxlength="4000" aria-label="${tr("回答")}" placeholder="${tr("简短回应，或让主持人继续推进...")}"></textarea>
       <div class="btn-row"><button class="cand-btn" id="skipTableAnswer">${tr("跳过")}</button>
       <button class="send-btn" id="sendTableAnswer">${tr("回答")}</button></div>`;
@@ -501,12 +571,14 @@ function showAction(d) {
     cands.forEach((c) => {
       const b = document.createElement("button");
       b.className = "cand-btn";
+      b.dataset.target = c.pos;
       b.textContent = c.pos === 0 ? tr("平安日") : `${seatText(c.pos)} ${c.name}${c.note ? " (" + c.note + ")" : ""}`;
       b.onclick = () => {
         sel = c.pos;
         [...btns.children].forEach((x) => x.classList.remove("sel"));
         b.classList.add("sel");
         $("#sendVote").disabled = false;
+        $("#sendVote").textContent = `${tr("确认投票")} → ${c.pos === 0 ? tr("平安日") : seatText(c.pos) + " " + c.name}`;
       };
       btns.appendChild(b);
     });
@@ -523,19 +595,21 @@ function showAction(d) {
     } else {
       html += `<div class="btn-row" id="nightBtns"></div>`;
     }
-    html += `<button class="send-btn" id="sendNight">${tr("确认")}</button>`;
+    html += `<button class="send-btn" id="sendNight">${isWitch ? tr("确认") : data.role_key === "badge" ? (uiLocale === "en" ? "Destroy badge" : "撕毁警徽") : tr("跳过")}</button>`;
     panelEl.innerHTML = html;
     if (!isWitch) {
       const btns = $("#nightBtns"); let sel = null;
       cands.forEach((c) => {
         const b = document.createElement("button");
         b.className = "cand-btn";
+        b.dataset.target = c.pos;
         b.textContent = `${seatText(c.pos)} ${c.name}${c.note || ""}`;
         if (c.note) b.classList.add("self-knife");
         b.onclick = () => {
           sel = c.pos;
           [...btns.children].forEach((x) => x.classList.remove("sel"));
           b.classList.add("sel");
+          $("#sendNight").textContent = `${tr("确认")} → ${seatText(c.pos)} ${c.name}`;
         };
         btns.appendChild(b);
       });
@@ -622,8 +696,7 @@ function pauseStream(status) {
 // 胜负已定但复盘尚未生成（崩溃发生在复盘前）：展示待完成状态，不误判为全部完成，
 // 且不清除续接信息。
 function showReviewPending() {
-  $("#reviewText").textContent = tr("复盘暂不可用，可稍后重试。");
-  $("#reviewMask").style.display = "flex";
+  showReview(tr("复盘暂不可用，可稍后重试。"));
 }
 
 // ---------- 断线重连 / 恢复（§6）----------
@@ -632,6 +705,13 @@ function persistState() {
     if (gameId) localStorage.setItem(SAVE_KEY, JSON.stringify({ game_id: gameId, last_event_no: lastEventNo }));
     else localStorage.removeItem(SAVE_KEY);
   } catch (_) { /* storage unavailable — rejoin only within this page load */ }
+  updateContinueUI();
+}
+
+function updateContinueUI() {
+  const exists = Boolean(gameId || savedGame()?.game_id);
+  $("#continueGame").disabled = !exists;
+  $("#continueHint").textContent = tr(exists ? "继续本机保存的对局，不重新发牌。" : "本机暂无可继续的对局。");
 }
 
 function savedGame() {
@@ -684,6 +764,7 @@ async function rejoin() {
 
 function applyRecoveryView(view) {
   document.body.classList.add("playing");
+  $("#gameSetup").open = false;
   lockNames(true);
 
   if (lastEventNo === 0) {
@@ -750,9 +831,27 @@ function restoreSavedGame() {
 // ---------- 复盘弹窗 ----------
 function showReview(text) {
   $("#reviewText").textContent = text;
+  if ($("#reviewMask").style.display === "none") reviewFocus = document.activeElement;
   $("#reviewMask").style.display = "flex";
+  $("#openReview").hidden = false;
+  $("#closeReview").focus();
 }
-$("#closeReview").onclick = () => { $("#reviewMask").style.display = "none"; };
+function closeReview() {
+  $("#reviewMask").style.display = "none";
+  const target = reviewFocus?.isConnected && !reviewFocus.disabled && reviewFocus.getClientRects().length
+    ? reviewFocus : $("#openReview");
+  target.focus();
+}
+$("#closeReview").onclick = closeReview;
+$("#openReview").onclick = () => showReview($("#reviewText").textContent);
+$("#reviewMask").addEventListener("keydown", event => {
+  if (event.key === "Escape") { event.preventDefault(); closeReview(); }
+  if (event.key === "Tab") { event.preventDefault(); $("#closeReview").focus(); }
+});
+$("#latestSpeech").onclick = () => { logEl.scrollTop = logEl.scrollHeight; $("#latestSpeech").hidden = true; };
+logEl.addEventListener("scroll", () => {
+  if (logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 60) $("#latestSpeech").hidden = true;
+});
 
 // ---------- 闯关短复盘重试 ----------
 function showCampaignReviewRetry() {
@@ -831,8 +930,8 @@ async function newGame() {
   const names = Object.fromEntries([...document.querySelectorAll("#castNames input")]
     .map(input => [input.dataset.playerId, input.value.trim()]));
   const values = Object.values(names);
-  if (values.some(name => !name || [...name].length > 24) ||
-      new Set(values.map(name => name.normalize("NFKC").toLocaleLowerCase())).size !== values.length) {
+  if ($("#characterChoice").value === "custom" && (values.some(name => !name || [...name].length > 24) ||
+      new Set(values.map(name => name.normalize("NFKC").toLocaleLowerCase())).size !== values.length)) {
     $("#castError").textContent = tr("名字必须不同，且为1至24字的文字、数字、空格或连字符。");
     return;
   }
@@ -862,10 +961,12 @@ async function newGame() {
   $("#newGame").disabled = true;
   lockNames(true);
   $("#reviewMask").style.display = "none";
+  $("#openReview").hidden = true;
   try {
   const start = await fetch("/api/start", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ board_id: board, locale, llm, driver: driver.driver, connection: driver.connection, names, personalities, conjecture, player_role })
+    body: JSON.stringify({ board_id: board, locale, llm, driver: driver.driver, connection: driver.connection, names, personalities, conjecture, player_role,
+      character: $("#characterChoice").value === "custom" ? undefined : $("#characterChoice").value })
   });
   // Credentials are scoped to the request/game runner, never retained by UI.
   $("#llmApiKey").value = "";
@@ -902,10 +1003,11 @@ async function loadOfflineCast() {
     if (!response.ok) return;
     const data = await response.json();
     const select = $("#offlineCharacter");
-    const previous = select.value;
+    const previous = select.value || "random";
     select.innerHTML = "";
+    select.add(new Option(tr("随机人物（名字、头像、人格绑定）"), "random"));
     for (const c of data.characters) select.add(new Option(c.name, c.id));
-    if (data.characters.some(c => c.id === previous)) select.value = previous;
+    if (previous === "random" || data.characters.some(c => c.id === previous)) select.value = previous;
     select.onchange = () => {
       $("#offlineDescription").textContent = data.characters.find(c => c.id === select.value)?.description || "";
     };
@@ -935,6 +1037,7 @@ async function offlineGame() {
     hideCampaignReviewRetry(); hideCampaignTeachingRetry();
     campaignReviewGameId = null; campaignTeachingGameId = null;
     $("#reviewMask").style.display = "none";
+    $("#openReview").hidden = true;
     $("#offlineError").textContent = "";
     $("#gameSetup").open = false;
     document.body.classList.add("playing"); lockNames(true);
@@ -977,9 +1080,11 @@ async function campaignGame() {
     $("#locale").disabled = true;
     lockNames(true);
     $("#reviewMask").style.display = "none";
+    $("#openReview").hidden = true;
     const start = await fetch("/api/campaign/start", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile_id: "default", role: status.role, locale, llm, driver: driver.driver, connection: driver.connection })
+      body: JSON.stringify({ profile_id: "default", role: status.role, locale, llm, driver: driver.driver, connection: driver.connection,
+        character: $("#characterChoice").value === "custom" ? undefined : $("#characterChoice").value })
     });
     $("#llmApiKey").value = "";
     const started = await start.json();

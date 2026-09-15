@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Reorganize the web game desk with grouped setup, full-width seating, readable speech and responsive controls.", "zh": "重整网页游戏桌面：分组开局、全宽座次、发言阅读与响应式操作。"},
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md"],
+  "reason": "Explain the changed browser setup and reading/review interactions.",
+  "compatibility": {"en": "No changes to game rules, model drivers or save formats.", "zh": "不改变规则、模型驱动或存档格式。"}
+}

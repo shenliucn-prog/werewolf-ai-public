@@ -36,6 +36,33 @@ API 路径兼容提供 Chat Completions 协议的远程或本地模型服务，�
 
 ## Any Agent / SDK through an adapter
 
+### Register and check locally / 本机登记与检查
+
+In web setup, select **Your Agent**, expand **Add local Agent connection**, and
+register the installed Codex adapter with a connection name, model, effort and
+budget. Installation does not prove login: **Check connection** verifies a real
+response. Registration makes no model call. Each explicit check uses one call
+outside the per-game budget; starting a game still performs its own preflight.
+Failed checks stay visible and can be retried without creating or abandoning a game.
+
+网页选择「用户 Agent」后可登记已安装的 Codex。登记不等于验证：检查连接会单独调用
+一次模型，不计入某局预算，也不发牌；开局仍有自己的预检。失败可以修改连接后重试。
+API 密钥只在当前请求内使用，不写入本地设置。网页保存配置不会删除已登记的可信连接。
+
+Other adapters must be registered from the local terminal, never as executable
+commands sent from a browser. For example, after implementing the protocol below:
+
+```bash
+python -m werewolf_web.connection_setup --name "My Agent" --adapter command --model "your-model" --command '["/absolute/path/to/wrapper"]'
+```
+
+Refresh the page and select that named connection. The registry stays local and
+is excluded from releases. The browser registration endpoint only supports the
+fixed built-in adapter, requires a same-origin setup token on localhost, and
+rejects executable-command fields. No universal compatibility is implied.
+
+### Decision protocol
+
 Python embedding can inject any `DecisionRuntime` implementation after its
 `preflight()` succeeds. Desktop apps can also consume `/api/start`, SSE
 `/api/stream?game_id=...`, `/api/action` and `/api/host_chat`; retain the session id.

@@ -32,7 +32,20 @@ identifiers have been removed. Local export manifests record which files/fields 
 these packaging artifacts are not committed to source. Do not
 strip the entire EXIF block. See the [publication plan](PUBLICATION_PLAN.md).
 
-## Persona material
+## Additional eighteen portraits and characters
+
+The expanded library adds eighteen original fictional characters and portraits
+generated with OpenAI's built-in image generation tool at the maintainer's
+request. No real-person references were used. See [character and prompt notes](CHARACTERS.md).
+These new PNGs carry caBX provenance manifests rather than the original twelve's
+EXIF format; release preparation preserves their complete bytes. Manifest
+signatures have not been independently verified. Artwork is not automatically
+covered by the code's MIT license.
+
+The expanded bilingual persona descriptions were AI-assisted for this project;
+the historical declaration below applies to the original persona material.
+
+## Original persona material
 
 NPC names, descriptions, and catchphrases are maintained in the persona files
 and localization code. The maintainer

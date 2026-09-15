@@ -24,6 +24,8 @@ def introduction(engine, conjecture=False, *, offline_choices=False):
               "夜间按私密提示行动；天亮公布死亡并翻牌。白天顺序发言，主持人允许短暂公开插话，最后投票放逐。",
               "首日发言前统一报名上警，之后不能加入；警上发言结束后可退警。所有存活玩家（含候选人）参与警长投票，平票则无警长。",
               "警长放逐票重 1.5 票；发言顺序自动从存活警长开始，不能选择方向。可以投玩家或平安日；平安日最高票或最高票并列时无人出局。这是实验性规则。"])
+    lines.append("Clarifications: each addressed player receives one combined reply per election/day window. The host closes follow-ups before the final statement and ballot. Guns resolve first, then a dead sheriff transfers/destroys the badge. First-night victims and daytime exiles have last words; other deaths do not." if en else
+                 "澄清：警上与白天分开，每位被问者合并回答一次；主持人收口后进行最后陈述及投票。死亡先结算开枪，再交接或撕毁警徽；首夜死者与白天被放逐者有遗言，其他死亡无遗言。")
     for key in roles:
         label = board_role_name(engine.locale, engine.board, key, ROLE_META[key]["cn"])
         desc = witch_rule_text(engine.locale, engine.board) if key == "witch" else role_desc(engine.locale, key, ROLE_META[key])

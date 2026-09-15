@@ -40,8 +40,8 @@ class OfflineWebTest(unittest.IsolatedAsyncioTestCase):
     async def test_cast_has_twelve_localized_characters(self):
         for locale in ("en", "zh-CN"):
             result = await run.offline_cast(locale)
-            self.assertEqual(len(result["characters"]), 12)
-            self.assertEqual(len({c["id"] for c in result["characters"]}), 12)
+            self.assertEqual(len(result["characters"]), 30)
+            self.assertEqual(len({c["id"] for c in result["characters"]}), 30)
 
     async def test_real_entry_restores_undealt_offline_without_model(self):
         started = await run.offline_start(Request({"offline_confirmed": True}))

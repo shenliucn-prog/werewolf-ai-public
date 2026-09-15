@@ -180,6 +180,7 @@ async def start(req: Request):
                              session_id=game_id,
                              locale=body.get("locale", "zh-CN"), names=body.get("names"),
                              personalities=body.get("personalities"),
+                             character=body.get("character"),
                              conjecture=body.get("conjecture", False),
                              player_role=body.get("player_role"), onboarding=True,
                              checkpoint_path=checkpoint.checkpoint_path(game_id))
@@ -217,9 +218,8 @@ async def offline_cast(locale: str = "zh-CN"):
     from .i18n import cast
     if locale not in ("zh-CN", "en"):
         raise HTTPException(status_code=422, detail="Unsupported locale")
-    names = {p["id"]: p["name"] for p in cast(locale)}
-    return {"characters": [{"id": c.id, "name": names[c.id],
-                            "description": c.description[locale == "en"]} for c in CHARACTERS]}
+    from .characters import catalog
+    return {"characters": catalog(locale)}
 
 
 @app.post("/api/offline/start")
@@ -284,6 +284,7 @@ async def campaign_start(req: Request):
                              session_id=game_id,
                              locale=body.get("locale", "zh-CN"),
                              player_role=role, onboarding=True,
+                             character=body.get("character"),
                              checkpoint_path=checkpoint.checkpoint_path(game_id))
         runner.campaign_counted = not offline
         if not offline:
@@ -491,10 +492,72 @@ async def agent_connections():
     if not isinstance(connections, dict):
         return {"connections": []}
     return {"connections": [
-        {"name": name, "adapter": conn.get("adapter"), "model": conn.get("model")}
+        {"name": name, "adapter": conn.get("adapter"), "model": conn.get("model"),
+         "effort": conn.get("effort"), "max_calls": conn.get("max_calls")}
         for name, conn in connections.items()
         if isinstance(conn, dict)
     ]}
+
+
+_SETUP_TOKEN = secrets.token_urlsafe(32)
+_CHECK_LOCK = asyncio.Lock()
+
+
+def _setup_guard(req):
+    # Local page capability + same-origin check. No CORS or arbitrary executables.
+    from urllib.parse import urlsplit
+    if urlsplit(str(req.base_url)).hostname not in ("localhost", "127.0.0.1", "::1"):
+        raise HTTPException(status_code=403, detail="Local setup only.")
+    if not secrets.compare_digest(req.headers.get("x-setup-token", ""), _SETUP_TOKEN):
+        raise HTTPException(status_code=403, detail="Reload the local setup page.")
+    origin = req.headers.get("origin")
+    if origin and origin != str(req.base_url).rstrip("/"):
+        raise HTTPException(status_code=403, detail="Same-origin setup only.")
+
+
+@app.get("/api/connection/setup")
+async def connection_setup_info():
+    import shutil
+    return {"token": _SETUP_TOKEN, "codex_installed": shutil.which("codex") is not None}
+
+
+@app.post("/api/connection/register")
+async def connection_register(req: Request):
+    _setup_guard(req)
+    body = await _json_object(req)
+    if set(body) != {"name", "model", "effort", "max_calls"}:
+        raise HTTPException(status_code=422, detail="Only the built-in Codex adapter can be registered here.")
+    import shutil
+    if not shutil.which("codex"):
+        raise HTTPException(status_code=422, detail="Install and log in to the local Codex CLI first.")
+    from .connection_setup import register
+    try:
+        register(adapter="codex", **body)
+    except (ValueError, OSError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from None
+    return {"ok": True, "name": body["name"], "verified": False}
+
+
+@app.post("/api/connection/check")
+async def connection_check(req: Request):
+    _setup_guard(req)
+    body = await _json_object(req)
+    resolved = driver_mod.resolve_driver(explicit=body.get("llm"),
+        saved=user_settings.load_settings(), select=_driver_select(body))
+    if not resolved["configured"]:
+        raise HTTPException(status_code=422, detail="Choose and configure a connection first. / 请先选择并配置连接。")
+    summary = {k: resolved[k] for k in ("driver", "adapter", "model", "effort", "max_calls")}
+    if resolved["driver"] == "offline":
+        return {"ok": True, "summary": summary, "model_calls": 0}
+    if _CHECK_LOCK.locked():
+        raise HTTPException(status_code=409, detail="A connection check is already running.")
+    async with _CHECK_LOCK:
+        try:
+            planner = create_runtime(**resolved["runtime_kwargs"])
+            await asyncio.to_thread(planner.preflight)
+        except (ModelTurnError, ValueError, OSError):
+            raise HTTPException(status_code=503, detail="Connection failed. Check local login/model settings and retry; no game was started. / 连接失败，请检查本机登录及模型设置后重试；未开局。") from None
+    return {"ok": True, "summary": summary, "model_calls": 1}
 
 
 app.mount("/", StaticFiles(directory=config.STATIC_DIR, html=True), name="static")

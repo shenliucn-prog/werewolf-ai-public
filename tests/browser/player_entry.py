@@ -39,11 +39,17 @@ class BrowserEntryTest(unittest.TestCase):
                 self.fail("Test HTTP server did not start")
             with sync_playwright() as pw:
                 browser = pw.chromium.launch()
-                page = browser.new_page()
+                page = browser.new_page(viewport={"width": 1440 if campaign else 390, "height": 900 if campaign else 844})
                 errors = []
                 page.on("pageerror", lambda error: errors.append(str(error)))
                 page.on("dialog", lambda dialog: dialog.accept())
                 page.goto(url)
+                self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+                artifacts = root / "output" / "playwright"
+                artifacts.mkdir(parents=True, exist_ok=True)
+                page.screenshot(path=str(artifacts / ("entry-desktop.png" if campaign else "entry-mobile.png")), full_page=True)
+                expect(page.locator("#continueGame")).to_be_disabled()
+                page.locator("#entryInterface").select_option("web")
                 if campaign:
                     expect(page.locator("#castNames input")).to_have_count(12)
                     with page.expect_response(lambda r: r.url.endswith("/api/start")) as unconfigured:
@@ -53,24 +59,38 @@ class BrowserEntryTest(unittest.TestCase):
                     # Actual browser -> game backend -> synthetic HTTP provider.
                     fixture_url = page.request.get(url + "/test-fixture").json()["url"]
                     settings_toggle = page.locator("details.llm-settings:has(#driverMode) > summary")
-                    settings_toggle.click()
                     page.locator("#driverMode").select_option("api")
-                    page.locator("#llmMode").select_option("custom")
+                    expect(page.locator("#apiFields")).to_be_visible()
                     page.locator("#llmBaseUrl").fill(fixture_url)
                     page.locator("#llmModel").fill("synthetic-browser-fixture")
+                    page.locator("#checkConnection").click()
+                    expect(page.locator("#connectionFeedback")).to_contain_text("连接通过", timeout=15000)
+                    self.assertIsNone(page.evaluate("localStorage.getItem('werewolf.game')"))
+                    expect(page.locator("#characterChoice option")).to_have_count(32)
+                    page.locator("#characterChoice").select_option("linque")
                     settings_toggle.click()
+                    page.locator("#entryMode").select_option("campaign")
                     page.locator("#campaignGame").click()
                     expect(page.locator("#retryCampaignTeaching")).to_be_visible(timeout=15000)
                     page.locator("#retryCampaignTeaching").click()
                     expect(page.locator("#retryCampaignTeaching")).to_be_hidden(timeout=15000)
                 else:
+                    page.locator("#driverMode").select_option("offline")
                     page.locator("#offlineSetup").evaluate("el => el.open = true")
                     page.locator("#offlineSpectator").set_checked(spectator)
                     page.locator("#offlineGame").click()
                 expect(page.locator("#actionPanel button").first).to_be_visible(timeout=15000)
+                expect(page.locator("#table .seat")).to_have_count(12)
+                page.screenshot(path=str(artifacts / ("roundtable-desktop.png" if campaign else "roundtable-mobile.png")), full_page=True)
+                if campaign:
+                    expect(page.locator("#playerBody")).to_contain_text("林雀")
+                self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
                 game_id = page.evaluate("JSON.parse(localStorage.getItem('werewolf.game')).game_id")
                 self.assertTrue(game_id)
                 page.reload()
+                page.locator("#gameSetup").evaluate("el => el.open = true")
+                page.locator("#entryInterface").select_option("web")
+                page.locator("#entryMode").select_option("continue")
                 page.locator("#continueGame").click()
                 expect(page.locator("#actionPanel button").first).to_be_visible(timeout=15000)
                 self.assertEqual(page.evaluate("JSON.parse(localStorage.getItem('werewolf.game')).game_id"), game_id)
@@ -89,6 +109,8 @@ class BrowserEntryTest(unittest.TestCase):
                         elif kind == "vote":
                             page.locator("#voteBtns button").first.click()
                             button = page.locator("#sendVote")
+                        elif kind in ("night", "day_skill"):
+                            button = page.locator("#sendNight")
                         elif kind == "model_retry":
                             self.fail("Fixture produced an invalid model decision")
                     with page.expect_response(lambda r: r.url.endswith("/api/action") and r.request.method == "POST") as response:
@@ -100,6 +122,10 @@ class BrowserEntryTest(unittest.TestCase):
                     self.fail("Game did not settle within bounded player actions")
                 expect(page.locator("#reviewMask")).to_be_visible(timeout=120000)
                 self.assertTrue(page.locator("#reviewText").inner_text().strip())
+                page.keyboard.press("Escape")
+                expect(page.locator("#reviewMask")).to_be_hidden()
+                page.locator("#openReview").click()
+                expect(page.locator("#reviewMask")).to_be_visible()
                 if campaign:
                     view = page.request.get(url + f"/api/rejoin?game_id={game_id}").json()["view"]
                     self.assertTrue(view["finished"])

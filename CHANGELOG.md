@@ -4,6 +4,52 @@
 
 No additional changes yet. / 暂无后续变更。
 
+## 0.3.0
+
+### Player experience / 玩家体验
+
+- Redesigned bilingual web game desk, grouped setup, character search and clearer
+  connection guidance. Local Agent registration and connection checking are
+  separate from starting a game; a connection check makes one model call.
+- 重做中英文网页游戏桌面、分组开局、人物搜索与连接引导。本机 Agent 登记、
+  连接检查与开局分离；连接检查单独消耗一次模型调用。
+- Expand the library to 30 authored personalities with 18 new original portraits.
+  Each game still seats 12 distinct characters. Character identity and secret
+  game role remain independent; personality inputs affect both supported drivers.
+- 人物库扩至三十人，新增十八张原创肖像；每局仍为十二位不同人物，人物与秘密
+  身份独立，性格参数接入离线与模型模式。
+- Give living human players an optional complete reply before daytime exile
+  voting, even after repeated questions. Improve clarification closure, repeated
+  dialogue handling, model reply validation and public flipped-Seer evidence.
+- 存活真人在白天放逐投票前有一次可跳过的完整回应，不因连续追问耗尽机会。
+  同时改进追问收尾、重复台词、模型回应校验与公开预言家翻牌证据保留。
+
+### Delivery / 交付
+
+- Add browser continuation/settlement tests, cross-platform smoke tests, coverage
+  reporting, and verified tagged download archives with checksums. Refresh
+  bilingual onboarding, support guidance and artwork provenance documentation.
+- 新增浏览器续局/结算测试、跨平台检查、覆盖率报告，以及带校验和的标签候选包
+  验证流程；同步双语开局、开源支持与素材来源文档。
+
+Compatibility: saved cast mappings remain stable on resume, including original
+twelve-character mappings. New character-cast games sample from thirty. Existing
+driver/credential checks remain in force. Back up local saves before upgrading;
+older versions are not guaranteed to read new character saves. No local settings,
+credentials, saves or game transcripts are included in the release package.
+兼容性：恢复保留存档人物映射，包含原十二人人物映射；新人物对局从三十人中抽取。
+驱动与凭据校验保持。升级前备份本地存档，不保证旧版本读取新人物存档。
+发布包不含本地设置、密钥、存档与对局记录。
+
+Limits: experimental local single-player game, not a hosted multiplayer service.
+Offline uses authored choices and does not understand arbitrary prose or count
+toward campaign scores. Personality differences are not verified balance gains.
+No real API/Agent full game was run for this release; browser model tests use
+synthetic providers. Artwork licensing is separate from the source-code MIT license.
+限制：仍为实验性本机单人游戏，不是托管多人服务。离线使用预设选项，不理解任意
+自由文本、不计正式闯关成绩；人格差异不代表已验证的平衡收益。本版未跑真实
+API/Agent 整局，浏览器模型测试使用模拟服务。肖像许可独立于代码 MIT 许可。
+
 ## 0.2.0
 
 - Offline terminal/Web discussion now starts with contextual responses and

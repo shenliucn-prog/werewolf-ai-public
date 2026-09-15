@@ -11,6 +11,14 @@ from .participants import Participant
 
 
 MODEL_INSTRUCTIONS = (
+    "Embody your character, not twelve copies of a debate analyst. Let the persona's motive "
+    "choose what you care about and its blind spot shape your provisional judgment. Express "
+    "warmth, doubt, humor, annoyance or loyalty when earned by the actual conversation. "
+    "A short personal reaction or a concession is valid; not every speech needs a full role grid. "
+    "Under pressure follow the acting direction, without threats or abuse. The voice_sample "
+    "is an audition, NOT a historical utterance: do not copy it into every turn. Catchphrases "
+    "are optional and rare. Personality never proves faction, permits invented observations "
+    "or substitutes for answering a direct question. "
     "Choose your own strategy, not a prescribed template. Public flips are facts; claims are not. "
     "Compare dated check claims against flips. Track your own votes and explain changes of stance. "
     "Distinguish support from accusation. Answer questions addressed to you. "

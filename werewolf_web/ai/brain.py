@@ -66,6 +66,9 @@ class Style:
 
     @staticmethod
     def from_persona(persona: dict) -> "Style":
+        if "style_weights" in persona:
+            # Authored cast uses language-independent numerical behavior.
+            return Style.from_dict({**Style().to_dict(), **persona["style_weights"]})
         # 口头禅也必须进语料：阿墨的"要从两面来看"就写在口头禅里，
         # 只取 traits/relations/habits 会漏掉他最鲜明的说话方式。
         blob = " ".join([

@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Add a portrait round table, interface-first setup, distinct character acting directions, quoted grouped clarifications and durable last words/badge handoff.", "zh": "新增肖像圆桌、界面优先开局、人物表演指引、带原句的合并澄清，以及可恢复的遗言与警徽交接。"},
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md", "docs/PLAYER_GUIDE.md", "docs/CHARACTERS.md"],
+  "reason": "Describe the changed player-facing discussion and exit rules, interface versus driver, character presentation and unverified model-performance limits.",
+  "compatibility": {"en": "Snapshots add dialogue_version=1. Missing version restores as 0 and does not introduce last words mid-game. Question pair saves remain readable; clarification limits now apply per recipient/window. Existing characters and credentials are unchanged.", "zh": "快照新增 dialogue_version=1，旧档缺失时恢复为 0，不在途中插入遗言。旧问题对格式仍可读取，澄清改为每位被问者每窗口一次；人物映射与凭据保持不变。"}
+}

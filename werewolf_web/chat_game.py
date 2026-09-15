@@ -119,7 +119,7 @@ def _render(event: dict, locale: str = "zh-CN"):
         print(f"{prefix} {seat_label(event['seat'])} {event['name']}：{event['text']}")
     elif kind == "private":
         print(f"🔒 {event['text']}")
-    elif kind in ("narration", "death", "flip", "exile", "gameover", "ballots"):
+    elif kind in ("narration", "death", "flip", "exile", "gameover", "ballots", "discussion_closed", "badge"):
         print(f"🎙️ {event.get('text') or event.get('reason', '')}")
     elif kind == "vote_result":
         from .public_record import target_label
@@ -182,7 +182,13 @@ def _ordinary_request_prompt(kind: str, data: dict, locale: str = "zh-CN") -> st
         return (f"\n{data.get('from', 'Someone')} interrupted: {data.get('text', '')}\nReply briefly, or press Enter to pass:\n> " if en
                 else f"\n{data.get('from', '有人')} 打断你：{data.get('text', '')}\n简短回应，或直接回车暂不回应：\n> ")
     if kind == "table_answer":
-        return (f"\nAnswer {data.get('from', 'the questioner')}'s question, or type skip to pass:\n> " if en
+        if data.get("last_words"):
+            return "\nYour last words, or type skip:\n> " if en else "\n请留下遗言，或输入 跳过：\n> "
+        if data.get("final_reply"):
+            return ("\nBefore voting: one final reply. Explain your position, or type skip. No further interruptions.\n> " if en
+                    else "\n投票前，留给你一次完整回应：可集中解释质疑，或输入 跳过。之后不再追加追问。\n> ")
+        quotes = "\n".join(f"{q['from']}: {q['text']}" for q in data.get("questions", []))
+        return quotes + (f"\nAnswer {data.get('from', 'the questioner')}'s question, or type skip to pass:\n> " if en
                 else f"\n请简短回答 {data.get('from', '提问者')} 的追问；输入 跳过 或直接回车暂不回答：\n> ")
     if kind == "election_up":
         return "\nRun for sheriff? Type yes or no:\n> " if en else "\n是否上警？输入 上警 / 不上警：\n> "
@@ -277,7 +283,7 @@ async def _repl(session: GameSession) -> int:
         while True:
             raw = await asyncio.to_thread(input, _request_prompt(kind, data, locale))
             record_command = re.fullmatch(r"/history|history|公开记录|历史|(?:第\d+天)?(?:发言记录|完整发言|票型|投票记录)|(?:上一轮|最近)(?:的)?票型|(?:day \d+ )?(?:votes|ballots|speeches)|(?:last|latest) (?:votes|ballots)", raw.strip().casefold())
-            if raw.startswith("?") or raw.strip().casefold() in ("/seats", "seats", "座次", "座次表", "/checks", "check claims", "查验声明", "查验对账") or record_command:
+            if raw.startswith("?") or raw.strip().casefold() in ("/rules", "rules", "完整规则", "/seats", "seats", "座次", "座次表", "/checks", "check claims", "查验声明", "查验对账") or record_command:
                 print("🎙️ " + session.answer_question(raw[1:] if raw.startswith("?") else raw))
                 continue
             if raw.strip().casefold() in ("/teaching", "教学"):
@@ -302,7 +308,7 @@ async def _repl(session: GameSession) -> int:
 async def play(board_id: str, seed: int | None, offline: bool, locale: str, names=None,
                personalities=None, conjecture=False, player_role=None, backend=None,
                model=None, effort=None, max_calls=None, agent_command=None,
-               resume_game_id=None):
+               resume_game_id=None, character=None):
     from . import driver as driver_mod
     from .ai.decision_runtime import create_runtime, ModelTurnError
     from . import checkpoint, campaign_flow, settings as user_settings
@@ -400,6 +406,7 @@ async def play(board_id: str, seed: int | None, offline: bool, locale: str, name
                           seed=seed, locale=locale, names=names,
                           personalities=personalities, conjecture=conjecture, player_role=player_role,
                           onboarding=True, planner=planner,
+                          character=character,
                           checkpoint_path=checkpoint.checkpoint_path(session_id))
     session.driver, session.adapter = resolved["driver"], resolved["adapter"]
     print("Text only; voice and visual gameplay are not designed or implemented." if locale == "en" else
@@ -506,6 +513,7 @@ def main():
     parser = argparse.ArgumentParser(description="对话式狼人杀")
     parser.add_argument("--board", help="板子 ID；省略时先选择 / select before dealing")
     parser.add_argument("--role", default="random", help="Your role ID, or random (default); see --list-roles")
+    parser.add_argument("--character", help="Authored character ID or random; separate from secret game role")
     parser.add_argument("--list-roles", action="store_true", help="List roles available on the selected board")
     parser.add_argument("--seed", type=int, help="可复现随机种子")
     parser.add_argument("--offline", action="store_true", help="只使用本地表达")
@@ -606,7 +614,7 @@ def main():
         parser.error(str(error))
     result = asyncio.run(play(args.board, args.seed, args.offline, args.lang, names, personalities,
                               args.conjecture, args.role, args.backend, args.model, args.effort, args.max_model_calls,
-                              args.agent_command))
+                              args.agent_command, character=args.character))
     if result == 1:
         raise SystemExit(1)
 

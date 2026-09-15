@@ -2,8 +2,8 @@
 
 English | [简体中文](README.zh-CN.md)
 
-<!-- version: 0.2.0 -->
-Version: **0.2.0** — experimental; see the [release](https://github.com/shenliucn-prog/werewolf-ai-public/releases/tag/v0.2.0).
+<!-- version: 0.3.0 -->
+Version: **0.3.0** — experimental; see the [release](https://github.com/shenliucn-prog/werewolf-ai-public/releases/tag/v0.3.0).
 See [changes](CHANGELOG.md) and [release process](docs/RELEASING.md).
 
 A local single-player Werewolf game: you play one seat against 11 AI opponents.
@@ -17,6 +17,35 @@ command execution and a persistent interactive process. Relaying the game does
 universal Agent plugin or separate native app yet.
 
 ## Choose a mode
+
+Start with **Agent conversation or browser**, then **model / registered Agent or
+explicit offline**, then campaign / free game / continue. Interface and NPC
+intelligence are separate choices. The browser presents a clockwise twelve-seat
+table with Raven as host; portraits remain visible on mobile. Selecting a seat
+does not submit an action: confirm the named target below.
+
+New player games separate election and daytime clarifications. Each addressed
+player answers a combined set of questions with source quotes; follow-ups are
+explicitly deferred when Raven closes discussion. The final statement does not
+open another question round. After death abilities, the sheriff passes or
+destroys the badge. First-night victims and daytime exiles may give last words
+or skip; other deaths have no last words. These are this project's house rules,
+not a claim of universal Werewolf rules. Older saves keep their old farewell
+policy. Full rules remain available via the Host (`/rules`).
+
+The setup offers 30 authored characters, or a random character: portrait,
+name and personality travel together. Each game seats 12 distinct characters:
+your choice plus 11 sampled companions. This is separate from your secret role.
+Search names or personality descriptions in the gallery. Saved games keep their cast.
+See the [character library and artwork notes](docs/CHARACTERS.md).
+Custom names/personality settings remain available. Before each daytime exile
+vote, a living human gets one optional final reply, even after repeated questions.
+Offline play uses contextual choices instead of understanding arbitrary text.
+
+For a local Agent, open **Add local Agent connection** in web setup. Registering
+the built-in Codex adapter makes no model call; **Check connection** makes one
+separate verification call and does not start a game. Other Agents use a trusted
+local wrapper; see [connection setup](docs/MODEL_CONNECTIONS.md).
 
 In this checkout, offline discussion offers a few contextual replies plus
 “listen” first; “Other responses” retains the full menu. NPCs can respond to
@@ -42,8 +71,8 @@ loss reviews use the model and can be retried.
 makes no model calls and does not count toward campaign progress.
 
 For an independent **choice-based offline game**, use
-`python -m werewolf_web.offline_game --lang en`. It offers twelve fixed
-personalities, character replacement, public spectating and local saves,
+`python -m werewolf_web.offline_game --lang en`. It draws twelve fixed
+personalities from thirty characters, with character replacement, public spectating and local saves,
 without free-text interpretation or campaign scoring.
 See [offline play](docs/OFFLINE_GAME.md) for commands and limitations.
 
@@ -121,6 +150,12 @@ can reuse non-secret saved model settings; keep credentials in trusted local
 configuration for recovery.
 
 For the optional browser interface:
+
+The web desk groups setup into connection, board/role, and start controls.
+During play, all twelve seats sit above the conversation; your identity and
+private rules chat stay separate. Reading older speech does not force-scroll
+you to new messages: use “Latest speech” to catch up. The review can be closed
+and reopened from the table. Layout and labels support mobile and Chinese/English.
 
 ```bash
 python -m uvicorn werewolf_web.run:app --host 127.0.0.1 --port 8000

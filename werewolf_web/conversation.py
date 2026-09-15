@@ -120,7 +120,8 @@ class InterruptionIntent:
 
 
 class QuestionQueue:
-    LIMIT = 2
+    # One combined answer per recipient, not two answers for the entire table.
+    LIMIT = 12
 
     def __init__(self, pending=None, answered=0):
         self.pending = deepcopy(pending or [])
@@ -150,10 +151,24 @@ class QuestionQueue:
         pending = cls._pairs(raw, "pending_questions")
         answered = snapshot.get("questions_answered", 0)
         if type(answered) is not int or not 0 <= answered <= cls.LIMIT:
-            raise ValueError("questions_answered must be an integer in 0..2")
+            raise ValueError("questions_answered is outside the table limit")
         state = snapshot.get("step_state", {})
         if not isinstance(state, dict):
             raise ValueError("step_state must be an object")
+        sources = state.get("question_sources", {})
+        if not isinstance(sources, dict):
+            raise ValueError("question_sources must be an object")
+        for key, source in sources.items():
+            if (not isinstance(key, str) or not isinstance(source, dict)
+                    or set(source) != {"from", "text", "event_no"}
+                    or not isinstance(source["from"], str) or not isinstance(source["text"], str)
+                    or (source["event_no"] is not None and
+                        (type(source["event_no"]) is not int or source["event_no"] < 1))):
+                raise ValueError("Invalid public question source")
+        farewells = state.get("farewells", [])
+        if (not isinstance(farewells, list) or any(type(pos) is not int or not 1 <= pos <= 12 for pos in farewells)
+                or len(set(farewells)) != len(farewells)):
+            raise ValueError("Invalid farewell completion markers")
         if "question_window" in state:
             window = cls._pairs(state["question_window"], "question_window")
             if any(pair not in pending for pair in window):

@@ -64,10 +64,11 @@ class QuestionQueueTest(unittest.TestCase):
         for pair in queue.window(state)[:2]:
             queue.begin(pair, state)
             queue.finish(pair, state)
+        queue.answered = queue.LIMIT
         with self.assertRaises(ValueError):
             queue.begin(["three", "C"], state)
         queue.finish(["three", "C"], state, consume=False)
-        self.assertEqual(queue.answered, 2)
+        self.assertEqual(queue.answered, queue.LIMIT)
         self.assertEqual(queue.pending, [])
 
     def test_legacy_dict_migrates_and_snapshots_are_detached(self):
@@ -96,7 +97,7 @@ class QuestionQueueSessionTest(unittest.IsolatedAsyncioTestCase):
             {"pending_questions": [["A"]]},
             {"pending_questions": [["A", "B"], ["A", "B"]]},
             {"questions_answered": -1}, {"questions_answered": True},
-            {"questions_answered": 3},
+            {"questions_answered": QuestionQueue.LIMIT + 1},
             {"step_state": {"answering_question": ["A", "B"]}},
             {"step_state": {"question_window": [["A", "B"]]}},
         ]
@@ -152,13 +153,13 @@ class QuestionQueueSessionTest(unittest.IsolatedAsyncioTestCase):
             again.restore(restored.snapshot())
             self.assertEqual(again.questions.window(again._step_state), [])
 
-    async def test_three_queued_questions_keep_two_opportunity_limit(self):
+    async def test_distinct_recipients_each_receive_an_opportunity(self):
         session = await self.make_session()
         targets = list(session.agents.values())[:3]
         for agent in targets:
             session.questions.enqueue(agent.name, session.engine.player_seat().name)
             agent.brain.answer_check_question = Mock(return_value=Speech(text="回答"))
         await session._answer_table_questions()
-        self.assertEqual([a.brain.answer_check_question.call_count for a in targets], [1, 1, 0])
-        self.assertEqual(session.questions.answered, 2)
+        self.assertEqual([a.brain.answer_check_question.call_count for a in targets], [1, 1, 1])
+        self.assertEqual(session.questions.answered, 3)
         self.assertEqual(session.questions.pending, [])

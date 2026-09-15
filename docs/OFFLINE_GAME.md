@@ -23,7 +23,7 @@ python -m werewolf_web.offline_game --board classic --character laomai --role wi
 python -m werewolf_web.offline_game --board classic --spectate --lang en
 ```
 
-The twelve fixed personalities are independent of the randomly dealt game
+The thirty authored personalities (twelve seated per game) are independent of the randomly dealt game
 roles. `--character` replaces that character with you; their autonomous version
 does not also appear at another seat. `--name` optionally changes your name.
 You are not forced to roleplay the selected personality. `--role` can select
@@ -111,7 +111,7 @@ python -m werewolf_web.offline_game --board classic --character tiandou --role s
 python -m werewolf_web.offline_game --board classic --spectate
 ```
 
-- 12 个固定人格，身份另行分配；可替代其中一个，也可公共视角旁观。
+- 30 个固定人格，每局抽取 12 人，身份另行分配；可替代其中一个，也可公共视角旁观。
 - 默认直接选情境回应或“先听听”；“其他说法”展开类别菜单，0 返回。
 - 收到金水、被查杀、多人对跳会产生不同接话。人格影响回应，不认证身份；
   同一 NPC 避免反复说同一句情境台词。仍是人工编写的策略，不理解任意语言。

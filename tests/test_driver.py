@@ -748,7 +748,7 @@ class TerminalDriverEntryTest(unittest.IsolatedAsyncioTestCase):
 
 
 class SettingsTrustedTest(unittest.TestCase):
-    def test_trusted_cli_persists_command_but_web_path_drops_it(self):
+    def test_browser_save_preserves_trusted_cli_command_not_incoming_command(self):
         with tempfile.TemporaryDirectory() as directory:
             path = os.path.join(directory, "settings.json")
             with patch.object(user_settings, "SETTINGS_PATH", path):
@@ -761,7 +761,7 @@ class SettingsTrustedTest(unittest.TestCase):
                 # Web (non-trusted) save never writes an executable.
                 user_settings.save_settings(
                     {"backend": "command", "command": ["evil"], "model": "m"})
-                self.assertNotIn("command", user_settings.load_settings())
+                self.assertEqual(user_settings.load_settings()["command"], ["python", "w.py"])
 
 
 if __name__ == "__main__":

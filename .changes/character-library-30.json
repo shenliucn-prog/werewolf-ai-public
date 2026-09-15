@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Expand the character library to 30 with 18 original portraits, searchable profiles and twelve distinct cast members per game.", "zh": "人物库扩为三十人，新增十八张原创肖像、可搜索人物档案，每局抽取十二位不同人物。"},
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md", "docs/CHARACTERS.md", "docs/ASSETS.md", "docs/OFFLINE_GAME.md"],
+  "reason": "Explain cast sampling, character versus secret role, behavioral limits and artwork provenance.",
+  "compatibility": {"en": "Seat count remains twelve. Restored games retain their saved character mapping; new character-cast games sample without replacement. Secret roles remain independent.", "zh": "座位数仍为十二，恢复保留已保存人物映射；新人物对局不重复抽取，秘密身份独立分配。"}
+}
