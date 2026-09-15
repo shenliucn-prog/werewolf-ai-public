@@ -1,0 +1,13 @@
+{
+  "summary": {
+    "en": "Upgrade coverage from 7.10.7 to 7.16.0 for development coverage measurement.",
+    "zh": "将开发测试覆盖率工具 coverage 从 7.10.7 升级至 7.16.0。"
+  },
+  "compatibility": {
+    "en": "No runtime dependency, save schema, model configuration or Agent protocol change. Coverage totals may vary with measurement fixes; retain the existing test gates.",
+    "zh": "不修改运行时依赖、存档格式、模型配置或 Agent 协议。测量修复可能影响覆盖率数字，保留现有测试门槛。"
+  },
+  "docs_impact": "none",
+  "docs": [],
+  "reason": "Reviewed CONTRIBUTING.md and docs/RELEASING.md: their coverage commands remain valid; this is a development-only version bump with no player behavior change."
+}
