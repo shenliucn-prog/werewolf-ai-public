@@ -81,3 +81,13 @@ Submit issues and pull requests to [werewolf-ai-public](https://github.com/shenl
 Explain the player-visible problem, the resulting behavior, and how you verified it. Keep unrelated refactors separate. Include the board, language, seed, and offline/online setting for reproducible gameplay reports.
 
 Never include API keys, `.env` files, real-person profiles, or raw private match transcripts. New portraits and other assets must include their source and permission terms.
+
+## Coding agents and dependency updates / 开发 Agent 与依赖升级
+
+Cursor, Claude Code, Codex and other coding hosts share [AGENTS.md](AGENTS.md).
+Follow [agent-neutral maintenance](docs/AGENT_DEVELOPMENT.md) for rule loading,
+duplicate Dependabot PRs, bilingual records, standard checks and handoff.
+Bot PRs have the same delivery gate; editor support does not imply an NPC adapter.
+
+所有开发工具遵循同一规则，依赖机器人不豁免交付检查。工具入口、去重、双语记录与交接见
+上述指南；编辑器支持不等于 NPC 模型自动接入。

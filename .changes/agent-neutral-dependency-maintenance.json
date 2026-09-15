@@ -1,0 +1,20 @@
+{
+  "summary": {
+    "en": "Share coding-agent instructions and dependency maintenance across Cursor, Claude Code and Codex; prevent duplicate runtime pip updates and retain all Python matrix results.",
+    "zh": "统一 Cursor、Claude Code、Codex 的协作入口与依赖维护流程，避免重复扫描运行时依赖，并保留全部 Python 矩阵结果。"
+  },
+  "compatibility": {
+    "en": "No game, save, configuration or NPC adapter protocol changes; no global agent settings or model routing changes. Host rule loading is documented, not live-host certification.",
+    "zh": "不修改游戏、存档、配置或 NPC 适配协议，不更改全局 Agent 设置或模型路由；说明规则加载方式，不宣称已实测所有宿主。"
+  },
+  "docs_impact": "readme",
+  "docs": [
+    "README.md",
+    "README.zh-CN.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "CONTRIBUTING.md",
+    "docs/AGENT_DEVELOPMENT.md"
+  ],
+  "reason": "Documents coding-tool entry points and dependency PR handling without changing gameplay."
+}
