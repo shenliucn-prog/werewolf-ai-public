@@ -1,0 +1,13 @@
+{
+  "summary": {
+    "en": "Upgrade the web runtime OpenAI SDK from 3.8.0 to 3.11.0.",
+    "zh": "将 Web 运行时的 OpenAI SDK 从 3.8.0 升级至 3.11.0。"
+  },
+  "compatibility": {
+    "en": "No save schema, endpoint configuration or Agent command protocol changes. Provider-neutral API/command adapters remain supported; mocked contract tests do not certify live Cursor or Claude Code model integration.",
+    "zh": "不修改存档格式、端点配置或 Agent 命令协议，保留通用 API／命令适配器。模拟契约测试不代表已验证 Cursor 或 Claude Code 的真实模型接入。"
+  },
+  "docs_impact": "none",
+  "docs": [],
+  "reason": "Reviewed docs/MODEL_CONNECTIONS.md and both READMEs: documented installation, API endpoints and trusted wrapper contracts are unchanged by this SDK-only update."
+}
