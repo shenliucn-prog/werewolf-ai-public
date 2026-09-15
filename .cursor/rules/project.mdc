@@ -1,0 +1,8 @@
+---
+description: Shared Werewolf AI project instructions
+alwaysApply: true
+---
+
+Read and follow the repository root [AGENTS.md](../../AGENTS.md).
+For code maintenance, read [docs/AGENT_DEVELOPMENT.md](../../docs/AGENT_DEVELOPMENT.md).
+These files are the shared policy; do not duplicate it here or change global Cursor settings.

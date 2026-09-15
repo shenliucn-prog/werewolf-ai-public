@@ -58,3 +58,13 @@ Merge is not release. A release requires an explicit user request, reviewed
 CHANGELOG, VERSION/README consistency, save compatibility notes and a tested
 tagged candidate. Never publish a tag, GitHub Release or merge automatically
 because implementation is complete.
+
+## Agent-neutral development
+
+This file is the canonical policy for Codex, Cursor, Claude Code and other
+coding agents. CLAUDE.md imports it; the Cursor project rule points here.
+Read docs/AGENT_DEVELOPMENT.md for dependency PR maintenance and handoff.
+Use standard Git, Python and Node commands; no particular Agent login, SDK,
+global model setting or private tool is required for development tests.
+Supporting an editor does not register its model as an NPC driver. Preserve
+the provider-neutral runtime and test command/API contracts without paid calls.

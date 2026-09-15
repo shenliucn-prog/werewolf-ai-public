@@ -16,6 +16,8 @@ command execution and a persistent interactive process. Relaying the game does
 **not** automatically connect that Agent's model to the NPCs. There is no
 universal Agent plugin or separate native app yet.
 
+Development with Cursor, Claude Code, Codex or another coding agent uses the same [project instructions](AGENTS.md) and [maintenance guide](docs/AGENT_DEVELOPMENT.md). This does not automatically connect the editor model to NPCs.
+
 ## Choose a mode
 
 Start with **Agent conversation or browser**, then **model / registered Agent or

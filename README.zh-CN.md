@@ -15,6 +15,8 @@
 **Agent 帮你转述，不等于它的模型已经接入 NPC**，仍需完成模型连接配置。
 目前没有通用 Agent 插件，也没有单独的原生 App。
 
+使用 Cursor、Claude Code、Codex 或其他 Agent 开发时，遵循同一份[项目规则](AGENTS.md)与[维护指南](docs/AGENT_DEVELOPMENT.md)。这不代表编辑器里的模型自动接入 NPC。
+
 ## 选择玩法
 
 开局顺序：**Agent 对话／网页 → 模型或已登记 Agent／主动离线 → 闯关／自由对局／继续 → 板子与人物**。
