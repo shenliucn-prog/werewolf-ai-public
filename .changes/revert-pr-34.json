@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Revert PR #34 at the maintainer's request, restoring the previous setup, speech and public-table behavior.", "zh": "按维护者要求撤回 PR #34，恢复此前的接入、发言与公共圆桌行为。"},
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md", "docs/PLAYER_GUIDE.md"],
+  "reason": "Exact rollback of PR #34 including its documentation; the separate private local experiment is unchanged.",
+  "compatibility": {"en": "No schema migration or save deletion. PR #34 added optional public event metadata; rollback restores prior readers and speech limits.", "zh": "不迁移或删除存档。PR #34 仅新增可选公共事件元数据；回滚恢复此前读取逻辑和发言限制。"}
+}

@@ -50,7 +50,6 @@ class BrowserEntryTest(unittest.TestCase):
                 page.screenshot(path=str(artifacts / ("entry-desktop.png" if campaign else "entry-mobile.png")), full_page=True)
                 expect(page.locator("#continueGame")).to_be_disabled()
                 page.locator("#entryInterface").select_option("web")
-                page.locator("#modelSettings > summary").click()
                 if campaign:
                     expect(page.locator("#castNames input")).to_have_count(12)
                     with page.expect_response(lambda r: r.url.endswith("/api/start")) as unconfigured:
@@ -117,9 +116,8 @@ class BrowserEntryTest(unittest.TestCase):
                     with page.expect_response(lambda r: r.url.endswith("/api/action") and r.request.method == "POST") as response:
                         button.click()
                     self.assertTrue(response.value.json()["ok"])
-                    page.wait_for_function("old => faulted || document.querySelector('#reviewMask').style.display !== 'none' || (pendingReq?.request_id !== old && document.querySelector('#actionPanel').style.display !== 'none')",
+                    page.wait_for_function("old => document.querySelector('#reviewMask').style.display !== 'none' || (pendingReq?.request_id !== old && document.querySelector('#actionPanel').style.display !== 'none')",
                                            arg=request_id, timeout=120000)
-                    self.assertFalse(page.evaluate("faulted"), page.locator("#status").inner_text() + "\n" + page.locator(".log").inner_text()[-2000:])
                 else:
                     self.fail("Game did not settle within bounded player actions")
                 expect(page.locator("#reviewMask")).to_be_visible(timeout=120000)

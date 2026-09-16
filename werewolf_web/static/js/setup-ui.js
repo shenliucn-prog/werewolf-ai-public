@@ -2,23 +2,6 @@
 let setupToken = null;
 let knownConnections = [];
 let characterCatalog = [];
-let codexInstalled = false;
-
-function updateQuickAgent() {
-  const button = $("#quickAgentConnect");
-  if (!button) return;
-  $("#quickAgentSetup").hidden = ["api", "offline"].includes($("#driverMode").value);
-  const selected = knownConnections.find(c => c.name === $("#agentConnection").value);
-  button.disabled = !selected && !codexInstalled;
-  button.textContent = selected ? setupText("使用这个 Agent", "Use this Agent") : setupText("连接本机 Codex", "Connect local Codex");
-  $("#quickAgentStatus").textContent = selected
-    ? `${setupText("已找到：", "Found: ")}${selected.name} · ${selected.model || "default"}`
-    : codexInstalled ? setupText("已找到本机 Codex", "Local Codex found") : setupText("尚未找到已登记的 Agent", "No registered Agent found");
-  $("#quickAgentHelp").textContent = selected
-    ? setupText("无需 API Key。入座时自动验证连接；这里不会额外调用模型。", "No API key needed. Connection is checked when you take your seat; no extra model call here.")
-    : codexInstalled ? setupText("沿用本机登录。默认 gpt-5.6-terra / medium / 240 次每局；可在高级设置修改。", "Uses your local login. Default: gpt-5.6-terra / medium / 240 calls per game; change in advanced settings.")
-    : setupText("让你的 Agent 在本机用 connection_setup 登记适配器，或展开下方选择 API / 离线。打开聊天本身不等于已连接 NPC。", "Ask your Agent to register its adapter locally using connection_setup, or choose API / offline below. An open chat alone is not an NPC connection.");
-}
 
 function setupText(zh, en) { return uiLocale === "en" ? en : zh; }
 function feedback(text, failed=false) {
@@ -44,7 +27,6 @@ function connectionSummary() {
   $("#connectionSummary").textContent = text;
   $("#registerConnection").hidden = mode !== "agent";
   $("#checkConnection").hidden = mode === "offline";
-  updateQuickAgent();
 }
 
 async function refreshConnectionSetup() {
@@ -52,7 +34,6 @@ async function refreshConnectionSetup() {
     const response = await fetch("/api/connection/setup");
     if (!response.ok) throw new Error();
     const info = await response.json();
-    codexInstalled = info.codex_installed;
     setupToken = info.token;
     $("#registerCodex").disabled = !info.codex_installed;
     $("#codexAvailability").textContent = info.codex_installed
@@ -62,12 +43,6 @@ async function refreshConnectionSetup() {
     if (!entries.ok) throw new Error();
     knownConnections = (await entries.json()).connections || [];
     await loadAgentConnections();
-    if (!$("#driverMode").value && knownConnections.length === 1) {
-      $("#driverMode").value = "agent";
-      $("#agentConnection").value = knownConnections[0].name;
-      $("#driverMode").dispatchEvent(new Event("change"));
-    }
-    if (knownConnections.length > 1) $("#modelSettings").open = true;
     connectionSummary();
   } catch (_) {
     feedback(setupText("无法读取连接设置，请刷新重试。", "Cannot load connection settings. Reload and retry."), true);
@@ -95,22 +70,6 @@ $("#registerCodex").onclick = async () => {
     $("#checkConnection").focus();
   } catch (error) { feedback(error.message, true); }
   finally { button.disabled = false; }
-};
-
-if ($("#quickAgentConnect")) $("#quickAgentConnect").onclick = async () => {
-  const button = $("#quickAgentConnect"); button.disabled = true;
-  try {
-    $("#driverMode").value = "agent";
-    $("#driverMode").dispatchEvent(new Event("change"));
-    if (!knownConnections.length) {
-      await setupRequest("/api/connection/register", {name:$("#connectionName").value.trim(), model:$("#connectionModel").value.trim(), effort:$("#connectionEffort").value, max_calls:Number($("#connectionBudget").value)});
-      await refreshConnectionSetup();
-    }
-    if (!$("#agentConnection").value && knownConnections.length === 1) $("#agentConnection").value = knownConnections[0].name;
-    connectionSummary();
-    feedback(setupText("已选好。接下来选人物、入座即可；开局会验证连接，失败不会转为离线。", "Selected. Choose your character and take a seat; startup checks the connection and never falls back to offline."));
-  } catch (error) { feedback(error.message, true); }
-  finally { updateQuickAgent(); }
 };
 
 $("#checkConnection").onclick = async () => {

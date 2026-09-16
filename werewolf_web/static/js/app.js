@@ -277,13 +277,6 @@ function handleEvent(d) {
     case "private": log(`🔒 ${escapeHtml(d.text)}`, "private"); break;
     case "speech":
       highlightSpeaker(d.seat);
-      if (d.claim === "seer" || d.check_reports?.length) {
-        const title = uiLocale === "en" ? "Claims Seer · unverified" : "自称预言家 · 尚未认证";
-        const reports = (d.check_reports || []).map(r => uiLocale === "en"
-          ? `Night ${r.night} · seat ${r.target} · ${r.result}`
-          : `第${r.night}夜 · ${r.target}号 · ${r.result === "good" ? "好人" : "狼人"}`);
-        log(`<strong>${escapeHtml(d.name)} · ${title}</strong>${reports.map(r => `<p>${escapeHtml(r)}</p>`).join("")}`, "seer-claim");
-      }
       if (d.reply_to?.length) log(`<details><summary>${uiLocale === "en" ? "Replying to" : "回应的追问"}</summary>${d.reply_to.map(q => `<p>${escapeHtml(q.from)}：${escapeHtml(q.text)}</p>`).join("")}</details>`, "narr");
       log(`<b>${d.seat ? seatText(d.seat) + " · " : ""}${escapeHtml(d.name)}</b>${d.talk_kind === "last_words" ? (uiLocale === "en" ? " · Last words" : " · 遗言") : ""}：${escapeHtml(d.text)}`, "speech"); break;
     case "death": log(`💀 ${escapeHtml(d.text)}`, "death"); markDead(d.seat); break;
