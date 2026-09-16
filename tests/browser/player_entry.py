@@ -117,8 +117,9 @@ class BrowserEntryTest(unittest.TestCase):
                     with page.expect_response(lambda r: r.url.endswith("/api/action") and r.request.method == "POST") as response:
                         button.click()
                     self.assertTrue(response.value.json()["ok"])
-                    page.wait_for_function("old => document.querySelector('#reviewMask').style.display !== 'none' || (pendingReq?.request_id !== old && document.querySelector('#actionPanel').style.display !== 'none')",
+                    page.wait_for_function("old => faulted || document.querySelector('#reviewMask').style.display !== 'none' || (pendingReq?.request_id !== old && document.querySelector('#actionPanel').style.display !== 'none')",
                                            arg=request_id, timeout=120000)
+                    self.assertFalse(page.evaluate("faulted"), page.locator("#status").inner_text() + "\n" + page.locator(".log").inner_text()[-2000:])
                 else:
                     self.fail("Game did not settle within bounded player actions")
                 expect(page.locator("#reviewMask")).to_be_visible(timeout=120000)
