@@ -146,7 +146,13 @@ def public_facts(entries):
         kind = ev.get("type")
         temporal = {"day": r.get("day"), "night": r.get("night"),
                     "phase": r.get("phase")}
-        if kind == "flip":
+        if kind == "narration" and ev.get("night_outcome", {}).get("deaths") == 0:
+            facts.append({"kind": "night_outcome", "deaths": 0,
+                          "night": ev["night_outcome"]["night"],
+                          "day": r.get("day"), "phase": r.get("phase"),
+                          "source": "host", "text": ev.get("text"),
+                          "event_no": ev.get("event_no")})
+        elif kind == "flip":
             facts.append({"kind": "flip", "seat": ev.get("seat"),
                           "text": ev.get("text"), "event_no": ev.get("event_no"),
                           **temporal})

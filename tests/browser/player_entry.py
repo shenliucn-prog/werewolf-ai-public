@@ -50,6 +50,7 @@ class BrowserEntryTest(unittest.TestCase):
                 page.screenshot(path=str(artifacts / ("entry-desktop.png" if campaign else "entry-mobile.png")), full_page=True)
                 expect(page.locator("#continueGame")).to_be_disabled()
                 page.locator("#entryInterface").select_option("web")
+                page.locator("#modelSettings > summary").click()
                 if campaign:
                     expect(page.locator("#castNames input")).to_have_count(12)
                     with page.expect_response(lambda r: r.url.endswith("/api/start")) as unconfigured:

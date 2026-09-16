@@ -1,4 +1,11 @@
 /* Night Table: one reading surface, a full table, and a stable action dock. */
+.seer-claim { border:1px solid var(--gold); border-radius:12px; padding:16px; margin:16px 0 6px; background:var(--panel2); color:var(--gold); }
+.seer-claim strong { display:block; font-size:17px; }
+.seer-claim p { margin:8px 0 0; font-weight:600; }
+#quickAgentSetup { margin:16px 0 24px; }
+#quickAgentStatus { font-size:20px; font-weight:600; }
+#quickAgentConnect { background:var(--accent); color:var(--bg); padding:12px 22px; }
+.table .seat.speaking { outline:2px solid var(--gold); outline-offset:4px; }
 :root {
   color-scheme: dark;
   --bg: #14121e; --panel: #1c1929; --panel2: #272237; --seat: #272237;

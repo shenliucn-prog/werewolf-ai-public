@@ -209,6 +209,9 @@ class GameSession:
         obj["event_no"] = self._event_no
         obj.setdefault("day", self.engine.day_count)
         obj.setdefault("night", self.engine.night_count)
+        if obj.get("type") == "speech":
+            from .check_claims import parse_reports
+            obj["check_reports"] = parse_reports(obj.get("text", ""))
         if obj.get("type") == "init":
             self._init_event = obj
         if obj.get("type") == "request":
@@ -793,7 +796,9 @@ class GameSession:
         self._reset_table_talk()
         self.emit({"type": "narration", "phase": "day", "text": self.host.narrate("day_start", t(self.engine.locale, "day_start", d=e.day_count))})
         if not any(ev.type == "death" for ev in night_events):
-            self.emit({"type": "narration", "text": "Host Raven: No one died last night." if e.locale == "en" else "主持人夜鸦：昨夜平安，无人死亡。"})
+            self.emit({"type": "narration", "phase": "day",
+                       "night_outcome": {"night": e.night_count, "deaths": 0},
+                       "text": "Host Raven: No one died last night." if e.locale == "en" else "主持人夜鸦：昨夜平安，无人死亡。"})
         await self._pace(0.3)
         if e.day_count == 1:
             self._step = "election"
