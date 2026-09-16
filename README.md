@@ -20,15 +20,6 @@ Development with Cursor, Claude Code, Codex or another coding agent uses the sam
 
 ## Choose a mode
 
-For browser setup, a sole registered Agent is selected automatically (no model call).
-Local Codex can be registered with one click; other adapters remain supported through
-local registration. API and explicit offline options are under **Change connection**.
-Starting a game verifies the connection; a failed check never becomes offline play.
-NPC turns now target short, character-specific statements; public Seer declarations
-are highlighted as **unverified claims**, and peaceful-night announcements are supplied
-to the model as public facts. Turn/phase motion respects reduced-motion preferences.
-Shorter output is not a measured guarantee of lower model latency.
-
 Start with **Agent conversation or browser**, then **model / registered Agent or
 explicit offline**, then campaign / free game / continue. Interface and NPC
 intelligence are separate choices. The browser presents a clockwise twelve-seat

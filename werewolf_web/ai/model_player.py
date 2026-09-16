@@ -31,26 +31,11 @@ class ModelNPCAgent(StrategicNPCAgent):
         return value
 
     def speak(self, today, player_last_speech="", task="public speech", **details):
-        brief = task in ("brief answer to public question", "brief public interruption")
-        limit = (120 if brief else 240) if self.engine.locale != "en" else (360 if brief else 720)
-        details["speech_contract"] = {
-            "max_characters_including_check_report": limit,
-            "target": "1–2 short sentences" if brief else "2–3 short sentences",
-            "preferred_length": (("20–50 Chinese characters" if brief else "60–100 Chinese characters")
-                                 if self.engine.locale != "en" else
-                                 ("10–25 words" if brief else "25–50 words")),
-            "direction": "Make one point, in your character's distinctive voice. Choose a reaction, "
-                         "one reason and, only if needed, one target. No numbered essay, table-wide "
-                         "recap or repeated demand for evidence. Answer a direct question first. "
-                         "Preserve any explicit Seer report within the limit. Character warmth, "
-                         "bluntness, wit or hesitation should follow the supplied persona, not a "
-                         "generic detective voice. Do not invent facts to sound distinctive.",
-        }
         names = [s.name for s in self.engine.alive_seats() if s.name != self.name]
         named = {"type": ["string", "null"], "enum": [None, *names]}
         from ..game.engine import ROLE_META
         value = self.decide(task, {
-            "text": {"type": "string", "maxLength": limit},
+            "text": {"type": "string", "maxLength": 1600},
             "claim": {"type": ["string", "null"], "enum": [None, *ROLE_META]},
             "accuse": named, "defend": named,
             "question_to": {"type": ["string", "null"], "enum": [None]}
