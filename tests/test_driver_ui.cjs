@@ -61,8 +61,13 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 10));
   const connectionRow = w.document.querySelector('#agentConnectionRow');
   const connectionSel = w.document.querySelector('#agentConnection');
   assert.ok(driverMode);
-  assert.equal(driverMode.value, '');                       // server default
-  assert.equal(connectionRow.hidden, true);                 // hidden unless agent
+  assert.equal(driverMode.value, 'agent'); // sole trusted connection is selected, not invoked
+  assert.equal(connectionRow.hidden, false);
+  assert.equal(requests.filter(r => r.url === '/api/connection/check').length, 0);
+  w.document.querySelector('#quickAgentConnect').click();
+  await flush();
+  assert.equal(requests.filter(r => r.url === '/api/connection/check').length, 0);
+  assert.match(w.document.querySelector('#connectionFeedback').textContent, /已选好|Selected/);
   assert.equal(w.document.querySelectorAll('#characterCards button').length, 30);
   const search = w.document.querySelector('#characterSearch');
   search.value = 'Guest 17'; search.dispatchEvent(new w.Event('input'));
@@ -237,6 +242,32 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 10));
   w.document.querySelector('#newGame').click();
   assert.equal(requests.length, beforeAgent);
   assert.match(w.document.querySelector('#textCommand').textContent, /interface=Agent conversation/);
+  assert.deepEqual(errors, []);
+  w.eval('handleEvent({type:"speech",seat:2,name:"Two",claim:"seer",text:"My report",check_reports:[{night:1,target:4,result:"good"}]})');
+  assert.match(w.document.querySelector('.seer-claim').textContent, /尚未认证|unverified/);
+  assert.match(w.document.querySelector('.seer-claim').textContent, /4/);
+  const motion = {matches:false, addEventListener() {}};
+  const frames = [];
+  w.matchMedia = () => motion;
+  w.HTMLElement.prototype.getClientRects = () => [{}];
+  w.HTMLElement.prototype.animate = function(keyframes) {
+    frames.push(keyframes);
+    return {finished:Promise.resolve(), cancel() {}};
+  };
+  vm.runInContext(fs.readFileSync(path.join(root, 'js/table-motion.js'), 'utf8'), dom.getInternalVMContext());
+  w.eval('handleEvent({type:"speech",seat:2,name:"Two",text:"Short turn"})');
+  await flush();
+  assert.ok(frames.some(f => f[0].transform === 'translateY(24px)'));
+  frames.length = 0;
+  motion.matches = true;
+  w.eval('handleEvent({type:"speech",seat:2,name:"Two",text:"Reduced motion"})');
+  await flush();
+  assert.ok(frames.length);
+  assert.ok(frames.every(f => f.every(k => !k.transform)));
+  frames.length = 0;
+  w.eval('applyRecoveryView({public_events:[{type:"speech",event_no:99999,seat:2,name:"Two",text:"Replay"}],finished:true,review_status:"done"})');
+  await flush();
+  assert.equal(frames.length, 0);
   assert.deepEqual(errors, []);
   console.log('PASS: driver selector (api/agent/offline), pre-configured connection, unconfigured guidance, and table_answer controls');
   w.close();

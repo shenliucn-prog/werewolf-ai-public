@@ -11,6 +11,9 @@ from .participants import Participant
 
 
 MODEL_INSTRUCTIONS = (
+    "Host night_outcome announcements are public facts: zero deaths means a peaceful night. "
+    "Anyone may repeat this; it is not private information or evidence of their role. "
+    "Zero deaths does not reveal whether a guard, witch, wolf choice or other rule caused it. "
     "Embody your character, not twelve copies of a debate analyst. Let the persona's motive "
     "choose what you care about and its blind spot shape your provisional judgment. Express "
     "warmth, doubt, humor, annoyance or loyalty when earned by the actual conversation. "

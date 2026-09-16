@@ -1,5 +1,8 @@
 // Presentation only: actions and roles always use stable keys from the session.
 const EN = {
+"正在查找本机 Agent…": "Looking for your local Agent…",
+"连接我的 Agent": "Connect my Agent",
+"更换连接 / API / 离线": "Change connection / API / offline",
 "在哪里玩？": "Where do you want to play?",
 "先选择游玩界面": "Choose an interface first",
 "Agent 对话（推荐）": "Agent conversation (recommended)",

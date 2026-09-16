@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Simplify registered-Agent onboarding, shorten NPC turns, preserve peaceful-night facts and highlight public Seer claims with accessible table motion.", "zh": "简化已登记 Agent 接入、缩短 NPC 发言、保留平安夜公共事实，并突出预言家声明与可访问的圆桌动效。"},
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md", "docs/PLAYER_GUIDE.md"],
+  "reason": "Player entry and conversation behavior changed; no private design assets or local runtime data are included.",
+  "compatibility": {"en": "Existing saves remain readable. New public metadata is additive; missing old peaceful-night metadata is not fabricated. New model speech uses shorter limits.", "zh": "旧存档仍可读取。新增公共元数据，不虚构旧档缺失的平安夜事实；后续模型发言采用较短限制。"}
+}

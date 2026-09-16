@@ -37,7 +37,13 @@
       <section class="setup-section" aria-labelledby="connectionTitle">
         <h2 id="connectionTitle" data-i18n="谁来扮演其他玩家？">谁来扮演其他玩家？</h2>
         <p class="field-help" data-i18n="正式对局需要模型或本机 Agent。连接检查通过后才会发牌。">正式对局需要模型或本机 Agent。连接检查通过后才会发牌。</p>
-        <details class="llm-settings" id="modelSettings" open><summary data-i18n="模型设置">模型设置</summary>
+        <div id="quickAgentSetup">
+          <p id="quickAgentStatus" role="status" data-i18n="正在查找本机 Agent…">正在查找本机 Agent…</p>
+          <button id="quickAgentConnect" type="button" disabled data-i18n="连接我的 Agent">连接我的 Agent</button>
+          <p id="quickAgentHelp" class="field-help"></p>
+        </div>
+        <p id="connectionFeedback" role="status" aria-live="polite"></p>
+        <details class="llm-settings" id="modelSettings"><summary data-i18n="更换连接 / API / 离线">更换连接 / API / 离线</summary>
           <div class="llm-settings-body">
             <label><span data-i18n="驱动">驱动</span><select id="driverMode">
               <option value="" data-i18n="使用服务器默认">使用服务器默认</option><option value="api" data-i18n="模型 API（含本地服务）">模型 API（含本地服务）</option><option value="agent" data-i18n="本机 Agent 连接">本机 Agent 连接</option><option value="offline" data-i18n="离线规则测试">离线规则测试</option>
@@ -55,12 +61,10 @@
             </div>
             <select id="llmMode" hidden aria-hidden="true" tabindex="-1"><option value=""></option><option value="local"></option><option value="custom"></option></select>
           </div>
-        </details>
         <div id="connectionTools">
           <p id="connectionSummary" class="field-help" role="status"></p>
           <button type="button" id="checkConnection" data-i18n="检查连接">检查连接</button>
           <p class="field-help" data-i18n="检查会调用一次模型，单独消耗额度；不发牌。开局仍会再次预检。">检查会调用一次模型，单独消耗额度；不发牌。开局仍会再次预检。</p>
-          <p id="connectionFeedback" role="status" aria-live="polite"></p>
           <details id="registerConnection">
             <summary data-i18n="添加本机 Agent 连接">添加本机 Agent 连接</summary>
             <p class="field-help" data-i18n="内置 Codex 适配器可在这里登记。其他 Agent 使用下方本地登记工具；不会把当前聊天自动当成 NPC。">内置 Codex 适配器可在这里登记。其他 Agent 使用下方本地登记工具；不会把当前聊天自动当成 NPC。</p>
@@ -77,6 +81,7 @@
             </details>
           </details>
         </div>
+        </details>
       </section>
       <section class="setup-section" aria-labelledby="tableSettingsTitle">
         <h2 id="tableSettingsTitle" data-i18n="决定这一局">决定这一局</h2>
@@ -84,7 +89,7 @@
         <div class="controls">
           <label><span data-i18n="你想成为哪位人物？">你想成为哪位人物？</span><select id="characterChoice"><option value="random" data-i18n="随机人物（名字、头像、人格绑定）">随机人物（名字、头像、人格绑定）</option><option value="custom" data-i18n="自定义名字与人格">自定义名字与人格</option></select></label>
           <div id="characterPreview" class="character-preview"></div>
-          <details id="characterGallery" open><summary data-i18n="认识茶馆的人物">认识茶馆的人物</summary>
+          <details id="characterGallery"><summary data-i18n="认识茶馆的人物">认识茶馆的人物</summary>
             <label><span data-i18n="搜索名字或性格">搜索名字或性格</span><input id="characterSearch" type="search" maxlength="80"></label>
             <p id="characterCount" class="field-help" role="status" aria-live="polite"></p>
             <div id="characterCards" class="character-cards"></div>
@@ -158,5 +163,6 @@
     </section>
   </div>
   <script src="/js/i18n.js?v=roundtable-1"></script><script src="/js/app.js?v=roundtable-1"></script><script src="/js/setup-ui.js?v=roundtable-1"></script><script src="/js/roundtable.js?v=roundtable-1"></script>
+  <script src="/js/table-motion.js?v=1"></script>
 </body>
 </html>

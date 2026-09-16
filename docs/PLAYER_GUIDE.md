@@ -109,3 +109,19 @@ configured provider; do not include sensitive real-world details.
 发送失败会恢复操作面板；断线或服务重启后可通过「继续游戏」恢复原存档。
 模型故障暂停对局，不会自动离线代打。离线模拟需主动选择，不计正式闯关成绩。
 详细设置见[游戏模式](GAME_MODES.md)，完整规则见[本项目规则版本](RULE_VARIANT.md)。
+# Short turns and quick Agent setup / 短发言与 Agent 快速接入
+
+A sole registered local Agent is selected without a model call; startup still
+checks it. One-click Codex registration uses the displayed model/effort/budget,
+not a new login or a browser-supplied command. Expand Change connection for API,
+multiple registered connections or explicit offline play. NPC Chinese speech
+targets 60–100 characters (replies 20–50), with hard limits 240/120 including
+check reports; English limits are 720/360 characters. Human speech is unchanged.
+These are output constraints, not a measured latency improvement. Explicit Seer
+reports are attributed claims, not host-confirmed identities. A peaceful night
+means zero deaths, not proof of a particular protective skill.
+
+网页自动选中唯一已登记连接，不调用模型；开局仍会验证。一键登记 Codex 使用显示的
+模型、推理强度与预算；网页不接受命令。API、多连接、主动离线在“更换连接”中。
+NPC 中文发言目标 60–100 字，回复 20–50 字；硬上限含查验声明为 240/120 字，
+英文为 720/360 字符。不限制真人发言。声明不等于真身份，平安夜不等于确认某种技能。
