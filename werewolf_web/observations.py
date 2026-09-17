@@ -11,6 +11,15 @@ from .participants import Participant
 
 
 MODEL_INSTRUCTIONS = (
+    "Optimize your own faction's victory, not agreement with the table or an attractive speech. "
+    "Before choosing a speech or vote, compare your own recent public commitments and actions. "
+    "A changed stance needs a concrete new observation or an acknowledged earlier mistake; "
+    "do not invent either. A sheriff support vote is not an exile vote. "
+    "If you are a wolf, privately weigh whether defending a teammate can actually change the "
+    "outcome against exposing surviving pack members through linked votes. Sacrificing a teammate, "
+    "defending them, counterclaiming or maintaining cover are choices, never mandatory scripts. "
+    "Do not confuse your fabricated public suspicion with your private knowledge of your team. "
+    "Do not disclose this private comparison in public speech. Do not assume future votes are known. "
     "Embody your character, not twelve copies of a debate analyst. Let the persona's motive "
     "choose what you care about and its blind spot shape your provisional judgment. Express "
     "warmth, doubt, humor, annoyance or loyalty when earned by the actual conversation. "
@@ -79,6 +88,16 @@ class ObservationGateway:
             raise ValueError("Observation participant does not match the acting seat")
         context = model_context.bound_information(asdict(agent.information_set()))
         context["rules"] = introduction(agent.engine, False)
+        own_statements = [row["event"] for row in agent.public_record.entries
+                          if row["event"].get("type") == "speech"
+                          and row["event"].get("seat") == agent.seat.pos][-2:]
+        details = deepcopy(details)
+        details["own_recent_public_commitments"] = [
+            {"event_no": event.get("event_no"), "day": event.get("day"),
+             "night": event.get("night"), "phase": event.get("phase"),
+             "text": event.get("text", "")[:240],
+             "excerpt": len(event.get("text", "")) > 240}
+            for event in own_statements]
         request = {
             "task": task, "language": agent.engine.locale, "actor": agent.seat.pos,
             "information": context, "persona": agent.persona,

@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Reveal recorded night actions after game over and reinforce model stance continuity.", "zh": "终局后揭示已记录的夜间行动与死因，增强模型立场连续性提示。"},
+  "compatibility": {"en": "Optional private night_audit field; old saves restore with empty history. No configuration or provider protocol changes.", "zh": "新增可选私有 night_audit 字段，旧存档按空记录恢复；不修改配置或模型协议。"},
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md", "docs/POSTGAME_REVIEW.md"],
+  "reason": "Document post-game visibility, legacy save limitations and unverified model-quality effects."
+}

@@ -94,7 +94,7 @@ class ObservationBoundaryTest(unittest.IsolatedAsyncioTestCase):
             "cognitive_parameters": agent.brain.cognition.to_dict(),
             "public_context": model_context.build_public_context(agent),
             "own_previous_decisions": agent.model_decisions[-model_context.DECISION_MEMORY:],
-            "details": details, "instructions": MODEL_INSTRUCTIONS,
+            "details": {**details, "own_recent_public_commitments": []}, "instructions": MODEL_INSTRUCTIONS,
             "joint_hypotheses": for_brain(agent.brain),
             "public_story": public_story(agent.brain),
         })
@@ -104,6 +104,7 @@ class ObservationBoundaryTest(unittest.IsolatedAsyncioTestCase):
     async def test_other_secrets_do_not_change_civilian_input(self):
         session, agent = await self.make_session()
         before = ObservationGateway.for_model(agent, "public speech", {}).to_request()
+        session.night_audit = [{"private_test": "SECRET_NIGHT_AUDIT"}]
         others = [s for s in session.engine.seats.values() if s.pos != agent.seat.pos]
         others[0].role, others[1].role = others[1].role, others[0].role
         session.engine.seer_results = [{"secret": "PRIVATE-CHECK"}]

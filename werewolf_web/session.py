@@ -80,6 +80,7 @@ class GameSession:
         # finished review already ran and never re-triggers (or re-charges) it —
         # only an explicit retry re-requests.
         self.campaign_review_state = None
+        self.night_audit = []  # Private until normal endgame; never an NPC observation.
         # Optional recovery sink: when set, the game writes checkpoints at turn
         # boundaries and around every external call; None disables persistence.
         self.checkpoint_path = checkpoint_path
@@ -756,6 +757,8 @@ class GameSession:
         if night_events is None:
             actions = self._step_state.pop("actions")
             night_events = e.resolve_night(actions)
+            from .night_review import capture
+            self.night_audit.append(capture(e.night_count, actions, night_events))
             self._step_state["night_events"] = night_events
             for ev in night_events:
                 await self._emit_event(ev)
@@ -932,12 +935,14 @@ class GameSession:
         #    winner/reason, the final-role reveal and finished=True are durable
         #    first.  A review failure (or a crash mid-review) must never leave a
         #    finished game looking unfinished (CAMPAIGN_DESIGN §1 / §7).
-        self.emit({"type": "gameover", "winner": e.winner, "reason": e.end_reason})
+        self.emit({"type": "gameover", "winner": e.winner, "reason": e.end_reason}, publish=False)
         self.emit({"type": "narration",
-                   "text": ("Final roles\n" if e.locale == "en" else "最终身份\n") + reveal})
+                   "text": ("Final roles\n" if e.locale == "en" else "最终身份\n") + reveal}, publish=False)
         self.finished = True
         self._step = None
-        self._checkpoint()
+        from .night_review import render
+        self.emit({"type": "narration", "text": render(self)}, publish=False)
+        self._commit_batch()
         # 2) Campaign post-loss short review (§7): generated exactly once here,
         #    after the game settled and *before* the host review, so a Web SSE
         #    client receives it in order.  Guarded by the durable
