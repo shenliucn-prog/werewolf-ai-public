@@ -16,6 +16,23 @@ from werewolf_web.run import GameSession
 
 
 class CodexPlayerTest(unittest.IsolatedAsyncioTestCase):
+    def test_vote_receives_own_public_commitments_without_forcing_target(self):
+        agent, planner, record = self.make_agent()
+        for i in range(4):
+            record.observe({"type": "speech", "seat": agent.seat.pos,
+                            "text": f"commitment-{i}", "event_no": i + 1,
+                            "day": 2, "phase": "day"}, 2)
+        record.observe({"type": "speech", "seat": 99, "text": "NOT_MY_COMMITMENT"}, 2)
+        target = next(s for s in agent.engine.alive_seats() if s.name != agent.name)
+        planner.complete.return_value = {"target": target.pos}
+        self.assertEqual(agent.vote([{"pos": target.pos, "name": target.name}]), target.pos)
+        request = planner.complete.call_args.args[0]
+        rows = request["details"]["own_recent_public_commitments"]
+        self.assertEqual([r["text"] for r in rows], ["commitment-2", "commitment-3"])
+        self.assertEqual(rows[-1]["day"], 2)
+        self.assertIn("faction's victory", request["instructions"])
+        self.assertIn("never mandatory scripts", request["instructions"])
+
     def make_agent(self, role="civilian", locale="zh-CN"):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)

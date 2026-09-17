@@ -64,6 +64,7 @@ def snapshot(session) -> dict:
         "campaign_profile": session.campaign_profile,
         "campaign_counted": session.campaign_counted,
         "campaign_review_state": session.campaign_review_state,
+        "night_audit": deepcopy(session.night_audit),
         "conjecture": session.conjecture,
         "onboarding": session.onboarding,
         "dialogue_version": session.dialogue_version,
@@ -129,7 +130,9 @@ def _prepare_loop_state(data):
         if any(not isinstance(pair, (list, tuple)) or
                any(not isinstance(name, str) for name in pair) for pair in pairs):
             raise ValueError("GameSession.snapshot: invalid table_pairs")
+        from .night_review import validate as validate_night_audit
         state = {
+            "night_audit": validate_night_audit(data.get("night_audit", [])),
             "campaign_profile": profile, "speech_events": speeches,
             "_triggered": set(triggered), "_table_extra_by_name": dict(counts),
             "_table_pairs": {frozenset(pair) for pair in pairs},

@@ -58,6 +58,11 @@ Offline and model players share an [explicit check-claim audit](docs/CHECK_CLAIM
 it links contradictory Seer reports to public records, without certifying identities.
 Unstructured prose is not automatically audited.
 
+After a normal game over, [night-action review](docs/POSTGAME_REVIEW.md) reveals
+recorded targets and death causes. Live play keeps these private; older saves
+cannot reconstruct missing actions. Model prompts reinforce stance continuity
+and faction goals, without prescribing votes or claiming stronger play.
+
 | Entry | What it does |
 | --- | --- |
 | Campaign | Start as a Civilian and win to unlock the next role across 16 fixed-board levels. A faction win counts even if you died. |
