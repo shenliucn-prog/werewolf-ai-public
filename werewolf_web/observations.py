@@ -8,6 +8,7 @@ from copy import deepcopy
 from dataclasses import asdict, dataclass
 
 from .participants import Participant
+from .ai.acting_state import own_state, ACTING_INSTRUCTIONS
 
 
 MODEL_INSTRUCTIONS = (
@@ -58,7 +59,15 @@ MODEL_INSTRUCTIONS = (
     "These lines are your public claims, never quote another player in this declaration format. "
     "check_claim_audit flags only explicit declarations, not all prose; compatibility is not proof, "
     "and a contradiction is not automatic proof of the speaker's faction."
-)
+    " speaking_turns.awaiting means not yet given a main turn, NOT evasion or refusal. "
+    "A queued question does not prove its recipient already had an opportunity to answer. "
+    "Public facts outrank attributed statements and your hypotheses: an exile ballot targeting "
+    "someone is not proof they were exiled; night_death must not be described as voted out. "
+    "Revealed god-side roles (including witch and civilian) are good faction: exiling a witch "
+    "is not a correct wolf elimination. Distinguish a wolf's private benefit from a plausible "
+    "public good-player argument. Keep support (站/保) distinct from accusation (怀疑/出); "
+    "your structured accuse/defend fields must match what you actually say. "
+) + ACTING_INSTRUCTIONS
 
 
 @dataclass(frozen=True)
@@ -103,6 +112,7 @@ class ObservationGateway:
             "information": context, "persona": agent.persona,
             "personality_parameters": asdict(agent.style),
             "cognitive_parameters": agent.brain.cognition.to_dict(),
+            "own_acting_state": own_state(agent.brain),
             "public_context": model_context.build_public_context(agent),
             "own_previous_decisions": agent.model_decisions[-model_context.DECISION_MEMORY:],
             "details": details, "instructions": MODEL_INSTRUCTIONS,

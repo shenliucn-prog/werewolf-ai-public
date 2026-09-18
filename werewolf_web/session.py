@@ -825,6 +825,12 @@ class GameSession:
     async def _step_speeches(self):
         e = self.engine
         order = e.speech_order()
+        if not any(row["day"] == e.day_count and "speech_order" in row["event"]
+                   for row in self.public_record.entries):
+            self.emit({"type": "narration", "speech_order": order, "phase": "day",
+                       "text": ("Speaking order: " if e.locale == "en" else "本轮发言顺序：")
+                       + " → ".join(f"#{pos}" for pos in order)}, publish=False)
+            self._commit_batch()
         # ``speech_events``/``player_last_speech`` are instance fields restored
         # from the snapshot; they are only reset on a *fresh* step (a mid-step
         # resume re-enters mid-loop with the accumulated speeches intact).
@@ -1033,18 +1039,8 @@ class GameSession:
             if f"我是{role_name}" in text.replace(" ", "") or (role == "witch" and "我是神女巫" in text.replace(" ", "")):
                 claim = role
                 break
-        accuse = defend = None
-        compact = text.replace(" ", "")
-        for seat in self.engine.alive_seats():
-            if seat.is_player or f"{seat.pos}号" not in compact:
-                continue
-            if re.search(rf"(?:怀疑|投|出|踩|查杀|狼).{{0,8}}{seat.pos}号", compact) or \
-               re.search(rf"{seat.pos}号.{{0,8}}(?:是狼|查杀|有问题)", compact):
-                accuse = seat.name
-                break
-            if re.search(rf"(?:保|金水|好人|站).{{0,8}}{seat.pos}号", compact):
-                defend = seat.name
-                break
+        from .speech_targets import chinese_targets
+        accuse, defend = chinese_targets(text, self.engine.alive_seats())
         return Speech(text=text, claim=claim, accuse=accuse, defend=defend, question_to=question_to)
 
     def _broadcast_speech(self, seat, speech: Speech):
@@ -1859,8 +1855,12 @@ class GameSession:
                         "candidates": candidates}, action="badge_transfer")
                     target = answer.get("target")
                 elif candidates:
-                    target = await self._npc_call(self.agents[seat.name].vote, candidates, sheriff=True,
-                                                  action="badge_transfer")
+                    if self.planner is not None:
+                        target = await self._npc_call(self.agents[seat.name].transfer_badge,
+                                                      candidates, action="badge_transfer")
+                    else:
+                        target = await self._npc_call(self.agents[seat.name].vote, candidates,
+                                                      sheriff=True, action="badge_transfer")
                 else:
                     target = None
                 e.sheriff = target

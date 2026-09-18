@@ -59,7 +59,7 @@ class StatementMemoryTest(unittest.TestCase):
         self.assertEqual(rows, before)
 
     def test_live_context_uses_ledger_not_only_brain_claim_order(self):
-        agent = SimpleNamespace(brain=self.brain, public_record=SimpleNamespace(
+        agent = SimpleNamespace(brain=self.brain, engine=SimpleNamespace(day_count=1), public_record=SimpleNamespace(
             entries=[self.row(4, claim="seer"), self.row(8, "day", claim="witch")]))
         context = build_public_context(agent)
         items = context["older_statement_summaries"][0]["items"]

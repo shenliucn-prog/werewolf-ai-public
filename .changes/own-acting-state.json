@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Include isolated own-seat affect in NPC model requests with personality decision guidance.", "zh": "向 NPC 模型请求加入隔离的自身情绪状态及人格决策指引。"},
+  "compatibility": {"en": "No new save fields or configuration; rules and model routing unchanged.", "zh": "不新增存档字段或配置，不改变规则或模型路由。"},
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md", "docs/NPC_ACTING_STATE.md"],
+  "reason": "Experimental model behavior input; document privacy boundaries and limited observed differentiation."
+}

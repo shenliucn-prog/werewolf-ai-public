@@ -112,6 +112,18 @@ class ModelNPCAgent(StrategicNPCAgent):
             "target": {"type": ["integer", "null"], "enum": [None, *positions]},
         }, candidates=candidates)["target"]
 
+    def transfer_badge(self, candidates):
+        return self.decide("transfer or destroy sheriff badge", {
+            "target": {"type": ["integer", "null"],
+                       "enum": [None, *[c["pos"] for c in candidates]]},
+        }, candidates=candidates, badge_owner=self.seat.pos,
+            choice_meaning="You have died. Select a living successor, or null to destroy the badge. "
+            "This is NOT an exile ballot, a check target or a new sheriff election. "
+            "Consult your own private results, including the latest night, and public votes. "
+            "For a good player, giving extra voting power to someone you checked as wolf "
+            "helps the opposing faction; distinguish check results from public claims. "
+            "For a wolf, preserve your faction's prospects without unnecessarily exposing allies.")["target"]
+
     def night_action(self, kind, candidates, **kwargs):
         positions = [c["pos"] if isinstance(c, dict) else c for c in candidates]
         if kind == "witch":
