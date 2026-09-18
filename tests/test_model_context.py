@@ -18,7 +18,7 @@ def _record(locale="zh-CN"):
 
 
 def _agent(record, brain):
-    return SimpleNamespace(public_record=record, brain=brain)
+    return SimpleNamespace(public_record=record, brain=brain, engine=SimpleNamespace(day_count=1))
 
 
 class ModelContextTest(unittest.TestCase):

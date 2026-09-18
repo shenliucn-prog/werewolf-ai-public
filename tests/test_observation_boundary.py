@@ -14,6 +14,7 @@ from werewolf_web.ai.joint_belief import for_brain
 from werewolf_web.ai.decision_runtime import ModelTurnError, RuntimeBase
 from werewolf_web.ai.model_controller import ModelController
 from werewolf_web.observations import MODEL_INSTRUCTIONS, ObservationGateway
+from werewolf_web.ai.acting_state import own_state
 from werewolf_web.onboarding import introduction
 from werewolf_web.participants import participant_roster
 from werewolf_web.session import GameSession
@@ -92,6 +93,7 @@ class ObservationBoundaryTest(unittest.IsolatedAsyncioTestCase):
             "information": info, "persona": agent.persona,
             "personality_parameters": asdict(agent.style),
             "cognitive_parameters": agent.brain.cognition.to_dict(),
+            "own_acting_state": own_state(agent.brain),
             "public_context": model_context.build_public_context(agent),
             "own_previous_decisions": agent.model_decisions[-model_context.DECISION_MEMORY:],
             "details": {**details, "own_recent_public_commitments": []}, "instructions": MODEL_INSTRUCTIONS,

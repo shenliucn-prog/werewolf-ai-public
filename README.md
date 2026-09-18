@@ -9,6 +9,11 @@ See [changes](CHANGELOG.md) and [release process](docs/RELEASING.md).
 A local single-player Werewolf game: you play one seat against 11 AI opponents.
 **Normal play requires a model API or a supported connection to your own Agent.**
 Models decide NPC speech and actions; Python enforces rules and saves progress.
+NPC model requests include only that NPC's temporary emotional state alongside
+its personality. This is experimental acting context, not identity evidence or
+cross-game learning; noticeably distinct personalities are not yet guaranteed.
+NPC context distinguishes the public speaking order, revealed roles and death
+timing from player claims. These safeguards do not guarantee error-free reasoning.
 The browser is optional—not a browser-only game.
 
 Playing in your Agent's conversation is recommended. The Agent needs local

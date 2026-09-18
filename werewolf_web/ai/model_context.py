@@ -141,17 +141,25 @@ def public_facts(entries):
     never by a monotonic 4-tuple guess.
     """
     facts = []
+    exiled = {r["event"].get("seat") for r in entries if r["event"].get("type") == "exile"}
     for r in entries:
         ev = r["event"]
         kind = ev.get("type")
         temporal = {"day": r.get("day"), "night": r.get("night"),
                     "phase": r.get("phase")}
         if kind == "flip":
+            from ..game.engine import ROLE_META, WOLF_ROLES
+            role = ev.get("role")
             facts.append({"kind": "flip", "seat": ev.get("seat"),
+                          "role": role,
+                          "side": ("wolf" if role in WOLF_ROLES else "god") if role in ROLE_META else "unknown",
                           "text": ev.get("text"), "event_no": ev.get("event_no"),
                           **temporal})
         elif kind in ("death", "exile"):
             facts.append({"kind": kind, "seat": ev.get("seat"),
+                          "death_context": ("exile" if kind == "exile" or ev.get("seat") in exiled
+                                            else "night_death" if temporal["phase"] in ("night", "dawn")
+                                            else "unknown"),
                           "text": ev.get("text"), "event_no": ev.get("event_no"),
                           **temporal})
     ballots = [r for r in entries if r["event"].get("type") == "ballots"]
@@ -165,7 +173,23 @@ def public_facts(entries):
                       "day": r.get("day"), "night": r.get("night"),
                       "ballots": ev.get("ballots"), "tally": ev.get("tally"),
                       "event_no": ev.get("event_no")})
+    # New records are ordered by their ledger IDs, not grouped by event type.
+    facts.sort(key=lambda f: f.get("event_no") if type(f.get("event_no")) is int else -1)
     return facts[-FACT_WINDOW:]
+
+
+def speaking_turns(entries, day):
+    orders = [r for r in entries if r["day"] == day and "speech_order" in r["event"]]
+    if not orders:
+        return {"status": "unknown"}
+    order = orders[-1]["event"]["speech_order"]
+    completed = {r["event"].get("seat") for r in entries if r["day"] == day
+                 and r["event"].get("type") == "speech"
+                 and r["event"].get("phase", r.get("phase")) == "day"
+                 and not r["event"].get("table_talk") and not r["event"].get("election")}
+    return {"status": "public_schedule", "order": list(order),
+            "completed": [p for p in order if p in completed],
+            "awaiting": [p for p in order if p not in completed]}
 
 
 def build_public_context(agent):
@@ -173,6 +197,7 @@ def build_public_context(agent):
     entries = agent.public_record.entries
     from ..check_claims import audit
     return {
+        "speaking_turns": speaking_turns(entries, agent.engine.day_count),
         "check_claim_audit": audit(entries),
         "recent_public_statements": recent_public_statements(entries),
         "older_statement_summaries": older_statement_summaries(agent.brain, entries),

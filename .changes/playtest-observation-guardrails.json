@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Fix Chinese seat/stance extraction and clarify public turn, fact and badge-transfer context.", "zh": "修复中文座号及立场提取，明确公开发言顺序、事实与警徽交接上下文。"},
+  "compatibility": {"en": "No save schema or configuration change; legacy missing public metadata stays unknown; accepted actions remain unchanged.", "zh": "无存档格式或配置变更；旧记录缺少的公开元信息保持未知，已接受行动不重算。"},
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md", "docs/PLAYTEST_GUARDRAILS.md"],
+  "reason": "Clarify observable safeguards and avoid claiming guaranteed model reasoning quality."
+}
