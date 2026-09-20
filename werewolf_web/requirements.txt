@@ -1,7 +1,7 @@
 # Python >=3.10. Verified in an isolated Python 3.12 environment.
 fastapi==0.141.1
 starlette==1.6.0
-uvicorn==0.52.4
+uvicorn==0.53.0
 openai==3.13.0
 httpx==0.28.1
 # No multipart uploads or uvicorn standard extras are used by this application.
