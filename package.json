@@ -8,5 +8,5 @@
     "test": "node tests/test_setup_ui.cjs && node tests/test_driver_ui.cjs",
     "check": "node --check werewolf_web/static/js/app.js && node --check werewolf_web/static/js/i18n.js && node --check werewolf_web/static/js/setup-ui.js && node --check werewolf_web/static/js/roundtable.js"
   },
-  "devDependencies": { "jsdom": "30.0.1" }
+  "devDependencies": { "jsdom": "30.1.0" }
 }
