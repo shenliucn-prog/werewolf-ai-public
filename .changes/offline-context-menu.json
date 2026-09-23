@@ -1,0 +1,1 @@
+{"summary":{"en":"Show quoted questions and distinct short reply choices in offline play.","zh":"离线回应显示追问原句，并展示不同回应意图的简短选项。"},"docs_impact":"docs","docs":["docs/OFFLINE_GAME.md"],"reason":"Both browser and terminal preserve context and keep advanced choices accessible.","compatibility":{"en":"Existing request IDs and choice validation remain unchanged.","zh":"请求编号与选项校验规则保持不变。"}}
