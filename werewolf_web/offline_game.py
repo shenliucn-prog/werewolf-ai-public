@@ -81,10 +81,8 @@ def speech_choices(session, actor, reply=False):
             text = words(lang,
                 f"我{'引用' if stance == 'agree' else '质疑对这条记录的推论'}记录{number}「{quote}」。{boundary}",
                 f"I {'cite' if stance == 'agree' else 'question conclusions drawn from'} record {number}: “{quote}”. {boundary}")
-            # Agreeing adopts the stated position; challenging a statement does
-            # not automatically accuse its author of being a wolf.
-            fields = {k: event.get(k) for k in ("accuse", "defend")} if stance == "agree" else {}
-            add(f"cite:{number}:{stance}", "引用 / Cite", text, protected_facts=(quote,), **fields)
+            # A quote is attribution, not fresh independent accusation evidence.
+            add(f"cite:{number}:{stance}", "引用 / Cite", text, protected_facts=(quote,))
     contextual = contextual_choices(session.public_record.entries,
                                     {s.pos: s.name for s in e.alive_seats()}, actor.pos, lang)
     persona = BY_ID[session.character_map[actor.player_id]].style()
@@ -360,6 +358,9 @@ class OfflineSession(GameSession):
         raise ValueError("Offline speech must come from an accepted structured option")
 
     def _broadcast_speech(self, seat, speech):
+        from .social_actions import validate_public
+        validate_public(speech.social_action, self._events,
+                        {s.name for s in self.engine.seats.values()})
         super()._broadcast_speech(seat, speech)
         if self.proxy:
             self.proxy.observe_speech(self.engine.day_count, seat.name, speech, self._event_no + 1)
@@ -437,6 +438,13 @@ class OfflineSession(GameSession):
         # Validate the proxy on a throwaway engine before applying base state.
         probe = deepcopy(self.engine)
         probe.restore(data["engine"])
+        from .social_actions import validate_public
+        prefix = []
+        for event in data.get("events", []):
+            if event.get("type") == "speech":
+                validate_public(event.get("social_action"), prefix,
+                                {s.name for s in probe.seats.values()})
+            prefix.append(event)
         if probe.character_cast and probe.cast_personas.get("acheng") != self.character:
             raise ValueError("Offline character does not match saved cast")
         if probe.seats:

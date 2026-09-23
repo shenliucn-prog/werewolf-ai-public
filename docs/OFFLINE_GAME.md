@@ -139,7 +139,43 @@ python -m werewolf_web.offline_game --board classic --spectate
 - 完全不调用模型、不计正式闯关成绩。存档只留本地，不要上传。
 - 支持终端／Agent 转述终端，以及网页独立的「离线选项玩法」面板。使用上方板子与身份，选择人物或公开旁观；「继续游戏」可恢复选项。旁观自动推进，没有全知开关。
 - 程序策略和人物台词仍有局限；跑通对局不代表平衡已经认证。
-# Conversational personalities / 对话人格
+## Reproducible checks / 可复现验收
+
+`python -m scripts.offline_acceptance --games 12 --ablation` runs 24 synthetic
+classic-board games across Chinese/English and player/spectator entry. Paired
+cases disable only post-answer feedback; they are **not** the old release and do
+not isolate every personality change. Reports include winner, days, exact text
+repeats and action counts, never transcripts or private saves. Model calls and
+network connections are blocked in this harness. Existing tests additionally
+exercise all boards/roles and disk resume. This is correctness evidence, not
+human enjoyment or certified balance. The smoke ablation runs in unittest CI.
+
+上述命令运行 24 局合成经典板对照，覆盖中英文与参与／旁观；对照仅关闭答后反馈，
+不等于旧版本，也不能单独证明人格升级的效果。报告只有胜负、天数、原文重复数和动作
+计数，不含对局原文或私密存档。测试禁止模型和网络调用。其他测试覆盖全部板子／角色
+及磁盘恢复；这些结果证明流程可运行，不代表已经验证乐趣或平衡性。
+
+The initial 12-seed paired run finished all 24 games. With feedback enabled:
+810 speeches, 163 exact repeated texts, 83 follow-ups; disabled: 752 speeches,
+172 repeats, zero follow-ups. Each arm had 10 wolf and 2 good-side wins. This
+small classic-board sample shows a wolf-heavy outcome and still substantial
+repetition, **not** solved balance or conversational variety. More seeds and
+human playtests are needed before changing role rules or claiming improvement.
+
+首批 12 种子配对的 24 局全部完成。反馈开启：810 次发言、163 次原文重复、83 次
+答后反馈；关闭：752 次发言、172 次重复、无答后反馈。两组均狼胜 10 局、好人胜
+2 局，显示该小样本偏狼且仍有重复；不能宣称平衡或多样性已解决。
+
+## Public action boundaries / 公开动作边界
+
+Social references must point to earlier public records; replies must name the
+speaker of their source. Citations do not duplicate the original accusation in
+the belief model. Invalid references fail before broadcasting or applying a
+restored save. Legacy speeches without action metadata remain readable.
+Laya/local generative inference remains deferred; these checks are deterministic.
+
+社交引用必须来自已有公开记录，回应对象须与原发言人一致；引用不再重复增加原指控。
+非法引用在广播或恢复修改前被拒绝，无动作元数据的旧发言仍兼容。Laya 暂不接入。
 
 Reply menus show the question and its record number in both terminal and Web.
 At most three reply intentions plus Skip are suggested; all other legal choices
@@ -147,6 +183,8 @@ remain under Other responses. Questions are displayed as plain text.
 
 终端和网页的回应菜单显示追问原句及记录编号；首页最多三种回应意图加“跳过”，
 其他合法说法仍可展开选择。引用按纯文本显示，不执行其中的标签。
+
+## Conversational personalities / 对话人格
 
 All 30 characters map to six authored conversational families: mediators,
 challengers, observers, connectors, explorers and instigators. They prefer
