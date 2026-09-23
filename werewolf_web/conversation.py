@@ -56,8 +56,10 @@ class InterruptionIntent:
     @staticmethod
     def _speech(value):
         fields = {"text", "claim", "accuse", "defend", "question_to", "protected_facts"}
-        if not isinstance(value, dict) or set(value) != fields:
+        if not isinstance(value, dict) or set(value) not in (fields, fields | {"social_action"}):
             raise ValueError("Invalid interruption speech fields")
+        from .social_actions import validate
+        validate(value.get("social_action"))
         if not isinstance(value["text"], str):
             raise ValueError("Invalid interruption speech text")
         if any(value[k] is not None and not isinstance(value[k], str)

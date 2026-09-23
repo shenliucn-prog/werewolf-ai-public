@@ -48,6 +48,8 @@ See the [character library and artwork notes](docs/CHARACTERS.md).
 Custom names/personality settings remain available. Before each daytime exile
 vote, a living human gets one optional final reply, even after repeated questions.
 Offline play uses contextual choices instead of understanding arbitrary text.
+Clarification choices refer to the questioner's public record. NPC replies can
+explain a prior stance or reserve judgment without turning it into a new accusation.
 
 For a local Agent, open **Add local Agent connection** in web setup. Registering
 the built-in Codex adapter makes no model call; **Check connection** makes one
