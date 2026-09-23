@@ -25,7 +25,8 @@ def freeze(value):
         return {"__speech__": True, "text": value.text, "claim": value.claim,
                 "accuse": value.accuse, "defend": value.defend,
                 "question_to": value.question_to,
-                "protected_facts": list(value.protected_facts)}
+                "protected_facts": list(value.protected_facts),
+                "social_action": deepcopy(value.social_action)}
     if isinstance(value, eng_mod.GameEvent):
         return {"__event__": True, **value.to_dict()}
     if isinstance(value, dict):
@@ -41,7 +42,8 @@ def thaw(value):
             return Speech(text=value.get("text", ""), claim=value.get("claim"),
                           accuse=value.get("accuse"), defend=value.get("defend"),
                           question_to=value.get("question_to"),
-                          protected_facts=tuple(value.get("protected_facts", [])))
+                          protected_facts=tuple(value.get("protected_facts", [])),
+                          social_action=deepcopy(value.get("social_action")))
         if value.get("__event__"):
             return eng_mod.GameEvent.from_dict(value)
         return {key: thaw(val) for key, val in value.items()}

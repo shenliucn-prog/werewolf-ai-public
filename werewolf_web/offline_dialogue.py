@@ -6,6 +6,47 @@ Candidates are options, not a correct-answer recommendation.
 from dataclasses import asdict
 from .ai.brain import Speech
 from .check_claims import audit
+from .social_actions import make
+
+
+def reply_choices(events, actor, asker, locale, questions=()):
+    """Answer this person's latest public question, without private evidence.
+
+    Explicit stance fields are authoritative; quoted text is never re-parsed.
+    Derived from the durable ledger so recovery needs no parallel memory.
+    """
+    en = locale == "en"
+    refs = {q.get("event_no") for q in questions if q.get("from") == asker
+            and type(q.get("event_no")) is int}
+    question = next((e for e in reversed(events) if e.get("type") == "speech"
+                     and e.get("name") == asker
+                     and (e.get("event_no") in refs or e.get("question_to") == actor
+                          or e.get("accuse") == actor)), None)
+    if question is None or type(question.get("event_no")) is not int:
+        return []
+    ref = question["event_no"]
+    options = []
+
+    def add(intent, text):
+        options.append({"id": f"reply:{ref}:{intent}", "topic": "direct_reply",
+                        "group": "Answer this question" if en else "回应这次追问",
+                        "label": text, "action": make(intent, asker, [ref], ref),
+                        "speech": asdict(Speech(text=text, social_action=make(intent, asker, [ref], ref)))})
+
+    own = next((e for e in reversed(events) if e.get("type") == "speech"
+                and e.get("name") == actor and e.get("event_no", ref) < ref), None)
+    if own and (own.get("accuse") or own.get("defend")):
+        target = own.get("accuse") or own.get("defend")
+        position = ("suspected" if own.get("accuse") else "supported") if en else (
+            "怀疑" if own.get("accuse") else "支持")
+        add("explain_stance", f"{asker}, in record {own['event_no']} I {position} {target}. That was my judgment, not a confirmed check." if en else
+            f"{asker}，我在记录{own['event_no']}里{position}{target}。那是我的判断，不是已证实的查验。")
+    add("reserve_judgment", f"{asker}, I heard your question in record {ref}. I have no new public evidence; I am reserving judgment, not clearing anyone." if en else
+        f"{asker}，记录{ref}的追问我听到了。我没有新的公开依据，先保留判断，不代表认谁是好人。")
+    if question.get("accuse") == actor:
+        add("request_basis", f"{asker}, record {ref} suspects me. Please identify the statement or ballot behind that judgment." if en else
+            f"{asker}，记录{ref}里你怀疑我，请指出依据是哪句话或哪一票。")
+    return options
 
 
 def contextual_choices(entries, seats, actor, locale):

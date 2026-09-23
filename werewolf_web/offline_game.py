@@ -16,7 +16,8 @@ from .i18n import cast, role_name
 from .game.engine import BOARD_MAP, ROLE_META
 from . import checkpoint
 from .check_claims import audit, finding_text
-from .offline_dialogue import contextual_choices, shortlist, choose_reaction
+from .offline_dialogue import contextual_choices, shortlist, choose_reaction, reply_choices
+from .social_actions import annotate
 
 
 def words(locale, zh, en):
@@ -85,7 +86,7 @@ def speech_choices(session, actor, reply=False):
             add(f"cite:{number}:{stance}", "引用 / Cite", text, protected_facts=(quote,), **fields)
     contextual = contextual_choices(session.public_record.entries,
                                     {s.pos: s.name for s in e.alive_seats()}, actor.pos, lang)
-    return contextual + choices
+    return [annotate(c) for c in contextual + choices]
 
 
 def action_choices(session, kind, data):
@@ -93,6 +94,9 @@ def action_choices(session, kind, data):
     if kind in ("speech", "table_reply", "table_answer"):
         key = "answer" if kind == "table_answer" else "text"
         choices = speech_choices(session, session.engine.player_seat(), kind != "speech")
+        if kind == "table_answer" and data.get("from"):
+            choices = reply_choices(session._events, session.engine.player_seat().name,
+                                    data["from"], lang, data.get("questions", ())) + choices
         suggested = {c["id"] for c in shortlist(choices)}
         result = [{**c, "suggested": c["id"] in suggested,
                    "payload": {key: c["label"], "offline_speech": c["speech"]}} for c in choices]
@@ -228,6 +232,12 @@ class ChoiceAgent(StrategicNPCAgent):
         return speech
 
     def table_reply(self, interrupter):
+        answers = reply_choices(self.session._events, self.name, interrupter, self.engine.locale,
+                                self.session._question_context(self.name))
+        if answers:
+            preferred = "explain_stance" if self.style.logic >= self.style.caution else "reserve_judgment"
+            chosen = next((c for c in answers if c["action"]["kind"] == preferred), answers[0])
+            return Speech(**deepcopy(chosen["speech"]))
         own = [ev for ev in self.session._events if ev.get("type") == "speech" and ev.get("name") == self.name]
         # A reply must close this question, not select a new question about a
         # different player. Reiterate an attributed position or admit no basis.
@@ -252,6 +262,16 @@ class ChoiceAgent(StrategicNPCAgent):
 
 class OfflineSession(GameSession):
     offline_choice_mode = True
+
+    def _record_event(self, obj):
+        if obj.get("type") == "speech":
+            # Match the actual committed utterance, not a regenerated menu.
+            speech = next((sp for name, sp in reversed(self.speech_events)
+                           if name == obj.get("name") and sp.text == obj.get("text")), None)
+            if speech is not None:
+                obj = {**obj, "social_action": deepcopy(speech.social_action),
+                       "question_to": speech.question_to}
+        return super()._record_event(obj)
 
     async def _pace(self, seconds):
         await asyncio.sleep(0)

@@ -69,6 +69,14 @@ Brain strategy; this release is not a new optimal Werewolf solver.
 
 ## Save and continue
 
+Offline speech now carries an explicit public action (intent, target, source
+records and reply reference). Explanations and reserved judgment are not new
+accusations or certified identities. Clarifications use the questioner's record;
+old saves without this optional metadata remain readable.
+
+离线发言包含明确的公开行动（意图、对象、依据与回应记录）。解释或保留判断不等于
+重新指控，更不认证身份；澄清对应提问者记录，旧存档缺少该可选字段仍能恢复。
+
 The startup banner prints the game ID and a resume command:
 
 ```sh

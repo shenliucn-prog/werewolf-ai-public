@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Ground offline clarification replies in the questioner's public record and distinguish explanation from renewed accusation.", "zh": "离线澄清对应提问者公开记录，区分解释此前立场与再次指控。"},
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md", "docs/OFFLINE_GAME.md"],
+  "reason": "First incremental offline social-response improvement; no model dependency or strategic voting changes.",
+  "compatibility": {"en": "Adds optional speech action metadata. Old saves remain readable; older clients are not guaranteed to read new saves.", "zh": "新增可选发言行动字段；兼容读取旧存档，不保证旧客户端读取新存档。"}
+}

@@ -185,6 +185,12 @@ class Speech:
     defend: Optional[str] = None    # 保的人（名字）
     question_to: Optional[str] = None
     protected_facts: tuple[str, ...] = ()
+    social_action: Optional[dict] = None
+
+    def __post_init__(self):
+        from ..social_actions import validate
+        validate(self.social_action)
+        self.social_action = deepcopy(self.social_action)
 
 
 @dataclass
