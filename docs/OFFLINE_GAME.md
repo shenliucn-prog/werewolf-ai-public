@@ -141,6 +141,15 @@ python -m werewolf_web.offline_game --board classic --spectate
 - 程序策略和人物台词仍有局限；跑通对局不代表平衡已经认证。
 # Conversational personalities / 对话人格
 
+Social references must point to earlier public records; replies must name the
+speaker of their source. Citations do not duplicate the original accusation in
+the belief model. Invalid references fail before broadcasting or applying a
+restored save. Legacy speeches without action metadata remain readable.
+Laya/local generative inference remains deferred; these checks are deterministic.
+
+社交引用必须来自已有公开记录，回应对象须与原发言人一致；引用不再重复增加原指控。
+非法引用在广播或恢复修改前被拒绝，无动作元数据的旧发言仍兼容。Laya 暂不接入。
+
 Reply menus show the question and its record number in both terminal and Web.
 At most three reply intentions plus Skip are suggested; all other legal choices
 remain under Other responses. Questions are displayed as plain text.

@@ -36,8 +36,10 @@ class SocialFeedbackIntegrationTest(unittest.IsolatedAsyncioTestCase):
         await session._step_setup()
         agent = next(iter(session.agents.values()))
         player = session.engine.player_seat()
+        session.emit({"type": "speech", "name": agent.name, "text": "Why?", "question_to": player.name})
+        ref = session._events[-1]["event_no"]
         await session._publish_table_speech(player, Speech(text="I reserve judgment.",
-            social_action=make("reserve_judgment", agent.name, [1], 1)), "clarification")
+            social_action=make("reserve_judgment", agent.name, [ref], ref)), "clarification")
         await session._social_feedback()
         events = [e for e in session._events if e.get("talk_kind") == "social_feedback"]
         self.assertEqual(len(events), 1)
