@@ -32,6 +32,24 @@ def make(kind, target=None, sources=(), reply_to=None):
     return action
 
 
+def validate_public(action, events, roster):
+    """Validate references against the already-public prefix, never secrets."""
+    validate(action)
+    if action is None:
+        return
+    if action["target"] is not None and action["target"] not in roster:
+        raise ValueError("Unknown social target")
+    sources = {e.get("event_no"): e for e in events
+               if e.get("type") in {"speech", "ballots", "death", "flip", "exile"}}
+    if any(n not in sources for n in action["sources"]):
+        raise ValueError("Social source is not an existing public record")
+    reply = action["reply_to"]
+    if reply is not None and (reply not in action["sources"]
+            or sources[reply].get("type") != "speech"
+            or sources[reply].get("name") != action["target"]):
+        raise ValueError("Reply does not reference the addressed speaker")
+
+
 def annotate(choice):
     """Attach semantics to authored options, never parse a player's prose."""
     choice = deepcopy(choice)

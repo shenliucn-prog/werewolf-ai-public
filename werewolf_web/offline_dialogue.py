@@ -132,21 +132,23 @@ def contextual_choices(entries, seats, actor, locale):
     return choices
 
 
-def shortlist(options):
+def shortlist(options, answering=False):
     """At most three different discussion topics plus a neutral pass."""
     selected, topics = [], set()
     for option in options:
         topic = option.get("topic")
+        if answering and topic == "direct_reply":
+            topic = (topic, option["speech"]["social_action"]["kind"])
         if topic and topic not in topics and len(selected) < 3:
             selected.append(option)
             topics.add(topic)
     wait = next((o for o in options if o["id"] == "wait"), None)
-    if wait:
+    if wait and not answering:
         selected.append(wait)
     return selected
 
 
-def choose_reaction(options, own_speeches, style, table_speeches=()):
+def choose_reaction(options, own_speeches, style, table_speeches=(), character_id=None):
     # Cross-speaker repetition is still repetition. Only public recent speech
     # is consulted; the candidate text includes the report reference/target.
     fresh = [c for c in options if c.get("topic") and
@@ -158,5 +160,7 @@ def choose_reaction(options, own_speeches, style, table_speeches=()):
         if c["topic"] == "social_feedback":
             return priorities[c["topic"]], -options.index(c), 0
         social = style.loyalty if ":thanks:" in c["id"] else style.caution
-        return priorities[c["topic"]], social, -len(c["label"])
+        from .offline_persona import reaction_bias
+        bias = reaction_bias(character_id, c) if character_id else 0
+        return priorities[c["topic"]], social + bias, -len(c["label"])
     return max(fresh, key=score) if fresh else None

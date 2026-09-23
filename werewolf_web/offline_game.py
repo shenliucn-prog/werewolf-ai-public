@@ -81,10 +81,8 @@ def speech_choices(session, actor, reply=False):
             text = words(lang,
                 f"我{'引用' if stance == 'agree' else '质疑对这条记录的推论'}记录{number}「{quote}」。{boundary}",
                 f"I {'cite' if stance == 'agree' else 'question conclusions drawn from'} record {number}: “{quote}”. {boundary}")
-            # Agreeing adopts the stated position; challenging a statement does
-            # not automatically accuse its author of being a wolf.
-            fields = {k: event.get(k) for k in ("accuse", "defend")} if stance == "agree" else {}
-            add(f"cite:{number}:{stance}", "引用 / Cite", text, protected_facts=(quote,), **fields)
+            # A quote is attribution, not fresh independent accusation evidence.
+            add(f"cite:{number}:{stance}", "引用 / Cite", text, protected_facts=(quote,))
     contextual = contextual_choices(session.public_record.entries,
                                     {s.pos: s.name for s in e.alive_seats()}, actor.pos, lang)
     persona = BY_ID[session.character_map[actor.player_id]].style()
@@ -100,7 +98,7 @@ def action_choices(session, kind, data):
         if kind == "table_answer" and data.get("from"):
             choices = reply_choices(session._events, session.engine.player_seat().name,
                                     data["from"], lang, data.get("questions", ())) + choices
-        suggested = {c["id"] for c in shortlist(choices)}
+        suggested = {c["id"] for c in shortlist(choices, answering=kind == "table_answer")}
         result = [{**c, "suggested": c["id"] in suggested,
                    "payload": {key: c["label"], "offline_speech": c["speech"]}} for c in choices]
         if kind == "table_answer":
@@ -190,7 +188,7 @@ class ChoiceAgent(StrategicNPCAgent):
             chosen = None
         if chosen is None:
             recent = [ev for ev in self.session._events if ev.get("type") == "speech"][-12:]
-            chosen = choose_reaction([c for c in options if c.get("topic") != "opening"], own, self.style, recent)
+            chosen = choose_reaction([c for c in options if c.get("topic") != "opening"], own, self.style, recent, self.character.id)
         if chosen is None and not self.is_wolf:
             chosen = next((c for c in options if c["id"].startswith("audit:")
                            and not any(ev["text"].endswith(c["label"]) for ev in own)), None)
@@ -238,8 +236,9 @@ class ChoiceAgent(StrategicNPCAgent):
         answers = reply_choices(self.session._events, self.name, interrupter, self.engine.locale,
                                 self.session._question_context(self.name))
         if answers:
-            preferred = "explain_stance" if self.style.logic >= self.style.caution else "reserve_judgment"
-            chosen = next((c for c in answers if c["action"]["kind"] == preferred), answers[0])
+            from .offline_persona import reply_order
+            order = reply_order(self.character.id)
+            chosen = min(answers, key=lambda c: order.index(c["action"]["kind"]))
             return Speech(**deepcopy(chosen["speech"]))
         own = [ev for ev in self.session._events if ev.get("type") == "speech" and ev.get("name") == self.name]
         # A reply must close this question, not select a new question about a
@@ -359,6 +358,9 @@ class OfflineSession(GameSession):
         raise ValueError("Offline speech must come from an accepted structured option")
 
     def _broadcast_speech(self, seat, speech):
+        from .social_actions import validate_public
+        validate_public(speech.social_action, self._events,
+                        {s.name for s in self.engine.seats.values()})
         super()._broadcast_speech(seat, speech)
         if self.proxy:
             self.proxy.observe_speech(self.engine.day_count, seat.name, speech, self._event_no + 1)
@@ -436,6 +438,13 @@ class OfflineSession(GameSession):
         # Validate the proxy on a throwaway engine before applying base state.
         probe = deepcopy(self.engine)
         probe.restore(data["engine"])
+        from .social_actions import validate_public
+        prefix = []
+        for event in data.get("events", []):
+            if event.get("type") == "speech":
+                validate_public(event.get("social_action"), prefix,
+                                {s.name for s in probe.seats.values()})
+            prefix.append(event)
         if probe.character_cast and probe.cast_personas.get("acheng") != self.character:
             raise ValueError("Offline character does not match saved cast")
         if probe.seats:
@@ -492,6 +501,8 @@ async def play(session, *, read=input, write=print, automatic=False):
                 selected = session.auto_choice(event["kind"], event["data"], options)
             else:
                 write(event["data"].get("desc", ""))
+                for question in event["data"].get("questions", ()):
+                    write(f"{question.get('from', '')} · #{question.get('event_no', '?')}: {question.get('text', '')}")
                 groups = list(dict.fromkeys(c["group"] for c in options))
                 suggested = [c for c in options if c.get("suggested")]
                 browse = False

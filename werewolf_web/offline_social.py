@@ -53,7 +53,7 @@ def feedback_choices(events, observer, style, locale):
             continue
         ref, who = event["event_no"], event["name"]
         if ref in used:
-            continue
+            return []  # Do not revive older answers after closing the latest.
         # Don't revive an old day's conversation after the host moved on.
         latest_day = max((e.get("day", 0) for e in events), default=0)
         if event.get("day", 0) != latest_day:
