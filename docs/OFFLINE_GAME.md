@@ -139,3 +139,15 @@ python -m werewolf_web.offline_game --board classic --spectate
 - 完全不调用模型、不计正式闯关成绩。存档只留本地，不要上传。
 - 支持终端／Agent 转述终端，以及网页独立的「离线选项玩法」面板。使用上方板子与身份，选择人物或公开旁观；「继续游戏」可恢复选项。旁观自动推进，没有全知开关。
 - 程序策略和人物台词仍有局限；跑通对局不代表平衡已经认证。
+# Conversational personalities / 对话人格
+
+All 30 characters map to six authored conversational families: mediators,
+challengers, observers, connectors, explorers and instigators. They prefer
+different legal replies (explain, reserve judgment, ask for grounds), not just
+different catchphrases. Existing continuous personality weights still apply.
+These are bounded tie-breaks, not 30 independent reasoning engines; they do not
+override checks, invent evidence or change night-action legality.
+
+30 名人物分为调停、挑战、观察、联结、探索、试探六类对话倾向：同一追问可优先解释、
+保留判断或要求依据。原有连续人格参数继续生效。这不是 30 套独立推理器，也不会凭
+个性覆盖查验事实、创造证据或改变夜间技能规则。

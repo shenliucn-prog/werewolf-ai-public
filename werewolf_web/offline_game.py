@@ -190,7 +190,7 @@ class ChoiceAgent(StrategicNPCAgent):
             chosen = None
         if chosen is None:
             recent = [ev for ev in self.session._events if ev.get("type") == "speech"][-12:]
-            chosen = choose_reaction([c for c in options if c.get("topic") != "opening"], own, self.style, recent)
+            chosen = choose_reaction([c for c in options if c.get("topic") != "opening"], own, self.style, recent, self.character.id)
         if chosen is None and not self.is_wolf:
             chosen = next((c for c in options if c["id"].startswith("audit:")
                            and not any(ev["text"].endswith(c["label"]) for ev in own)), None)
@@ -238,8 +238,9 @@ class ChoiceAgent(StrategicNPCAgent):
         answers = reply_choices(self.session._events, self.name, interrupter, self.engine.locale,
                                 self.session._question_context(self.name))
         if answers:
-            preferred = "explain_stance" if self.style.logic >= self.style.caution else "reserve_judgment"
-            chosen = next((c for c in answers if c["action"]["kind"] == preferred), answers[0])
+            from .offline_persona import reply_order
+            order = reply_order(self.character.id)
+            chosen = min(answers, key=lambda c: order.index(c["action"]["kind"]))
             return Speech(**deepcopy(chosen["speech"]))
         own = [ev for ev in self.session._events if ev.get("type") == "speech" and ev.get("name") == self.name]
         # A reply must close this question, not select a new question about a

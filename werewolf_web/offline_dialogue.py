@@ -146,7 +146,7 @@ def shortlist(options):
     return selected
 
 
-def choose_reaction(options, own_speeches, style, table_speeches=()):
+def choose_reaction(options, own_speeches, style, table_speeches=(), character_id=None):
     # Cross-speaker repetition is still repetition. Only public recent speech
     # is consulted; the candidate text includes the report reference/target.
     fresh = [c for c in options if c.get("topic") and
@@ -158,5 +158,7 @@ def choose_reaction(options, own_speeches, style, table_speeches=()):
         if c["topic"] == "social_feedback":
             return priorities[c["topic"]], -options.index(c), 0
         social = style.loyalty if ":thanks:" in c["id"] else style.caution
-        return priorities[c["topic"]], social, -len(c["label"])
+        from .offline_persona import reaction_bias
+        bias = reaction_bias(character_id, c) if character_id else 0
+        return priorities[c["topic"]], social + bias, -len(c["label"])
     return max(fresh, key=score) if fresh else None
