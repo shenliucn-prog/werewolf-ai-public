@@ -460,6 +460,11 @@ function showAction(d) {
       : kind === "ready" ? tr("先阅读本局规则，有疑问可问主持人。确认后才进入第一夜。")
       : (uiLocale === "en" ? "Respond, or listen for now" : "接着桌上的话，也可以先听听");
     panelEl.append(hint);
+    for (const question of data.questions || []) {
+      const quote = document.createElement("blockquote");
+      quote.textContent = `${question.from || data.from || ""} · #${question.event_no ?? "?"}: ${question.text || ""}`;
+      panelEl.append(quote);
+    }
     const suggested = d.choices.filter(c => c.suggested);
     const renderChoices = (choices, parent) => {
       let group = null;

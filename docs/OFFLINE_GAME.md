@@ -141,6 +141,13 @@ python -m werewolf_web.offline_game --board classic --spectate
 - 程序策略和人物台词仍有局限；跑通对局不代表平衡已经认证。
 # Conversational personalities / 对话人格
 
+Reply menus show the question and its record number in both terminal and Web.
+At most three reply intentions plus Skip are suggested; all other legal choices
+remain under Other responses. Questions are displayed as plain text.
+
+终端和网页的回应菜单显示追问原句及记录编号；首页最多三种回应意图加“跳过”，
+其他合法说法仍可展开选择。引用按纯文本显示，不执行其中的标签。
+
 All 30 characters map to six authored conversational families: mediators,
 challengers, observers, connectors, explorers and instigators. They prefer
 different legal replies (explain, reserve judgment, ask for grounds), not just

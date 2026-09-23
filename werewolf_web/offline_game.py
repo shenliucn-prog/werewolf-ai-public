@@ -100,7 +100,7 @@ def action_choices(session, kind, data):
         if kind == "table_answer" and data.get("from"):
             choices = reply_choices(session._events, session.engine.player_seat().name,
                                     data["from"], lang, data.get("questions", ())) + choices
-        suggested = {c["id"] for c in shortlist(choices)}
+        suggested = {c["id"] for c in shortlist(choices, answering=kind == "table_answer")}
         result = [{**c, "suggested": c["id"] in suggested,
                    "payload": {key: c["label"], "offline_speech": c["speech"]}} for c in choices]
         if kind == "table_answer":
@@ -493,6 +493,8 @@ async def play(session, *, read=input, write=print, automatic=False):
                 selected = session.auto_choice(event["kind"], event["data"], options)
             else:
                 write(event["data"].get("desc", ""))
+                for question in event["data"].get("questions", ()):
+                    write(f"{question.get('from', '')} · #{question.get('event_no', '?')}: {question.get('text', '')}")
                 groups = list(dict.fromkeys(c["group"] for c in options))
                 suggested = [c for c in options if c.get("suggested")]
                 browse = False
