@@ -48,6 +48,10 @@ See the [character library and artwork notes](docs/CHARACTERS.md).
 Custom names/personality settings remain available. Before each daytime exile
 vote, a living human gets one optional final reply, even after repeated questions.
 Offline play uses contextual choices instead of understanding arbitrary text.
+Source-linked replies now have distinct explanation/reservation options and bounded
+NPC follow-ups. All 30 characters have authored conversational priorities, not
+30 independent AI models. See the [offline guide](docs/OFFLINE_GAME.md) for limits
+and the synthetic batch/ablation check; Laya is not required or integrated.
 Clarification choices refer to the questioner's public record. NPC replies can
 explain a prior stance or reserve judgment without turning it into a new accusation.
 

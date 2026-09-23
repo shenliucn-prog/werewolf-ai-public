@@ -132,16 +132,18 @@ def contextual_choices(entries, seats, actor, locale):
     return choices
 
 
-def shortlist(options):
+def shortlist(options, answering=False):
     """At most three different discussion topics plus a neutral pass."""
     selected, topics = [], set()
     for option in options:
         topic = option.get("topic")
+        if answering and topic == "direct_reply":
+            topic = (topic, option["speech"]["social_action"]["kind"])
         if topic and topic not in topics and len(selected) < 3:
             selected.append(option)
             topics.add(topic)
     wait = next((o for o in options if o["id"] == "wait"), None)
-    if wait:
+    if wait and not answering:
         selected.append(wait)
     return selected
 
