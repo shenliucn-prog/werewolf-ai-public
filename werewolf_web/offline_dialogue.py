@@ -152,9 +152,11 @@ def choose_reaction(options, own_speeches, style, table_speeches=()):
     fresh = [c for c in options if c.get("topic") and
              not any(ev.get("text", "").endswith(c["label"])
                      for ev in [*own_speeches, *table_speeches])]
-    priorities = {"revealed_report": 6, "receive_wolf": 5, "receive_good": 4, "accused": 3,
+    priorities = {"social_feedback": 7, "revealed_report": 6, "receive_wolf": 5, "receive_good": 4, "accused": 3,
                   "counterclaim": 2 + style.logic, "hear_target": 1 + style.aggression, "opening": 0}
     def score(c):
+        if c["topic"] == "social_feedback":
+            return priorities[c["topic"]], -options.index(c), 0
         social = style.loyalty if ":thanks:" in c["id"] else style.caution
         return priorities[c["topic"]], social, -len(c["label"])
     return max(fresh, key=score) if fresh else None

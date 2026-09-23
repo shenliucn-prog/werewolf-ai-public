@@ -96,6 +96,15 @@ saved game concurrently.
 
 ## Scope
 
+After clarifications, up to three living NPC questioners can acknowledge an
+answer, maintain reservations or reconsider. These closing reactions do not
+open another question. Their public source references prevent replay duplicates.
+Social rapport and conversational openness are separate from role probabilities;
+this update does not add a social bonus to voting or night actions.
+
+澄清后最多三位存活的 NPC 提问者可表示听到了、仍有保留或重新考虑，不再开启追问。
+公开来源记录用于恢复去重；好感与沟通意愿不等于身份概率，本次不增加社交投票加成。
+
 This is a complete local rule game, unlike the earlier
 [single-scene discussion lab](OFFLINE_DISCUSSION_LAB.md). It supports the
 terminal, an Agent relaying that terminal, and the Web's separate **Offline

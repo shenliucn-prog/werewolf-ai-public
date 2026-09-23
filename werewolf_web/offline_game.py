@@ -18,6 +18,7 @@ from . import checkpoint
 from .check_claims import audit, finding_text
 from .offline_dialogue import contextual_choices, shortlist, choose_reaction, reply_choices
 from .social_actions import annotate
+from .offline_social import feedback_choices
 
 
 def words(locale, zh, en):
@@ -86,7 +87,9 @@ def speech_choices(session, actor, reply=False):
             add(f"cite:{number}:{stance}", "引用 / Cite", text, protected_facts=(quote,), **fields)
     contextual = contextual_choices(session.public_record.entries,
                                     {s.pos: s.name for s in e.alive_seats()}, actor.pos, lang)
-    return [annotate(c) for c in contextual + choices]
+    persona = BY_ID[session.character_map[actor.player_id]].style()
+    feedback = feedback_choices(session._events, actor.name, persona, lang)
+    return [annotate(c) for c in feedback + contextual + choices]
 
 
 def action_choices(session, kind, data):
@@ -278,6 +281,25 @@ class OfflineSession(GameSession):
 
     async def _question_reply(self, agent, asker):
         return await self._npc_call(agent.table_reply, asker)
+
+    async def _answer_table_questions(self):
+        await super()._answer_table_questions()
+        await self._social_feedback()
+
+    async def _social_feedback(self):
+        # The ledger is the completion marker, including crash/re-entry. This
+        # bounded closure cannot ask another question or replace a human turn.
+        emitted = sum(e.get("talk_kind") == "social_feedback" and e.get("day") == self.engine.day_count
+                      for e in self._events)
+        for agent in sorted(self.agents.values(), key=lambda a: a.seat.pos):
+            if emitted >= 3:
+                break
+            if not agent.seat.alive:
+                continue
+            choices = feedback_choices(self._events, agent.name, agent.style, self.engine.locale)
+            if choices:
+                await self._publish_table_speech(agent.seat, Speech(**choices[0]["speech"]), "social_feedback")
+                emitted += 1
 
     def __init__(self, board_id="classic", *, character="acheng", spectator=False,
                  player_name=None, **kwargs):
