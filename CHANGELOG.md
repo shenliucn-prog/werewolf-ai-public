@@ -2,7 +2,46 @@
 
 ## Unreleased
 
-No additional changes yet. / 暂无后续变更。
+Planned feature release: 0.4.0, subject to candidate verification. This section
+describes merged main-branch work, not a published tag.
+拟定功能版本：0.4.0，待候选验收；以下是已合入主分支的内容，尚未打标签发布。
+
+- Improve the roundtable flow: group quoted questions by recipient, close each
+  discussion window, and persist last words and sheriff-badge handoff. Character
+  acting guidance and own-seat affect are included in model observations.
+- 改进圆桌流程：按被问者合并带原句的追问、明确讨论窗口收尾，持久化遗言与警徽交接；
+  模型观察包含人物表演指引及该座位自己的情绪状态。
+- Reveal recorded night actions and death causes after game over. Clarify public
+  turn order, revealed facts and player claims in model context; fix Chinese
+  seat/stance extraction. Prompt changes do not establish model playing strength.
+- 终局展示已记录的夜间行动及死因；模型上下文区分发言顺序、公开事实与玩家声明，
+  修复中文座号／立场提取；提示改动不等于已验证真实模型实力。
+- Add source-linked offline replies, bounded post-answer feedback, six authored
+  conversational families across 30 characters, focused reply menus and public
+  source validation. Quoting a statement no longer creates another accusation.
+- 离线增加原句关联回应、有上限的答后反馈、覆盖 30 人物的六类对话倾向、简化回应菜单
+  和公开来源校验；引用同一句话不再额外增加一份指控。
+- Add reproducible offline batch/feedback-ablation checks and agent-neutral
+  contributor guidance. Refresh runtime and test dependencies already merged on
+  main. Pending dependency PRs are tracked in the next-release checklist.
+- 增加可复现的离线整局／反馈消融检查及通用 Agent 开发说明；更新主分支已合入的
+  运行时和测试依赖，尚待合并的升级在发布验收单单独跟踪。
+
+Compatibility: old saves remain readable through legacy defaults. Missing
+`dialogue_version` restores the old farewell policy; missing `night_audit` stays
+empty. Optional speech action metadata is validated when present. Old binaries
+are not guaranteed to load newer saves. Back up local saves before upgrading.
+There is no new required model, driver or Laya installation.
+兼容性：旧存档按兼容默认值恢复；缺失 `dialogue_version` 保持旧遗言规则，缺失
+`night_audit` 保持空记录；新增的可选发言动作元数据存在时会校验。不保证旧程序读取
+新存档，升级前请备份本地存档；无新增必选模型、驱动或 Laya 安装要求。
+
+Limits: offline play still uses authored options and earns no campaign score.
+The 12-seed paired classic-board sample produced 10 wolf wins and 2 good wins in
+each arm; balance and enjoyment remain unverified. Model conjecture play, voice
+and visual gameplay remain unimplemented. See [candidate scope](docs/NEXT_RELEASE.md).
+限制：离线仍使用预设选项、不计闯关成绩；12 种子配对经典板两组均狼胜 10、好人胜 2，
+平衡与乐趣仍待验证。模型猜想玩法、语音和视觉玩法尚未实现，见发布验收单。
 
 ## 0.3.0
 

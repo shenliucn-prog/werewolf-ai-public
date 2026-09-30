@@ -6,6 +6,10 @@ English | [简体中文](README.zh-CN.md)
 Version: **0.3.0** — experimental; see the [release](https://github.com/shenliucn-prog/werewolf-ai-public/releases/tag/v0.3.0).
 See [changes](CHANGELOG.md) and [release process](docs/RELEASING.md).
 
+The latest published version is v0.3.0. This main-branch checkout also contains
+unreleased changes listed in the changelog; downloading v0.3.0 does not include
+all features described here. See the [next-release checklist](docs/NEXT_RELEASE.md).
+
 A local single-player Werewolf game: you play one seat against 11 AI opponents.
 **Normal play requires a model API or a supported connection to your own Agent.**
 Models decide NPC speech and actions; Python enforces rules and saves progress.

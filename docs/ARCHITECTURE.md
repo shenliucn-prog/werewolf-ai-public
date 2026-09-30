@@ -14,7 +14,8 @@ All normal entry points inject `ModelNPCAgent` through a preflight-verified
 `DecisionRuntime`. API/local model servers, trusted Agent wrappers and optional
 Codex all implement `complete(request, schema) -> dict`. See [the connection
 protocol](MODEL_CONNECTIONS.md). HTTP bodies cannot supply executable commands;
-server owners select non-API adapters only through local environment configuration.
+server owners register non-API adapters through trusted local configuration and
+select those connections in the browser. Registration does not itself call a model.
 
 The LLM owns speech, candidacy/withdrawal, votes and skills; the engine validates
 and resolves rules. Requests contain the actor's lawful `InformationSet`, bounded
@@ -107,9 +108,10 @@ before implementation. There is currently no voice/avatar behavior protocol.
 
 ### Add a model service or research rule
 
-Playable online expression uses Chat Completions-compatible endpoints; native
-vendor APIs need a separate adapter. Preserve timeouts, budgets, local fallback,
-intent checks and key redaction. Changing endpoints must not forward a server key.
+Normal API-driven play uses Chat Completions-compatible endpoints; native
+vendor APIs need a separate adapter. Preserve timeouts, budgets, explicit
+retry/stop, intent checks and key redaction. A failed normal-model decision must
+not fall back to a local policy. Changing endpoints must not forward a server key.
 Test with stubs, not a maintainer's subscription. Codex research decisions are a
 **different** path; see [mechanics lab](MECHANICS_LAB.md).
 
@@ -123,8 +125,10 @@ game events. Never commit real users' private game logs or credentials.
 
 - `GET /api/boards?locale=en`, `/api/cast?locale=en`: public setup options.
 - `POST /api/start`: settings object; returns an opaque `game_id`, not public roles.
-- `GET /api/stream?game_id=...`: one SSE consumer. Missing game: 404; second
-  connection: 409. Closing it cancels the game and removes its registry entry.
+- `GET /api/stream?game_id=...&after=...`: one SSE consumer. Missing game: 404;
+  second simultaneous connection: 409. Closing the stream releases the viewer
+  slot; the background game task and durable checkpoint remain. Reconnect through
+  `/api/rejoin` and the numbered event cursor. Explicit `/api/leave` abandons a game.
 - `POST /api/action`: `game_id`, the current `request_id`, plus the action payload. Rejected actions
   keep the pending turn. Speech is limited to 4,000 characters.
 - `POST /api/host_chat`: `game_id`, `question` (1–320 characters); does not consume
