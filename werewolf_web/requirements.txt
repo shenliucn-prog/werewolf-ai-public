@@ -1,6 +1,6 @@
 # Python >=3.10. Verified in an isolated Python 3.12 environment.
 fastapi==0.141.1
-starlette==1.6.0
+starlette==1.7.0
 uvicorn==0.53.0
 openai==3.19.2
 httpx==0.28.1
