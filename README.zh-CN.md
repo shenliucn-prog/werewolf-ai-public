@@ -7,6 +7,9 @@
 当前版本：**0.3.0**（实验版本），参见[发布页](https://github.com/shenliucn-prog/werewolf-ai-public/releases/tag/v0.3.0)。
 参见[更新日志](CHANGELOG.md)与[版本发布流程](docs/RELEASING.md)。
 
+最新已发布版本为 v0.3.0；当前主分支还包含更新日志中列出的未发布改动。
+下载 v0.3.0 不会包含本页描述的全部新功能，详见[下次发布验收单](docs/NEXT_RELEASE.md)。
+
 本机运行的单人狼人杀：你占一个座位，与 11 个 AI 对手对局。
 **正式游玩必须连接模型 API，或通过受支持的适配器连接自己的 Agent。**
 模型负责 NPC 发言和行动，Python 后端负责规则、结算与存档；网页只是可选界面，不是纯前端游戏。
