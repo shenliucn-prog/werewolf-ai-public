@@ -23,9 +23,9 @@ describes merged main-branch work, not a published tag.
   和公开来源校验；引用同一句话不再额外增加一份指控。
 - Add reproducible offline batch/feedback-ablation checks and agent-neutral
   contributor guidance. Refresh runtime and test dependencies already merged on
-  main. Pending dependency PRs are tracked in the next-release checklist.
+  main, including jsdom 30.1.1, OpenAI SDK 3.19.2 and Starlette 1.7.0.
 - 增加可复现的离线整局／反馈消融检查及通用 Agent 开发说明；更新主分支已合入的
-  运行时和测试依赖，尚待合并的升级在发布验收单单独跟踪。
+  运行时和测试依赖，包含 jsdom 30.1.1、OpenAI SDK 3.19.2 和 Starlette 1.7.0。
 
 Compatibility: old saves remain readable through legacy defaults. Missing
 `dialogue_version` restores the old farewell policy; missing `night_audit` stays

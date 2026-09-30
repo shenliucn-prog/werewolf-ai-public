@@ -13,7 +13,9 @@ The reverted PR #34 is not included as a delivered feature.
 功能基线为 `42b9c13`，包含 #43–#48；双语改动和存档兼容见更新日志。
 已撤回的 #34 不作为交付功能。
 
-Dependency candidates are separate until merged and reverified:
+Dependency PRs #49–#51 were merged on 2026-09-30 with passing checks after
+updating each branch to its current base. The combined dependency baseline is
+`629528a`; release-package verification remains outstanding.
 
 | PR | Candidate | Scope |
 | --- | --- | --- |
@@ -21,7 +23,8 @@ Dependency candidates are separate until merged and reverified:
 | [#50](https://github.com/shenliucn-prog/werewolf-ai-public/pull/50) | OpenAI SDK 3.19.2 | Model client / 模型客户端 |
 | [#51](https://github.com/shenliucn-prog/werewolf-ai-public/pull/51) | Starlette 1.7.0 | Web runtime / 网页运行时 |
 
-依赖升级需合入并复验后才算发布内容，不把待合并 PR 当作已交付。
+以上依赖 PR 已于 2026-09-30 逐个更新基线、通过检查并合入，组合基线为
+`629528a`；发布包验收仍待完成。
 
 ## Evidence and remaining gates / 证据与待完成项
 
