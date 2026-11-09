@@ -1,5 +1,11 @@
 ## Player-visible change / 玩家可见变化
 
+## Track / 工作流
+
+- Track (one of [docs/TRACKS.md](../docs/TRACKS.md)) / 所属工作流:
+- Contract files touched (`session.py`, `game/engine.py`, `i18n.*`, `public_record.py`) / 是否改动契约文件:
+- If yes, affected tracks and why it is safe for each / 若改动契约文件，影响的 track 及安全理由:
+
 ## Tracking / 项目管理（由维护者补齐无权限填写的字段）
 
 - Linked issue, or why standalone / 关联 issue 或独立变更原因:

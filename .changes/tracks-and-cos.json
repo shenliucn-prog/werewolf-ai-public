@@ -1,0 +1,13 @@
+{
+  "summary": {
+    "en": "Define six development workstreams with scopes, module ownership, validation commands and branch prefixes, and add a Track field to the pull-request template.",
+    "zh": "定义六条开发工作流（范围、模块归属、验证命令、分支前缀），并在 PR 模板中增加所属工作流字段。"
+  },
+  "docs_impact": "docs",
+  "docs": ["docs/TRACKS.md", ".github/PULL_REQUEST_TEMPLATE.md"],
+  "reason": "Contributor-process documentation only. It does not change setup, entry points, advertised capabilities or user-facing behavior, so the READMEs are unchanged.",
+  "compatibility": {
+    "en": "No code, save, configuration or runtime behavior changes; no migration required.",
+    "zh": "不改变代码、存档、配置或运行时行为，无需迁移。"
+  }
+}
