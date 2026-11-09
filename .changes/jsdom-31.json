@@ -1,0 +1,13 @@
+{
+  "summary": {
+    "en": "Bump the jsdom development dependency from 30.1.1 to 31.0.0 and refresh the lockfile.",
+    "zh": "将开发依赖 jsdom 从 30.1.1 升级到 31.0.0，并刷新锁文件。"
+  },
+  "docs_impact": "none",
+  "docs": [],
+  "reason": "Development-only DOM test dependency. It does not change product behavior, setup, entry points or any documented version, so no guide needs an update.",
+  "compatibility": {
+    "en": "No save, configuration or runtime behavior changes; the game has no frontend build step and jsdom is not shipped.",
+    "zh": "不改变存档、配置或运行时行为；游戏没有前端构建步骤，jsdom 不打入发布包。"
+  }
+}
