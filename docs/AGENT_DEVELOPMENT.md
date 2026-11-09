@@ -62,13 +62,15 @@ git diff --check
 ```
 
 Before committing, `--base HEAD` includes working changes. After committing,
-use the actual PR base commit instead. CI tests Python 3.10, 3.12 and 3.13
-without cancelling sibling versions on the first failure, plus macOS/Windows
-smoke tests, Chromium entry checks, coverage and a dependency audit. CI does
-not invoke a live model. Use an isolated environment with no real credentials.
+use the actual PR base commit instead. Pull requests run the Python 3.10, 3.12
+and 3.13 suite, the JavaScript checks and the dependency audit. macOS/Windows
+smoke tests, Chromium entry checks and coverage run on master and the weekly
+schedule, so pull-request feedback stays fast. CI does not invoke a live model.
+Use an isolated environment with no real credentials.
 
-提交前用 HEAD 检查工作区；提交后改用 PR 实际基线提交。CI 不再因一个 Python 版本失败
-取消其他版本；另外保留跨平台、浏览器、覆盖率及依赖审计。测试环境不放真实密钥。
+提交前用 HEAD 检查工作区；提交后改用 PR 实际基线提交。PR 运行 Python 3.10/3.12/3.13
+测试、JS 检查与依赖审计；macOS/Windows 冒烟、Chromium 入口检查和覆盖率在 master 与每周
+计划任务上运行，保证 PR 反馈更快。CI 不调用真实模型；测试环境不放真实密钥。
 
 ## Editor support versus NPC integration / 编辑器与 NPC 接入
 

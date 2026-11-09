@@ -1,0 +1,13 @@
+{
+  "summary": {
+    "en": "Simplify CI so pull requests run the Python matrix, JavaScript checks and dependency audit, while macOS/Windows smoke, Chromium and coverage run on master and the weekly schedule. Update runtime and test dependencies and pin the current GitHub Actions releases.",
+    "zh": "简化 CI：PR 只运行 Python 矩阵、JS 检查与依赖审计，跨平台冒烟、Chromium 与覆盖率改在 master 和每周计划任务运行；同时更新运行时/测试依赖并固定当前 GitHub Actions 版本。"
+  },
+  "docs_impact": "docs",
+  "docs": ["docs/AGENT_DEVELOPMENT.md", "docs/TESTING.md"],
+  "reason": "Changes contributor-facing CI behavior and dependency versions, so both verification guides are updated. No product, setup or advertised capability changes.",
+  "compatibility": {
+    "en": "No save, configuration or runtime behavior changes; dependency updates keep the same public APIs.",
+    "zh": "不改变存档、配置或运行时行为；依赖更新保持相同公开 API。"
+  }
+}
