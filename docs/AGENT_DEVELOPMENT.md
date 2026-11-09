@@ -18,6 +18,13 @@ and [Cursor rules](https://cursor.com/docs/context/rules). File wiring and
 repository tests do not prove every installed editor version loads them:
 check the host's active project instructions on first use.
 
+When two agents share one folder and branch, follow the sync-first turn-taking
+agreement in [MULTI_AGENT.md](MULTI_AGENT.md): fetch and fast-forward before
+working, re-sync before committing, and take turns rather than editing at once.
+
+当两个 Agent 共享同一目录与分支时，遵循 [MULTI_AGENT.md](MULTI_AGENT.md) 的
+「先同步、轮流作业」约定：开工前 fetch 并快进，提交前再次同步，不要同时编辑。
+
 首次使用请在宿主中确认项目规则已加载。文件配置与自动测试不等于已实测每个编辑器版本。
 
 ## Dependency PRs / 依赖维护
