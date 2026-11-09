@@ -1,0 +1,13 @@
+{
+  "summary": {
+    "en": "Add a sync-first collaboration agreement for two coding agents sharing one folder and branch, and link it from the agent-development guide.",
+    "zh": "新增「先同步、轮流作业」的双 Agent 协作约定（共享同一目录与分支），并在跨 Agent 开发指南中链接。"
+  },
+  "docs_impact": "docs",
+  "docs": ["docs/MULTI_AGENT.md", "docs/AGENT_DEVELOPMENT.md"],
+  "reason": "Documentation-only change: it defines the working agreement for agents sharing this checkout and points to it from the existing cross-agent guide. No product, setup or advertised-capability behavior changes.",
+  "compatibility": {
+    "en": "No code, save, configuration or runtime behavior changes; no migration required.",
+    "zh": "不改变代码、存档、配置或运行时行为，无需迁移。"
+  }
+}
