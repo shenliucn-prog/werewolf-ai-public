@@ -11,6 +11,11 @@ on:
 permissions:
   contents: read
 
+# Cancel superseded pull-request runs; never cancel master or scheduled runs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -26,7 +31,8 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+          cache: 'pip'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           cache: 'npm'
@@ -35,8 +41,7 @@ jobs:
         env:
           LLM_ENABLED: 'false'
           LLM_API_KEY: ''
-      - run: node --check werewolf_web/static/js/app.js
-      - run: node --check werewolf_web/static/js/i18n.js
+      - run: npm run check
       - run: npm ci
       - run: npm test
       - run: python scripts/check_release.py
@@ -48,24 +53,9 @@ jobs:
         run: python scripts/check_delivery.py --base "$BASE_SHA"
       - run: git diff --check
 
-  dependencies:
-    needs: [platform-smoke, browser-and-coverage]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Enforce new verification jobs through the existing required check
-        env:
-          PLATFORM_RESULT: ${{ needs.platform-smoke.result }}
-          BROWSER_RESULT: ${{ needs.browser-and-coverage.result }}
-        run: test "$PLATFORM_RESULT" = success && test "$BROWSER_RESULT" = success
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.12'
-      - run: python -m pip install pip-audit
-      - run: python -m pip_audit -r werewolf_web/requirements.txt --progress-spinner off
-
+  # Heavy suites run on master and the weekly schedule, not on every pull request.
   platform-smoke:
+    if: github.event_name != 'pull_request'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -75,6 +65,7 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.12'
+          cache: 'pip'
       - run: python -m pip install -r werewolf_web/requirements.txt
       - run: python -m unittest tests.test_api_contract tests.test_offline_web -q
         env:
@@ -82,6 +73,7 @@ jobs:
           LLM_API_KEY: ''
 
   browser-and-coverage:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -89,6 +81,7 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.12'
+          cache: 'pip'
       - run: python -m pip install -r werewolf_web/requirements.txt -r requirements-test.txt
       - run: python -m playwright install --with-deps chromium
       - run: python tests/browser/player_entry.py
@@ -98,9 +91,35 @@ jobs:
           LLM_API_KEY: ''
       - run: python -m coverage report
       - run: python -m coverage json -o output/coverage.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: branch-coverage
           path: output/coverage.json
           retention-days: 7
           if-no-files-found: error
+
+  # Required aggregate check: dependency audit, plus the heavy suites on full runs.
+  dependencies:
+    needs: [platform-smoke, browser-and-coverage]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the platform and browser suites on full runs
+        env:
+          PLATFORM_RESULT: ${{ needs.platform-smoke.result }}
+          BROWSER_RESULT: ${{ needs.browser-and-coverage.result }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "Platform and browser suites run on master and the weekly schedule."
+            exit 0
+          fi
+          test "$PLATFORM_RESULT" = "success"
+          test "$BROWSER_RESULT" = "success"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - run: python -m pip install pip-audit
+      - run: python -m pip_audit -r werewolf_web/requirements.txt --progress-spinner off
