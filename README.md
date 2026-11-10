@@ -52,6 +52,16 @@ See the [character library and artwork notes](docs/CHARACTERS.md).
 Custom names/personality settings remain available. Before each daytime exile
 vote, a living human gets one optional final reply, even after repeated questions.
 Offline play uses contextual choices instead of understanding arbitrary text.
+Newly generated offline replies use natural references rather
+than internal record numbers. Structured menus also expose strategy categories
+and trade-offs (pressure, protection, questions, role claims, discussion, waiting)
+for clients; these describe existing NPC reasoning, not guaranteed persuasion.
+
+**Android offline companion (experimental source):** [Night Table](mobile/android/README.md)
+provides a native mobile interface, classic free play, role/character selection,
+and on-device saves. Android 14+ ARM64; build from source. No model, server,
+campaign or cloud-save sync. The desktop/web game remains available below.
+
 Source-linked replies now have distinct explanation/reservation options and bounded
 NPC follow-ups. All 30 characters have authored conversational priorities, not
 30 independent AI models. See the [offline guide](docs/OFFLINE_GAME.md) for limits

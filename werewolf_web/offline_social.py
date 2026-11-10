@@ -61,12 +61,12 @@ def feedback_choices(events, observer, style, locale):
         rapport = relationships(events, observer, style).get(who, {}).get("rapport", 0)
         en = locale == "en"
         texts = {
-            "acknowledge": f"{who}, I heard your answer in record {ref}. That closes my question, not your identity." if en else
-                f"{who}，记录{ref}的解释我听到了。这条先说到这，不代表身份已经确定。",
-            "stand_firm": f"{who}, record {ref} answers my question, but does not settle my doubts. I will hear the others." if en else
-                f"{who}，记录{ref}回答了问题，但我仍有保留。先听其他人，不继续追着你问。",
-            "reconsider": f"{who}, after record {ref}, I will leave my judgment open and hear other accounts." if en else
-                f"{who}，听完记录{ref}，我先不把判断说死，再听其他人的说法。",
+            "acknowledge": f"{who}, that answers my question. It doesn't settle your role, but I'll leave it there." if en else
+                f"{who}，解释我听到了，这个问题先放下。身份还得继续看。",
+            "stand_firm": f"{who}, I hear you, but I'm not convinced. Let's hear the others." if en else
+                f"{who}，你解释了，但我还没被说服。先听其他人。",
+            "reconsider": f"{who}, I'll rethink my read after that. I want to hear another side." if en else
+                f"{who}，听完你的解释，我再想想，也听听别人怎么说。",
         }
         preferred = ("stand_firm" if style.caution + style.aggression > 1.25 and rapport <= .1
                      else "acknowledge" if style.loyalty + rapport > .65 else "reconsider")

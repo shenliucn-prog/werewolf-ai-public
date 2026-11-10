@@ -39,13 +39,13 @@ def reply_choices(events, actor, asker, locale, questions=()):
         target = own.get("accuse") or own.get("defend")
         position = ("suspected" if own.get("accuse") else "supported") if en else (
             "怀疑" if own.get("accuse") else "支持")
-        add("explain_stance", f"{asker}, in record {own['event_no']} I {position} {target}. That was my judgment, not a confirmed check." if en else
-            f"{asker}，我在记录{own['event_no']}里{position}{target}。那是我的判断，不是已证实的查验。")
-    add("reserve_judgment", f"{asker}, I heard your question in record {ref}. I have no new public evidence; I am reserving judgment, not clearing anyone." if en else
-        f"{asker}，记录{ref}的追问我听到了。我没有新的公开依据，先保留判断，不代表认谁是好人。")
+        add("explain_stance", f"{asker}, I said I {position} {target}. That was a read, not a check." if en else
+            f"{asker}，我之前说的是{position}{target}，是判断，不是查验。")
+    add("reserve_judgment", f"{asker}, I hear you. I have no new evidence, so I am not taking a side yet." if en else
+        f"{asker}，你的问题我听到了。没有新依据，我先不站队。")
     if question.get("accuse") == actor:
-        add("request_basis", f"{asker}, record {ref} suspects me. Please identify the statement or ballot behind that judgment." if en else
-            f"{asker}，记录{ref}里你怀疑我，请指出依据是哪句话或哪一票。")
+        add("request_basis", f"{asker}, you suspect me—but for which statement or vote?" if en else
+            f"{asker}，你怀疑我，依据到底是哪句话、哪一票？")
     return options
 
 
@@ -72,8 +72,8 @@ def contextual_choices(entries, seats, actor, locale):
             target, ref = r["target"], r["event_no"]
             result = r["result"] if en else ("好人" if r["result"] == "good" else "狼人")
             add(f"revealed:{ev['event_no']}:{ref}",
-                f"Record {ev['event_no']} reveals #{who} as Seer. In record {ref}, they called #{target} {result}. That report deserves review, not automatic certainty." if en else
-                f"记录{ev['event_no']}显示{who}号翻牌为预言家；其记录{ref}称{target}号是{result}。应重新考虑这份声明，但不能自动当作查验已证实。",
+                f"#{who} flipped Seer. They called #{target} {result}; let's revisit that claim, without assuming every report was truthful." if en else
+                f"{who}号翻牌是预言家，之前说{target}号是{result}。这条值得重新考虑，但还要核对当时的说法。",
                 "revealed_report")
     latest = {}
     for report in reports:

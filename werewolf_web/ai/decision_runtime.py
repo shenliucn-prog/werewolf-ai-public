@@ -10,7 +10,6 @@ import tempfile
 from dataclasses import replace
 from typing import Protocol
 
-import httpx
 from ..recovery import (
     SCHEMA_VERSION, check_version,
     require_str, require_int, require_number, require_bool,
@@ -143,6 +142,12 @@ output support. The common player validates every decision before applying it.
         cfg = self.config
         if not cfg.enabled or not cfg.model:
             raise ModelTurnError("Model is not configured/enabled; choose a working LLM connection.")
+        # Offline sessions share the decision types, not the API transport.
+        # Keep the network dependency outside their import graph.
+        try:
+            import httpx
+        except ImportError:
+            raise ModelTurnError("Model API dependency is missing; install the runtime requirements. No offline substitution.") from None
         headers = {"Authorization": "Bearer " + cfg.api_key} if cfg.api_key else {}
         body = {"model": cfg.model, "messages": [
             {"role": "system", "content": "You play a fictional Werewolf game. Use only supplied lawful data. "

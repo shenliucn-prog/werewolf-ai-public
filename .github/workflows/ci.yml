@@ -41,6 +41,10 @@ jobs:
         env:
           LLM_ENABLED: 'false'
           LLM_API_KEY: ''
+      - name: Android bridge and theme contracts
+        run: python -m unittest discover -s mobile/android/tests -q
+        env:
+          PYTHONPATH: .:mobile/android/app/src/main/python
       - run: npm run check
       - run: npm ci
       - run: npm test

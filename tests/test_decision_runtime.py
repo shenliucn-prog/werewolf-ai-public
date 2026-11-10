@@ -30,7 +30,7 @@ class DecisionRuntimeTest(unittest.IsolatedAsyncioTestCase):
             return httpx.Response(200, json={"choices": [{"message": {"content": '{"ready":true}'}}]})
         client = httpx.Client(transport=httpx.MockTransport(respond))
         runtime = APIPlayerRuntime(self.config())
-        with patch("werewolf_web.ai.decision_runtime.httpx.Client", return_value=client):
+        with patch("httpx.Client", return_value=client):
             runtime.preflight()
         self.assertTrue(runtime.verified)
         self.assertEqual(str(requests[0].url), "http://local.example/v1/chat/completions")
@@ -42,7 +42,7 @@ class DecisionRuntimeTest(unittest.IsolatedAsyncioTestCase):
             (200, {"choices": [{"message": {"content": '{"ready":true}', "tool_calls": [{}]}}]})]:
             client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(status, json=payload)))
             runtime = APIPlayerRuntime(self.config(api_key="TEST_SECRET"))
-            with patch("werewolf_web.ai.decision_runtime.httpx.Client", return_value=client):
+            with patch("httpx.Client", return_value=client):
                 with self.assertRaises(ModelTurnError) as caught:
                     runtime.preflight()
             self.assertFalse(runtime.verified)
@@ -63,7 +63,7 @@ class DecisionRuntimeTest(unittest.IsolatedAsyncioTestCase):
             return httpx.Response(200, json={"choices": [{"message": {"content": '{"ready":true}'}}]})
         client = httpx.Client(transport=httpx.MockTransport(respond))
         runtime = APIPlayerRuntime(self.config(api_key="TEST_SECRET", reasoning_effort="high", reasoning_param="reasoning_effort"))
-        with patch("werewolf_web.ai.decision_runtime.httpx.Client", return_value=client):
+        with patch("httpx.Client", return_value=client):
             runtime.preflight()
 
     def test_generic_agent_wrapper_protocol_works_without_codex(self):
