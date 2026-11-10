@@ -6,16 +6,16 @@ from pathlib import Path
 
 
 class OfflineDependencyTest(unittest.TestCase):
-    def run_isolated(self, source):
+    def run_isolated(self, source, *arguments):
         result = subprocess.run(
-            [sys.executable, "-S", "-c", source],
+            [sys.executable, "-S", "-c", source, *arguments],
             cwd=Path(__file__).resolve().parents[1],
             capture_output=True, text=True, timeout=60,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_classic_game_and_disk_restore_without_site_packages_or_network(self):
-        self.run_isolated('''
+        source = '''
 import asyncio
 import json
 import os
@@ -50,7 +50,7 @@ async def finish(session):
     assert session.campaign_counted is False
 
 async def main(directory):
-    for locale in ("en", "zh-CN"):
+    for locale in (sys.argv[1],):
         path = os.path.join(directory, locale + ".json")
         session = WebOfflineSession(seed=7, locale=locale,
             session_id="no-sdk-" + locale, checkpoint_path=path)
@@ -67,7 +67,13 @@ async def main(directory):
 
 with tempfile.TemporaryDirectory() as directory:
     asyncio.run(main(directory))
-''')
+'''
+        # Each complete game gets the existing bounded process timeout. Running
+        # two languages in one process made the combined disk work exceed it on
+        # CI. Keep all gameplay, network isolation and restore assertions intact.
+        for locale in ("en", "zh-CN"):
+            with self.subTest(locale=locale):
+                self.run_isolated(source, locale)
 
     def test_api_without_http_dependency_fails_explicitly(self):
         self.run_isolated('''
