@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Add the standalone Android offline companion source with native role/character selection, strategy choices, local saves and light/dark themes.", "zh": "纳入独立 Android 离线客户端源码，包含原生身份／人物选择、策略选项、本地存档和深浅主题。"},
+  "compatibility": {"en": "Desktop save schemas unchanged. Mobile retains application ID local.werewolf.probe; upgrades require the same signing key. Mobile and desktop saves remain separate. Source integration only, not a signed release.", "zh": "桌面存档格式不变。手机保留 local.werewolf.probe 应用 ID，升级需要同一签名；手机与桌面存档独立。本次仅合入源码，不发布签名版本。"},
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md", "mobile/android/README.md"],
+  "reason": "Document the new experimental mobile entry and portable build, scope and save boundaries in both languages."
+}

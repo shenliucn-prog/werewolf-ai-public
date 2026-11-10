@@ -19,6 +19,7 @@ from .check_claims import audit, finding_text
 from .offline_dialogue import contextual_choices, shortlist, choose_reaction, reply_choices
 from .social_actions import annotate
 from .offline_social import feedback_choices
+from .offline_approaches import describe
 
 
 def words(locale, zh, en):
@@ -45,13 +46,13 @@ def speech_choices(session, actor, reply=False):
     if not reply:
         for role in dict.fromkeys(e.board["roles"]):
             label = role_name(lang, role, ROLE_META[role]["cn"])
-            add(f"claim:{role}", "声明 / Claim", words(lang, f"我声明自己是{label}。这是我的身份声明。", f"I claim to be {label}. This is my claim."), claim=role)
+            add(f"claim:{role}", "声明 / Claim", words(lang, f"我跳{label}，大家可以对照后面的行动看。", f"I claim {label}. Judge me by what I do next."), claim=role)
     for seat in e.alive_seats():
         if seat.pos == actor.pos:
             continue
         target = f"#{seat.pos} {seat.name}"
-        add(f"suspect:{seat.pos}", "怀疑 / Suspect", words(lang, f"我暂时怀疑{target}，这是判断，不是查验。", f"I provisionally suspect {target}; this is a judgment, not a check."), accuse=seat.name)
-        add(f"support:{seat.pos}", "支持 / Support", words(lang, f"我暂时支持{target}，但不把这个判断当作事实。", f"I provisionally support {target}, without treating that judgment as fact."), defend=seat.name)
+        add(f"suspect:{seat.pos}", "怀疑 / Suspect", words(lang, f"我现在更怀疑{target}，想把重点放在他身上。", f"I suspect {target}. That is where I want the discussion to focus."), accuse=seat.name)
+        add(f"support:{seat.pos}", "支持 / Support", words(lang, f"我倾向保{target}，今天先别急着出他。", f"I lean toward protecting {target}. I don't want to rush their exile."), defend=seat.name)
         if not reply:
             add(f"ask:{seat.pos}", "追问 / Ask", words(lang, f"请{target}说明目前的判断依据。", f"Please, {target}, explain the basis of your current judgment."), question_to=seat.name)
             if e.night_count:
@@ -66,7 +67,7 @@ def speech_choices(session, actor, reply=False):
         reporter = alive.get(finding["report"]["actor"])
         if finding["kind"] == "compatible_with_flip" or not reporter or reporter.pos == actor.pos:
             continue
-        add(f"audit:{finding['report']['event_no']}:{i}", "对账 / Audit", finding_text(finding, lang),
+        add(f"audit:{finding['report']['event_no']}:{i}", "对账 / Audit", finding_text(finding, lang, include_refs=False),
             question_to=reporter.name)
     # A bounded menu of exact recent public sources; any actor can cite one.
     sources = [event for event in session._events if event.get("type") in ("speech", "ballots", "flip", "exile")][-8:]
@@ -79,8 +80,8 @@ def speech_choices(session, actor, reply=False):
         for stance in ("agree", "challenge"):
             boundary = words(lang, "这是玩家声明，不代表已证实。", "This is a player statement, not proven truth.") if event["type"] == "speech" else words(lang, "这是公开事件；它不直接证明其他人的身份。", "This is a public event; it does not directly establish anyone else's role.")
             text = words(lang,
-                f"我{'引用' if stance == 'agree' else '质疑对这条记录的推论'}记录{number}「{quote}」。{boundary}",
-                f"I {'cite' if stance == 'agree' else 'question conclusions drawn from'} record {number}: “{quote}”. {boundary}")
+                f"我{'赞同这句话' if stance == 'agree' else '对这句话的推论有疑问'}：「{quote}」。{boundary}",
+                f"I {'agree with this statement' if stance == 'agree' else 'question this conclusion'}: “{quote}”. {boundary}")
             # A quote is attribution, not fresh independent accusation evidence.
             add(f"cite:{number}:{stance}", "引用 / Cite", text, protected_facts=(quote,))
     contextual = contextual_choices(session.public_record.entries,
@@ -99,7 +100,7 @@ def action_choices(session, kind, data):
             choices = reply_choices(session._events, session.engine.player_seat().name,
                                     data["from"], lang, data.get("questions", ())) + choices
         suggested = {c["id"] for c in shortlist(choices, answering=kind == "table_answer")}
-        result = [{**c, "suggested": c["id"] in suggested,
+        result = [{**describe(c, lang), "suggested": c["id"] in suggested,
                    "payload": {key: c["label"], "offline_speech": c["speech"]}} for c in choices]
         if kind == "table_answer":
             result.insert(0, {"id": "skip", "group": words(lang, "回应", "Respond"),
@@ -250,8 +251,8 @@ class ChoiceAgent(StrategicNPCAgent):
                 return Speech(text=words(self.engine.locale, f"{interrupter}，我之前说的是「{quote}」。我没有额外的公开依据，你可以保留判断。",
                     f"{interrupter}, I previously said: “{quote}”. I have no additional public evidence; you can reserve judgment."),
                     protected_facts=(quote,))
-            return Speech(text=words(self.engine.locale, f"{interrupter}，我的完整说法在记录{ev['event_no']}。我暂时没有额外依据。",
-                                     f"{interrupter}, my full statement is in record {ev['event_no']}. I have no additional basis yet."))
+            return Speech(text=words(self.engine.locale, f"{interrupter}，我暂时没有更多依据，先保留判断。",
+                                     f"{interrupter}, I have no additional basis yet. I am keeping my judgment open."))
         return Speech(text=words(self.engine.locale, "我暂时没有公开证据，不把猜测说成事实。", "I have no public evidence yet; my suspicion is not fact."))
 
     def table_interject(self, speaker, speech):

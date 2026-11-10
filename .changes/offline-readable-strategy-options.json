@@ -1,0 +1,13 @@
+{
+  "summary": {
+    "en": "Use natural offline dialogue references and expose distinct strategy categories with truthful trade-offs in choice metadata.",
+    "zh": "离线发言改用自然引用，并为选项提供不同策略分类与真实代价说明。"
+  },
+  "docs_impact": "readme",
+  "docs": ["README.md", "README.zh-CN.md", "docs/OFFLINE_GAME.md"],
+  "reason": "User-facing offline speech changes and additive menu metadata, also used by the experimental Android companion added in the same PR.",
+  "compatibility": {
+    "en": "No save/config schema change. Structured source IDs and option IDs remain; old saved utterances are not rewritten. New menu metadata does not enter accepted speech payloads.",
+    "zh": "存档与配置格式不变，保留结构化来源编号和选项编号；旧存档发言不重写，新增菜单说明不进入已接受发言内容。"
+  }
+}

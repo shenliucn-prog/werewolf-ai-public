@@ -118,6 +118,10 @@ def allowed_path(name):
         return False
     if path.suffix in {".key", ".pem", ".log", ".pyc"} or path.name == ".DS_Store":
         return False
+    if name.startswith("mobile/android/") and (
+            any(part in {"build", ".gradle", ".kotlin", ".idea"} for part in path.parts)
+            or path.name == "local.properties" or path.suffix in {".apk", ".aab", ".jks", ".keystore"}):
+        return False
     if name.startswith(("werewolf_web/data/reviews/", "werewolf_web/data/npc_memory/",
                         "werewolf_web/data/checkpoints/", "werewolf_web/data/campaign/",
                         "werewolf_web/data/perf/",

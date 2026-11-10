@@ -39,6 +39,24 @@ it is not a paced replay viewer.
 
 ## Play with options
 
+Newly generated NPC replies identify the person and statement naturally rather
+than speaking internal event numbers. Source IDs remain in structured actions for
+audit/recovery. Historical saved speech is not rewritten; explicit audit queries
+still show references. Option metadata (`approach`, `consequence`) lets clients
+present distinct strategies instead of only several cautious paraphrases.
+
+Pressure records an accusation, protection records a defense, questions enter the
+host's bounded reply queue, and claims enter role/counterclaim memory. NPCs weigh
+the speaker's credibility; a later flip can vindicate or undermine a stance.
+Merely citing another person is not independent evidence. Waiting does not add
+an accusation. There are no guaranteed persuasion bonuses or hidden-role hints.
+
+新生成的 NPC 回应直接说是谁、哪句话，不再说“记录40”；内部编号仍用于对账和
+恢复，旧存档原话不重写，主动查询对账仍可看编号。菜单附带策略分类和代价说明：
+踩人、保人、追问和报身份分别进入不同的判断或行动路径；引用不算独立证据，
+观望不增加指控。说服力取决于听者对发言者的信任，翻牌后会重新审视站队。
+这些是规则的说明，不是固定好感加分、必胜建议或新平衡认证。
+
 During discussion, choose directly from up to three contextual responses and
 neutral listening. “Other responses” opens the complete category menu; 0 returns.
 Night skills and ballots remain explicit choices. Categories include

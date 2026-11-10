@@ -51,5 +51,5 @@ class ReplyIntegrationTest(unittest.IsolatedAsyncioTestCase):
                       "question_to": agent.name, "text": "Why?"})
         response = agent.table_reply(player.name)
         self.assertIn(player.name, response.text)
-        self.assertIn("record", response.text)
+        self.assertNotRegex(response.text, r"(?i)records?\s*\d+|记录\s*\d+")
         self.assertIsNone(response.question_to)

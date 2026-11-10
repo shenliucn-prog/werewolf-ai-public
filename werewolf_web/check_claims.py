@@ -101,7 +101,7 @@ def audit(entries, *, limit=16):
                         "Compatibility with a flip does not establish a real check. Hidden wolves read good."}
 
 
-def finding_text(finding, locale):
+def finding_text(finding, locale, include_refs=True):
     r = finding["report"]
     labels = {
         "invalid_target": ("目标座位不合法", "invalid target seat"),
@@ -119,8 +119,10 @@ def finding_text(finding, locale):
     reference = "/".join(map(str, refs))
     detail = labels[finding["kind"]][en]
     if en:
-        return f"Records {reference}: #{r['actor']}'s night {r['night']} report about #{r['target']}: {detail}. This does not prove the speaker is a wolf."
-    return f"记录{reference}：{r['actor']}号对第{r['night']}夜查验{r['target']}号的声明，{detail}；这不直接证明发言者是狼人。"
+        lead = f"Records {reference}: " if include_refs else ""
+        return f"{lead}#{r['actor']}'s night {r['night']} report about #{r['target']}: {detail}. This does not prove the speaker is a wolf."
+    lead = f"记录{reference}：" if include_refs else ""
+    return f"{lead}{r['actor']}号对第{r['night']}夜查验{r['target']}号的声明，{detail}；这不直接证明发言者是狼人。"
 
 
 def query_text(entries, locale):

@@ -1,0 +1,7 @@
+{
+  "summary": {"en": "Decouple the offline engine from the optional HTTP client import and verify standard-library-only full games.", "zh": "解除离线引擎对 HTTP 客户端导入的依赖，并验证仅标准库环境中的完整对局。"},
+  "docs_impact": "none",
+  "docs": [],
+  "reason": "Internal dependency boundary only; existing installation and player entry points are unchanged. The separate Android runtime probe is not a released mobile product.",
+  "compatibility": {"en": "No save or configuration schema changes. API play still requires its HTTP dependency and fails explicitly if absent; it never substitutes offline decisions.", "zh": "存档与配置格式不变。API 模式仍需要 HTTP 依赖，缺失时明确失败，不会降级为离线决策。"}
+}
